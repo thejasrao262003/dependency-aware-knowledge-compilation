@@ -1,0 +1,9 @@
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.dakc/
+/wiki/
+/bench-work/
+dist/
+*.egg-info/

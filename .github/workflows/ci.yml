@@ -1,0 +1,31 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - name: Install
+        run: |
+          uv venv --python ${{ matrix.python-version }}
+          uv pip install -e '.[dev]'
+      - name: Tests (unit, integration, regression, benchmark properties)
+        run: uv run --no-sync pytest
+      - name: Benchmark smoke (100 docs, deterministic mock provider)
+        run: uv run --no-sync python -m benchmarks.run --sizes 100 --reps 1 --out bench-ci.json
+      - name: Example corpus end-to-end
+        run: |
+          mkdir -p /tmp/demo && cp -r examples/sample-knowledge-base /tmp/demo/knowledge
+          cd /tmp/demo
+          uv run --project "$GITHUB_WORKSPACE" --no-sync dakc ingest ./knowledge
+          uv run --project "$GITHUB_WORKSPACE" --no-sync dakc verify --against-full

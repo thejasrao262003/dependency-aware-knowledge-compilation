@@ -1,0 +1,41 @@
+[project]
+name = "dakc"
+version = "0.1.0"
+description = "Dependency-Aware Knowledge Compiler: incremental, claim-level recompilation of LLM-maintained knowledge bases"
+readme = "README.md"
+requires-python = ">=3.12"
+license = { text = "Apache-2.0" }
+dependencies = [
+    "blake3>=1.0",
+    "networkx>=3.3",
+    "pydantic>=2.7",
+    "typer>=0.12",
+    "rich>=13",
+    "markdown-it-py>=3.0",
+    "beautifulsoup4>=4.12",
+    "rapidfuzz>=3.9",
+    "httpx>=0.27",
+]
+
+[project.optional-dependencies]
+pdf = ["pymupdf>=1.24"]
+watch = ["watchdog>=4"]
+api = ["fastapi>=0.110", "uvicorn>=0.29"]
+anthropic = ["anthropic>=1.0"]
+dev = ["pytest>=8", "pymupdf>=1.24", "watchdog>=4", "fastapi>=0.110", "uvicorn>=0.29"]
+
+[project.scripts]
+dakc = "dakc.cli:main"
+
+[build-system]
+requires = ["hatchling>=1.24"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/dakc"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+markers = ["slow: larger benchmark-style tests"]
+filterwarnings = ["ignore:Using `httpx` with `starlette.testclient`"]

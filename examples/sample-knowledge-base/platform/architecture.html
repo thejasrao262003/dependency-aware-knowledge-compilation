@@ -1,0 +1,12 @@
+<!doctype html>
+<html><head><title>Architecture</title></head>
+<body>
+<h1>Platform architecture</h1>
+<p>The Gateway service routes requests to the Ledger service and the Billing service.</p>
+<p>All services run on Kubernetes in two regions.</p>
+<h2>Observability</h2>
+<ul>
+  <li>Prometheus scrapes metrics from every service.</li>
+  <li>Grafana dashboards read from Prometheus.</li>
+</ul>
+</body></html>

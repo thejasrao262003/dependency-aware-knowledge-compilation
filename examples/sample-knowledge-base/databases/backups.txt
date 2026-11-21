@@ -1,0 +1,5 @@
+Backup policy
+
+pgBackRest keeps 14 days of PostgreSQL backups in S3.
+
+Restores of the Ledger database are rehearsed monthly by the SRE team.

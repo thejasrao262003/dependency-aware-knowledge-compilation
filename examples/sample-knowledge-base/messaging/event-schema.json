@@ -1,0 +1,6 @@
+{
+  "topic": "payments.v1",
+  "producer": "Ledger",
+  "consumers": ["Billing", "Analytics"],
+  "format": "Avro"
+}

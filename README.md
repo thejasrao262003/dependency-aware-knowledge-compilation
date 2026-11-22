@@ -46,6 +46,10 @@ the per-commit costs and the limitations.
 > SQLite, no GPU, no network required (deterministic providers are the
 > default). See [what is not done](#limitations).
 
+**Who uses it, and how:** [docs/using-dakc-by-role.md](docs/using-dakc-by-role.md)
+covers docs maintainers, developers, CI owners, solution architects,
+reviewers and AI agents.
+
 ## Why this exists
 
 The research phase audited twelve open-source LLM-wiki and graph-RAG projects
@@ -173,6 +177,7 @@ free heuristic extractor, so its page and summary counts are labelled an
 | `dakc serve` | Local web UI and read-only REST API (`/status /check /plan /graph /artifacts /artifacts/{id}[/content\|/trace\|/downstream] /builds /diff /duplicates`) |
 | `dakc mcp [--read-only]` | MCP server for AI agents ([below](#mcp-server-for-ai-agents)) |
 | `dakc watch` | Recompile incrementally on file changes |
+| `dakc review --base REF` | Knowledge diff against a git ref: facts added and retracted, pages affected, LLM calls and cost; never calls a model |
 | `dakc sources` | Configured sources: type, path prefix, location, documents at HEAD ([below](#sources-and-publishers)) |
 | `dakc publish [NAME] [--dry-run] [--reset]` | Bring publishers up to date with HEAD; retries what a failed publish left pending |
 
@@ -208,11 +213,12 @@ Module functions: `dakc.open(path)`, `dakc.init(path, source_dir=...)`,
 `dakc.ingest(directory, workspace)`. `KnowledgeBase` methods: `status`,
 `check`, `plan`, `compile`, `artifacts`, `read`, `explain`, `trace`,
 `downstream`, `graph_stats`, `export_graph`, `builds`, `diff`, `duplicates`,
-`verify`, `rollback`. Every result is a dataclass with `to_dict()`.
+`verify`, `rollback`, `sources`, `publish`. Every result is a dataclass with `to_dict()`.
 
 Errors derive from `dakc.DakcError`: `WorkspaceNotFound`, `ArtifactNotFound`,
 `InvalidArgument`, `BuildLocked`, `CompileFailed` (with `.preserved`: HEAD
-still points at the previous build), `CostNotAllowed` and `RollbackError`.
+still points at the previous build), `CostNotAllowed`, `RollbackError`,
+`SourceError` and `PublishError`.
 `compile` and `rollback` hold the workspace build lock. Read methods never take
 it and see a consistent snapshot while a build runs. A `KnowledgeBase` holds
 one SQLite connection, so use one per thread. Details are in
@@ -303,6 +309,18 @@ plugins:
 
 See [docs/integrations/mkdocs.md](docs/integrations/mkdocs.md) and the
 runnable [examples/mkdocs-site](examples/mkdocs-site/mkdocs.yml).
+
+**GitHub pull requests.** The action comments on every pull request with what
+the change does to the knowledge base: facts added and retracted, pages
+affected, and the LLM calls and cost of applying it. It never calls a model.
+
+```yaml
+- uses: thejasrao262003/dependency-aware-knowledge-compilation@v0.5.0
+  with:
+    workspace: .
+```
+
+See [docs/integrations/github-action.md](docs/integrations/github-action.md).
 
 **Real documentation history.**
 [examples/fastapi-docs](examples/fastapi-docs/README.md) replays the last 50

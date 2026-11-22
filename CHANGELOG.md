@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v0.5.0: bounded fan-in, sources and publishers, and a knowledge diff for pull requests
 
 ### Upgrading from 0.4
 
@@ -54,6 +54,16 @@
       `SourceError`, `PublishError`.
     - `dakc watch` watches every filesystem source, and refuses to start
       when there is none.
+
+- **A knowledge diff for pull requests.**
+  - `dakc review --base REF` compiles the base and the head with the free
+    deterministic provider. It reports the documents changed, the facts added
+    and retracted (with their text and sources), the pages and summaries
+    affected, and the LLM calls and estimated cost of applying the change.
+  - A GitHub Action (`action.yml`) posts it as a pull request comment,
+    updated in place, and caches the base build between runs. See
+    `docs/integrations/github-action.md`.
+  - This repository reviews its own pull requests with it.
 
 ### Changed
 

@@ -459,6 +459,31 @@ def publish(
         raise typer.Exit(1)
 
 
+@app.command()
+def review(
+    workspace: WS = Path("."),
+    base: Annotated[str, typer.Option("--base", help="Git ref to compare with, e.g. origin/main or a commit sha.")] = "origin/main",
+    state_dir: Annotated[Optional[Path], typer.Option(help="Where the base build is kept between runs (cache it in CI).")] = None,
+    price: Annotated[Optional[list[str]], typer.Option("--price", help="LABEL:INPUT:OUTPUT in USD per million tokens; repeatable.")] = None,
+    fmt: Annotated[str, typer.Option("--format", help="markdown | json")] = "markdown",
+    output: Annotated[Optional[Path], typer.Option("--output", "-o", help="Write to this file instead of stdout.")] = None,
+    json_output: Annotated[Optional[Path], typer.Option("--json-output", help="Also write the result as JSON to this file.")] = None,
+    limit: Annotated[int, typer.Option(help="Items listed per section.")] = 25,
+) -> None:
+    """Knowledge diff against a git ref, for pull requests: facts added and retracted, pages affected, LLM calls and cost.
+    Uses the free deterministic provider, so it never calls or pays a model."""
+    from dakc.review import run
+
+    with _errors():
+        r, text = run(workspace, base, state_dir=state_dir, prices=price, fmt=fmt, limit=limit)
+    if json_output is not None:
+        json_output.write_text(json.dumps(r.to_dict(), indent=1, ensure_ascii=False), encoding="utf-8")
+    if output is not None:
+        output.write_text(text, encoding="utf-8")
+    else:
+        typer.echo(text)
+
+
 @app.command(name="rollback")
 def rollback_cmd(
     workspace: WS = Path("."),

@@ -1,0 +1,118 @@
+name: DAKC knowledge diff
+description: >-
+  Comment on pull requests with what the change does to your compiled knowledge base: facts added and
+  retracted, pages affected, and the LLM calls and cost of applying it. Never calls or pays a model.
+author: thejasrao262003
+branding:
+  icon: book-open
+  color: blue
+
+inputs:
+  workspace:
+    description: Directory holding dakc.toml, relative to the repository root.
+    default: "."
+  base:
+    description: Git ref to compare with. Defaults to the pull request's base commit.
+    default: ""
+  price:
+    description: >-
+      Optional model prices for the cost line, one LABEL:INPUT:OUTPUT per line, in USD per million tokens
+      (e.g. "gpt-5-mini:0.25:2.00").
+    default: ""
+  comment:
+    description: Post (or update) a pull request comment. The result is always written to the job summary.
+    default: "true"
+  limit:
+    description: Items listed per section of the comment.
+    default: "25"
+  dakc-version:
+    description: DAKC version from PyPI (e.g. "0.5.0"). Empty uses the DAKC at this action's own ref.
+    default: ""
+  github-token:
+    description: Token used to post the comment (needs pull-requests write).
+    default: ${{ github.token }}
+
+outputs:
+  has-changes:
+    description: '"true" when the change affects the knowledge base.'
+    value: ${{ steps.review.outputs.has-changes }}
+  llm-calls:
+    description: LLM calls compiling the change would make.
+    value: ${{ steps.review.outputs.llm-calls }}
+  report:
+    description: Path of the Markdown report.
+    value: ${{ steps.review.outputs.report }}
+
+runs:
+  using: composite
+  steps:
+    - uses: astral-sh/setup-uv@1db35dd8eee11c5894872e0b383ae6c406cf738d # v10.4.0
+
+    - id: refs
+      shell: bash
+      env:
+        INPUT_BASE: ${{ inputs.base }}
+        PR_BASE: ${{ github.event.pull_request.base.sha }}
+      run: |
+        base="${INPUT_BASE:-$PR_BASE}"
+        if [ -z "$base" ]; then
+          echo "::error::no base to compare with: set the 'base' input outside pull_request events"; exit 1
+        fi
+        if ! git cat-file -e "$base^{commit}" 2>/dev/null; then
+          git fetch --no-tags --depth=1 origin "$base"
+        fi
+        echo "base=$base" >> "$GITHUB_OUTPUT"
+
+    - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: ${{ runner.temp }}/dakc-review-state
+        key: dakc-review-${{ runner.os }}-${{ inputs.workspace }}-${{ steps.refs.outputs.base }}
+        restore-keys: dakc-review-${{ runner.os }}-${{ inputs.workspace }}-
+
+    - id: review
+      shell: bash
+      env:
+        WORKSPACE: ${{ inputs.workspace }}
+        BASE: ${{ steps.refs.outputs.base }}
+        PRICES: ${{ inputs.price }}
+        LIMIT: ${{ inputs.limit }}
+        DAKC_VERSION: ${{ inputs.dakc-version }}
+        ACTION_PATH: ${{ github.action_path }}
+      run: |
+        if [ -n "$DAKC_VERSION" ]; then from="dakc==$DAKC_VERSION"; else from="$ACTION_PATH"; fi
+        args=()
+        while IFS= read -r p; do
+          p="$(echo "$p" | xargs)"
+          [ -n "$p" ] && args+=(--price "$p")
+        done <<< "$PRICES"
+        out="$RUNNER_TEMP/dakc-knowledge-diff.md"
+        json="$RUNNER_TEMP/dakc-knowledge-diff.json"
+        uvx --from "$from" dakc review --workspace "$WORKSPACE" --base "$BASE" \
+          --state-dir "$RUNNER_TEMP/dakc-review-state" --limit "$LIMIT" --output "$out" --json-output "$json" "${args[@]}"
+        cat "$out" >> "$GITHUB_STEP_SUMMARY"
+        {
+          echo "report=$out"
+          echo "has-changes=$(jq -r '.has_changes' "$json")"
+          echo "llm-calls=$(jq -r '.llm_calls' "$json")"
+        } >> "$GITHUB_OUTPUT"
+
+    - if: inputs.comment == 'true' && github.event.pull_request.number
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.github-token }}
+        REPO: ${{ github.repository }}
+        PR: ${{ github.event.pull_request.number }}
+        REPORT: ${{ steps.review.outputs.report }}
+      run: |
+        marker='<!-- dakc-knowledge-diff -->'
+        post() {
+          id=$(gh api "repos/$REPO/issues/$PR/comments" --paginate \
+            --jq ".[] | select(.body | startswith(\"$marker\")) | .id" | head -n 1)
+          if [ -n "$id" ]; then
+            gh api -X PATCH "repos/$REPO/issues/comments/$id" -F body=@"$REPORT" > /dev/null && echo "updated comment $id"
+          else
+            gh api -X POST "repos/$REPO/issues/$PR/comments" -F body=@"$REPORT" > /dev/null && echo "posted a comment"
+          fi
+        }
+        # A fork's pull request gets a read-only token: report in the job summary instead of failing.
+        post || echo "::warning::could not comment on the pull request (needs pull-requests: write); the report is in the job summary"

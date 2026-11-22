@@ -1,0 +1,27 @@
+name: knowledge diff
+
+# DAKC reviewing its own pull requests: what each change does to the knowledge base
+# compiled from docs/ (facts added and retracted, pages affected, LLM calls and cost).
+# It runs the action from this checkout (uses: ./); other repositories use
+# thejasrao262003/dependency-aware-knowledge-compilation@<tag> instead.
+
+on:
+  pull_request:
+    paths: ["docs/**", ".github/dakc/**", "action.yml", "src/dakc/review.py"]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  knowledge-diff:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - uses: ./
+        with:
+          workspace: .github/dakc
+          price: |
+            gpt-5-mini:0.25:2.00

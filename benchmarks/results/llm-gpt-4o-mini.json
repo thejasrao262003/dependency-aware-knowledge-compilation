@@ -286,6 +286,13 @@
     "page": 61,
     "summary": 2
    },
+   "citation_coverage": {
+    "cited": 297,
+    "coverage": 0.7209,
+    "invalid_markers": 0,
+    "note": "measured after the run on its full-build store (report mode)",
+    "sentences": 412
+   },
    "counts": {
     "claim": 334,
     "edges": 1958,

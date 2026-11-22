@@ -27,6 +27,10 @@ class InjectedFault(RuntimeError):
     """Raised by :class:`FaultInjector` to simulate a failure."""
 
 
+class ConcurrentBuildError(RuntimeError):
+    """HEAD moved between loading the state and committing (a concurrent writer)."""
+
+
 class FaultInjector:
     """Raise :class:`InjectedFault` at the N-th event of a named point.
 
@@ -40,11 +44,14 @@ class FaultInjector:
         spec = spec if spec is not None else os.environ.get("DAKC_FAULT", "")
         self.targets: dict[str, int] = {}
         self.hard_exit: set[str] = set()
+        self.pause: set[str] = set()
         for part in filter(None, (p.strip() for p in spec.split(","))):
             point, n, mode = (part.split(":") + ["", ""])[:3]
             self.targets[point] = int(n or 1)
             if mode == "exit":  # simulate a killed process instead of an exception
                 self.hard_exit.add(point)
+            elif mode == "pause":  # hold the build open for 2 s (concurrency tests)
+                self.pause.add(point)
         self.counts: dict[str, int] = {}
 
     def tick(self, point: str, n: int = 1) -> None:
@@ -52,6 +59,12 @@ class FaultInjector:
             return
         self.counts[point] = self.counts.get(point, 0) + n
         if self.counts[point] >= self.targets[point]:
+            if point in self.pause:
+                import time
+
+                if self.counts[point] - n < self.targets[point]:
+                    time.sleep(2.0)
+                return
             if point in self.hard_exit:
                 os._exit(137)  # no cleanup, no rollback: like SIGKILL / power loss
             raise InjectedFault(f"injected fault at {point} #{self.counts[point]}")
@@ -83,9 +96,21 @@ class ChangeSet:
         }
 
 
-def commit(store: Store, build_id: int, cs: ChangeSet, versions: dict[str, int], stats: dict, fault: FaultInjector | None = None) -> None:
+def commit(
+    store: Store,
+    build_id: int,
+    cs: ChangeSet,
+    versions: dict[str, int],
+    stats: dict,
+    fault: FaultInjector | None = None,
+    expected_head: int | None = None,
+) -> None:
     fault = fault or FaultInjector("")
     with store.transaction() as c:
+        if expected_head is not None and store.head != expected_head:
+            raise ConcurrentBuildError(
+                f"HEAD moved from build {expected_head} to {store.head} while this build was computing; nothing was committed"
+            )
         written = 0
 
         def tick(n: int) -> None:
@@ -163,6 +188,7 @@ def rollback(store: Store, to_build: int) -> int:
         new_id = int(cur.lastrowid)
         store.set_meta("head", str(new_id))
         store.set_meta("config_fingerprint", target.stats.get("config_fingerprint", "") if target else "")
+        store.set_meta("compiler_versions", json.dumps(target.stats.get("compiler_versions", {}) if target else {}, sort_keys=True))
     return new_id
 
 

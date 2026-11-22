@@ -1,0 +1,535 @@
+{
+ "machine": {
+  "cpu": "Apple M5",
+  "cpu_count": 10,
+  "date": "2026-11-22T08:14:52Z",
+  "git_commit": "4dde25d",
+  "platform": "macOS-27.2-arm64-arm-64bit",
+  "provider": "mock (deterministic; tokens estimated as ceil(chars/4))",
+  "python": "3.12.13"
+ },
+ "profile": "realistic",
+ "reps": 3,
+ "sizes": [
+  {
+   "initial_build": {
+    "counts": {
+     "claim": 329123,
+     "edges": 1906814,
+     "entity": 10002,
+     "index": 1,
+     "page": 10002,
+     "passage": 167317,
+     "relationship": 156920,
+     "source": 20000,
+     "summary": 227
+    },
+    "llm_calls": 177546,
+    "seconds": 112.439
+   },
+   "n_docs": 20000,
+   "profile": "realistic",
+   "reps": 1,
+   "scenarios": {
+    "S0_no_change": {
+     "change": {
+      "changed": []
+     },
+     "oracle_changed_artifacts": 0,
+     "strategies": {
+      "dakc": {
+       "artifact_versions_written": 0,
+       "claims_regenerated": 0,
+       "edge_mismatches": 0,
+       "equivalent_to_full_rebuild": true,
+       "extraction_cache_hits": 0,
+       "input_tokens_est": 0,
+       "llm_calls": 0,
+       "output_tokens_est": 0,
+       "pages_cutoff": 0,
+       "pages_regenerated": 0,
+       "pages_rerendered_no_llm": 0,
+       "passages_reextracted": 0,
+       "processed_sources": 0,
+       "seconds_all": [
+        11.47
+       ],
+       "seconds_median": 11.47,
+       "stale_artifacts_retained": 0,
+       "status": "noop",
+       "summaries_regenerated": 0,
+       "unaffected_artifacts_modified": 0,
+       "unnecessary_regenerations": 0
+      },
+      "file": {
+       "artifact_versions_written": 0,
+       "claims_regenerated": 0,
+       "edge_mismatches": 0,
+       "equivalent_to_full_rebuild": true,
+       "extraction_cache_hits": 0,
+       "input_tokens_est": 0,
+       "llm_calls": 0,
+       "output_tokens_est": 0,
+       "pages_cutoff": 0,
+       "pages_regenerated": 0,
+       "pages_rerendered_no_llm": 0,
+       "passages_reextracted": 0,
+       "processed_sources": 0,
+       "seconds_all": [
+        10.6303
+       ],
+       "seconds_median": 10.6303,
+       "stale_artifacts_retained": 0,
+       "status": "noop",
+       "summaries_regenerated": 0,
+       "unaffected_artifacts_modified": 0,
+       "unnecessary_regenerations": 0
+      },
+      "full": {
+       "artifact_versions_written": 0,
+       "claims_regenerated": 585501,
+       "edge_mismatches": 0,
+       "equivalent_to_full_rebuild": true,
+       "extraction_cache_hits": 0,
+       "input_tokens_est": 22374049,
+       "llm_calls": 177546,
+       "output_tokens_est": 15456892,
+       "pages_cutoff": 0,
+       "pages_regenerated": 10002,
+       "pages_rerendered_no_llm": 0,
+       "passages_reextracted": 167317,
+       "processed_sources": 20000,
+       "seconds_all": [
+        87.8381
+       ],
+       "seconds_median": 87.8381,
+       "stale_artifacts_retained": 0,
+       "status": "noop",
+       "summaries_regenerated": 227,
+       "unaffected_artifacts_modified": 0,
+       "unnecessary_regenerations": 10229
+      }
+     }
+    },
+    "S1_one_modified": {
+     "change": {
+      "modified": [
+       "topic-023/doc-06666.md"
+      ]
+     },
+     "oracle_changed_artifacts": 26,
+     "strategies": {
+      "dakc": {
+       "artifact_versions_written": 22,
+       "claims_regenerated": 3,
+       "edge_mismatches": 0,
+       "equivalent_to_full_rebuild": true,
+       "extraction_cache_hits": 0,
+       "input_tokens_est": 162974,
+       "llm_calls": 5,
+       "output_tokens_est": 211965,
+       "pages_cutoff": 0,
+       "pages_regenerated": 3,
+       "pages_rerendered_no_llm": 8,
+       "passages_reextracted": 1,
+       "processed_sources": 1,
+       "seconds_all": [
+        12.1838
+       ],
+       "seconds_median": 12.1838,
+       "stale_artifacts_retained": 0,
+       "status": "committed",
+       "summaries_regenerated": 1,
+       "unaffected_artifacts_modified": 0,
+       "unnecessary_regenerations": 0
+      },
+      "file": {
+       "artifact_versions_written": 22,
+       "claims_regenerated": 27,
+       "edge_mismatches": 0,
+       "equivalent_to_full_rebuild": true,
+       "extraction_cache_hits": 0,
+       "input_tokens_est": 1499717,
+       "llm_calls": 45,
+       "output_tokens_est": 1671141,
+       "pages_cutoff": 0,
+       "pages_regenerated": 37,
+       "pages_rerendered_no_llm": 0,
+       "passages_reextracted": 7,
+       "processed_sources": 1,
+       "seconds_all": [
+        14.3338
+       ],
+       "seconds_median": 14.3338,
+       "stale_artifacts_retained": 0,
+       "status": "committed",
+       "summaries_regenerated": 1,
+       "unaffected_artifacts_modified": 0,
+       "unnecessary_regenerations": 26
+      },
+      "full": {
+       "artifact_versions_written": 22,
+       "claims_regenerated": 585500,
+       "edge_mismatches": 0,
+       "equivalent_to_full_rebuild": true,
+       "extraction_cache_hits": 0,
+       "input_tokens_est": 22374002,
+       "llm_calls": 177546,
+       "output_tokens_est": 15456841,
+       "pages_cutoff": 0,
+       "pages_regenerated": 10002,
+       "pages_rerendered_no_llm": 0,
+       "passages_reextracted": 167317,
+       "processed_sources": 20000,
+       "seconds_all": [
+        77.6697
+       ],
+       "seconds_median": 77.6697,
+       "stale_artifacts_retained": 0,
+       "status": "committed",
+       "summaries_regenerated": 227,
+       "unaffected_artifacts_modified": 0,
+       "unnecessary_regenerations": 10217
+      }
+     }
+    },
+    "S3_one_deleted": {
+     "change": {
+      "deleted": [
+       "topic-000/doc-01599.md"
+      ]
+     },
+     "oracle_changed_artifacts": 235,
+     "strategies": {
+      "dakc": {
+       "artifact_versions_written": 179,
+       "claims_regenerated": 0,
+       "edge_mismatches": 0,
+       "equivalent_to_full_rebuild": true,
+       "extraction_cache_hits": 0,
+       "input_tokens_est": 1149398,
+       "llm_calls": 39,
+       "output_tokens_est": 1289948,
+       "pages_cutoff": 0,
+       "pages_regenerated": 35,
+       "pages_rerendered_no_llm": 39,
+       "passages_reextracted": 0,
+       "processed_sources": 0,
+       "seconds_all": [
+        17.7043
+       ],
+       "seconds_median": 17.7043,
+       "stale_artifacts_retained": 0,
+       "status": "committed",
+       "summaries_regenerated": 4,
+       "unaffected_artifacts_modified": 0,
+       "unnecessary_regenerations": 0
+      },
+      "file": {
+       "artifact_versions_written": 179,
+       "claims_regenerated": 0,
+       "edge_mismatches": 0,
+       "equivalent_to_full_rebuild": true,
+       "extraction_cache_hits": 0,
+       "input_tokens_est": 1868895,
+       "llm_calls": 78,
+       "output_tokens_est": 2073761,
+       "pages_cutoff": 0,
+       "pages_regenerated": 74,
+       "pages_rerendered_no_llm": 0,
+       "passages_reextracted": 0,
+       "processed_sources": 0,
+       "seconds_all": [
+        21.0262
+       ],
+       "seconds_median": 21.0262,
+       "stale_artifacts_retained": 0,
+       "status": "committed",
+       "summaries_regenerated": 4,
+       "unaffected_artifacts_modified": 0,
+       "unnecessary_regenerations": 0
+      },
+      "full": {
+       "artifact_versions_written": 179,
+       "claims_regenerated": 585420,
+       "edge_mismatches": 0,
+       "equivalent_to_full_rebuild": true,
+       "extraction_cache_hits": 0,
+       "input_tokens_est": 22371449,
+       "llm_calls": 177522,
+       "output_tokens_est": 15455325,
+       "pages_cutoff": 0,
+       "pages_regenerated": 10002,
+       "pages_rerendered_no_llm": 0,
+       "passages_reextracted": 167293,
+       "processed_sources": 19999,
+       "seconds_all": [
+        83.699
+       ],
+       "seconds_median": 83.699,
+       "stale_artifacts_retained": 0,
+       "status": "committed",
+       "summaries_regenerated": 227,
+       "unaffected_artifacts_modified": 0,
+       "unnecessary_regenerations": 10151
+      }
+     }
+    },
+    "S4_one_renamed": {
+     "change": {
+      "renamed": [
+       [
+        "topic-023/doc-06666.md",
+        "topic-023/doc-06666-renamed.md"
+       ]
+      ]
+     },
+     "oracle_changed_artifacts": 78,
+     "strategies": {
+      "dakc": {
+       "artifact_versions_written": 34,
+       "claims_regenerated": 0,
+       "edge_mismatches": 0,
+       "equivalent_to_full_rebuild": true,
+       "extraction_cache_hits": 0,
+       "input_tokens_est": 0,
+       "llm_calls": 0,
+       "output_tokens_est": 0,
+       "pages_cutoff": 0,
+       "pages_regenerated": 0,
+       "pages_rerendered_no_llm": 34,
+       "passages_reextracted": 0,
+       "processed_sources": 0,
+       "seconds_all": [
+        13.7837
+       ],
+       "seconds_median": 13.7837,
+       "stale_artifacts_retained": 0,
+       "status": "committed",
+       "summaries_regenerated": 0,
+       "unaffected_artifacts_modified": 0,
+       "unnecessary_regenerations": 0
+      },
+      "file": {
+       "artifact_versions_written": 69,
+       "claims_regenerated": 28,
+       "edge_mismatches": 0,
+       "equivalent_to_full_rebuild": true,
+       "extraction_cache_hits": 0,
+       "input_tokens_est": 1486873,
+       "llm_calls": 44,
+       "output_tokens_est": 1657883,
+       "pages_cutoff": 0,
+       "pages_regenerated": 34,
+       "pages_rerendered_no_llm": 0,
+       "passages_reextracted": 7,
+       "processed_sources": 1,
+       "seconds_all": [
+        15.294
+       ],
+       "seconds_median": 15.294,
+       "stale_artifacts_retained": 0,
+       "status": "committed",
+       "summaries_regenerated": 3,
+       "unaffected_artifacts_modified": 0,
+       "unnecessary_regenerations": 3
+      },
+      "full": {
+       "artifact_versions_written": 34,
+       "claims_regenerated": 585501,
+       "edge_mismatches": 0,
+       "equivalent_to_full_rebuild": true,
+       "extraction_cache_hits": 0,
+       "input_tokens_est": 22374049,
+       "llm_calls": 177546,
+       "output_tokens_est": 15456892,
+       "pages_cutoff": 0,
+       "pages_regenerated": 10002,
+       "pages_rerendered_no_llm": 0,
+       "passages_reextracted": 167317,
+       "processed_sources": 20000,
+       "seconds_all": [
+        80.3702
+       ],
+       "seconds_median": 80.3702,
+       "stale_artifacts_retained": 0,
+       "status": "committed",
+       "summaries_regenerated": 227,
+       "unaffected_artifacts_modified": 0,
+       "unnecessary_regenerations": 10195
+      }
+     }
+    },
+    "S5_one_claim_modified": {
+     "change": {
+      "claim": "has a default port of: 35932 -> 35933",
+      "modified": [
+       "topic-023/doc-06666.md"
+      ]
+     },
+     "oracle_changed_artifacts": 12,
+     "strategies": {
+      "dakc": {
+       "artifact_versions_written": 9,
+       "claims_regenerated": 1,
+       "edge_mismatches": 0,
+       "equivalent_to_full_rebuild": true,
+       "extraction_cache_hits": 0,
+       "input_tokens_est": 2028,
+       "llm_calls": 2,
+       "output_tokens_est": 2062,
+       "pages_cutoff": 8,
+       "pages_regenerated": 1,
+       "pages_rerendered_no_llm": 0,
+       "passages_reextracted": 1,
+       "processed_sources": 1,
+       "seconds_all": [
+        12.3747
+       ],
+       "seconds_median": 12.3747,
+       "stale_artifacts_retained": 0,
+       "status": "committed",
+       "summaries_regenerated": 0,
+       "unaffected_artifacts_modified": 0,
+       "unnecessary_regenerations": 0
+      },
+      "file": {
+       "artifact_versions_written": 9,
+       "claims_regenerated": 28,
+       "edge_mismatches": 0,
+       "equivalent_to_full_rebuild": true,
+       "extraction_cache_hits": 0,
+       "input_tokens_est": 1484164,
+       "llm_calls": 42,
+       "output_tokens_est": 1654276,
+       "pages_cutoff": 0,
+       "pages_regenerated": 34,
+       "pages_rerendered_no_llm": 0,
+       "passages_reextracted": 7,
+       "processed_sources": 1,
+       "seconds_all": [
+        14.0921
+       ],
+       "seconds_median": 14.0921,
+       "stale_artifacts_retained": 0,
+       "status": "committed",
+       "summaries_regenerated": 1,
+       "unaffected_artifacts_modified": 0,
+       "unnecessary_regenerations": 34
+      },
+      "full": {
+       "artifact_versions_written": 9,
+       "claims_regenerated": 585501,
+       "edge_mismatches": 0,
+       "equivalent_to_full_rebuild": true,
+       "extraction_cache_hits": 0,
+       "input_tokens_est": 22374049,
+       "llm_calls": 177546,
+       "output_tokens_est": 15456892,
+       "pages_cutoff": 0,
+       "pages_regenerated": 10002,
+       "pages_rerendered_no_llm": 0,
+       "passages_reextracted": 167317,
+       "processed_sources": 20000,
+       "seconds_all": [
+        78.3149
+       ],
+       "seconds_median": 78.3149,
+       "stale_artifacts_retained": 0,
+       "status": "committed",
+       "summaries_regenerated": 227,
+       "unaffected_artifacts_modified": 0,
+       "unnecessary_regenerations": 10228
+      }
+     }
+    },
+    "S9_contradiction_then_delete": {
+     "change": {
+      "added": [
+       "topic-013/doc-correction.md"
+      ],
+      "claim": "Rosesql has a default port of: 33128 -> 65101",
+      "deleted": [
+       "topic-013/doc-00028.md"
+      ]
+     },
+     "oracle_changed_artifacts": 34,
+     "strategies": {
+      "dakc": {
+       "artifact_versions_written": 25,
+       "claims_regenerated": 1,
+       "edge_mismatches": 0,
+       "equivalent_to_full_rebuild": true,
+       "extraction_cache_hits": 0,
+       "input_tokens_est": 350547,
+       "llm_calls": 11,
+       "output_tokens_est": 419132,
+       "pages_cutoff": 0,
+       "pages_regenerated": 7,
+       "pages_rerendered_no_llm": 3,
+       "passages_reextracted": 1,
+       "processed_sources": 1,
+       "seconds_all": [
+        12.16
+       ],
+       "seconds_median": 12.16,
+       "stale_artifacts_retained": 0,
+       "status": "committed",
+       "summaries_regenerated": 3,
+       "unaffected_artifacts_modified": 0,
+       "unnecessary_regenerations": 0
+      },
+      "file": {
+       "artifact_versions_written": 25,
+       "claims_regenerated": 1,
+       "edge_mismatches": 0,
+       "equivalent_to_full_rebuild": true,
+       "extraction_cache_hits": 0,
+       "input_tokens_est": 726961,
+       "llm_calls": 14,
+       "output_tokens_est": 829449,
+       "pages_cutoff": 0,
+       "pages_regenerated": 10,
+       "pages_rerendered_no_llm": 0,
+       "passages_reextracted": 1,
+       "processed_sources": 1,
+       "seconds_all": [
+        12.6807
+       ],
+       "seconds_median": 12.6807,
+       "stale_artifacts_retained": 0,
+       "status": "committed",
+       "summaries_regenerated": 3,
+       "unaffected_artifacts_modified": 0,
+       "unnecessary_regenerations": 0
+      },
+      "full": {
+       "artifact_versions_written": 25,
+       "claims_regenerated": 585496,
+       "edge_mismatches": 0,
+       "equivalent_to_full_rebuild": true,
+       "extraction_cache_hits": 0,
+       "input_tokens_est": 22373944,
+       "llm_calls": 177546,
+       "output_tokens_est": 15456753,
+       "pages_cutoff": 0,
+       "pages_regenerated": 10002,
+       "pages_rerendered_no_llm": 0,
+       "passages_reextracted": 167317,
+       "processed_sources": 20000,
+       "seconds_all": [
+        75.8459
+       ],
+       "seconds_median": 75.8459,
+       "stale_artifacts_retained": 0,
+       "status": "committed",
+       "summaries_regenerated": 227,
+       "unaffected_artifacts_modified": 0,
+       "unnecessary_regenerations": 10216
+      }
+     }
+    }
+   }
+  }
+ ]
+}

@@ -244,3 +244,51 @@ def match_revisions(removed: dict[str, str], added: dict[str, str], threshold: f
 
 def numbers_differ(a: str, b: str) -> bool:
     return _NUMBER.findall(a) != _NUMBER.findall(b)
+
+
+# --------------------------------------------------------------------------- #
+# Advisory duplicate detection (never used for identity)
+# --------------------------------------------------------------------------- #
+
+_NEGATION = re.compile(r"\b(not|no|never|without|n't)\b", re.IGNORECASE)
+
+
+def likely_same_fact(a: str, b: str) -> bool:
+    """Conservative deterministic paraphrase test: same entities in the same
+    order, same numbers, same negation polarity, and similar remaining words.
+    Measured on a labelled set (benchmarks/equivalence.py) with zero false
+    merges but limited recall. DAKC uses it only to *report* likely duplicates;
+    claim identity stays exact, so a mistake here cannot corrupt the graph."""
+    if normalize_claim(a) == normalize_claim(b):
+        return True
+    order_a = sorted(extract_mentions(a), key=a.find)
+    order_b = sorted(extract_mentions(b), key=b.find)
+    if order_a != order_b or not order_a:
+        return False
+    if _NUMBER.findall(a) != _NUMBER.findall(b) or bool(_NEGATION.search(a)) != bool(_NEGATION.search(b)):
+        return False
+    drop = {e.casefold() for e in order_a}
+
+    def rest(s: str) -> str:
+        return " ".join(w for w in normalize_claim(s).split() if w not in drop)
+
+    return fuzz.token_set_ratio(rest(a), rest(b)) >= 80
+
+
+def duplicate_candidates(claims: list[tuple[str, str]]) -> list[tuple[str, str]]:
+    """Pairs of claim ids that are likely the same fact. Claims are bucketed by
+    entity set, numbers and polarity first, so cost stays near-linear."""
+    buckets: dict[tuple, list[tuple[str, str]]] = {}
+    for cid, text in claims:
+        key = (tuple(sorted(m.casefold() for m in extract_mentions(text))), tuple(_NUMBER.findall(text)), bool(_NEGATION.search(text)))
+        if key[0]:
+            buckets.setdefault(key, []).append((cid, text))
+    out: list[tuple[str, str]] = []
+    for group in buckets.values():
+        if len(group) > 200:  # pathological bucket: skip rather than go quadratic
+            continue
+        for i, (ca, ta) in enumerate(group):
+            for cb, tb in group[i + 1:]:
+                if likely_same_fact(ta, tb):
+                    out.append(tuple(sorted((ca, cb))))
+    return sorted(set(out))

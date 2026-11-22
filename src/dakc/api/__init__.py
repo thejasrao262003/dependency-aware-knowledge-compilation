@@ -51,7 +51,7 @@ def create_app(root: Path) -> FastAPI:
         st = store()
         report, _ = Compiler(
             st, ws.provider(), ws.source_root, aliases=ws.config.alias_map,
-            config_fingerprint=ws.config.fingerprint, dry_run=True, exclude=ws.excluded,
+            config_fingerprint=ws.config.fingerprint, dry_run=True, exclude=ws.excluded, provenance=ws.config.provenance,
         ).run()
         return report.to_dict(limit=500)
 

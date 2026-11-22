@@ -113,3 +113,23 @@ def test_context_dependency_heuristic():
     assert is_context_dependent("The service uses Redis.")
     assert is_context_dependent("However, Kafka retains events.")
     assert not is_context_dependent("Kafka retains events for 7 days.")
+
+
+def test_likely_same_fact_is_conservative():
+    from dakc.claims import duplicate_candidates, likely_same_fact
+
+    assert likely_same_fact("Kafka integrates with Flink.", "Kafka is integrated with Flink.")
+    assert likely_same_fact("The default port of Kafka is 9092.", "The default port of Kafka is 9092")
+    assert not likely_same_fact("Kafka integrates with Flink.", "Kafka does not integrate with Flink.")
+    assert not likely_same_fact("Kafka was first released in 2011.", "Kafka was first released in 2012.")
+    assert not likely_same_fact("Kafka replaces RabbitMQ.", "RabbitMQ replaces Kafka.")
+    pairs = duplicate_candidates([("c1", "Kafka integrates with Flink."), ("c2", "Kafka is integrated with Flink."),
+                                  ("c3", "Kafka does not integrate with Flink.")])
+    assert pairs == [("c1", "c2")]
+
+
+def test_equivalence_benchmark_has_no_false_merges_for_shipped_matcher():
+    from benchmarks.equivalence import guarded, labelled_pairs, score
+
+    pairs = labelled_pairs(40)
+    assert score(pairs, [guarded(p["a"], p["b"]) for p in pairs])["false_merges"] == 0

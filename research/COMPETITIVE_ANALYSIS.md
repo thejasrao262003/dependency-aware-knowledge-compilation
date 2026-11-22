@@ -5,6 +5,10 @@ commit listed below. Conclusions come from the implementation, not the README.
 Nothing was built or executed. Per-repository notes with file:line citations
 are in [`audits/`](audits/).
 
+**Scope of the conclusion.** This analysis supports "we did not find this
+combination of capabilities in the twelve projects audited". It is not a
+survey of all existing systems.
+
 **Method.** The seven repositories named in the PRD, plus five closely related
 projects found while searching, were each audited against the PRD's ten
 research questions. The most load-bearing claims were then re-checked

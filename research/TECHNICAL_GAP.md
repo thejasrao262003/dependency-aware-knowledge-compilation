@@ -2,9 +2,11 @@
 
 ## 1. Does an existing project already implement essentially the same engine?
 
-**No.** Twelve projects were audited at the code level
-(see [COMPETITIVE_ANALYSIS.md](COMPETITIVE_ANALYSIS.md)). Three come closest,
-each in a different way:
+**Not among the twelve projects audited.** Twelve projects were audited at
+the code level (see [COMPETITIVE_ANALYSIS.md](COMPETITIVE_ANALYSIS.md)). This
+supports a specific claim: we did not find this combination of capabilities
+in them. It does not establish that no such implementation exists anywhere.
+Three come closest, each in a different way:
 
 | Closest project | What it has | Why it is not the same engine |
 |---|---|---|

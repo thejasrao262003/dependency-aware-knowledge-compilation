@@ -55,9 +55,9 @@ inputs. A Markdown "wiki" directory is a projection of that store.
 | `invalidation` | Builds the plan: the affected set, rebuild categories and LLM-call estimates. |
 | `compiler` | Executes the plan layer by layer. Runs provider calls concurrently within a layer, applies signatures and early cutoff, and emits a ChangeSet. Strategies: `dakc`, `file`, `full`. |
 | `providers` | Extractor, page-writer and summarizer protocols. Deterministic heuristic and mock implementations. LLM components over one client protocol: an OpenAI-compatible `httpx` client (OpenAI, Ollama, vLLM, LM Studio) and a Claude client on the official `anthropic` SDK (optional extra). Token accounting. |
-| `transactions` | Build records, atomic commit, failure recording, crash recovery, rollback, state digest. |
+| `transactions` | Build records, atomic commit with a HEAD check, workspace build lock, failure injection, crash recovery, rollback, state digest. |
 | `storage` | SQLite schema and temporal (versioned) tables. |
-| `provenance` | Explain/trace queries: "why does this artifact exist, what does it depend on, what depends on it, is it stale". |
+| `provenance` | Explain queries, sentence-level trace (`trace`), strict grounding filter, canonical comparison and invariant checks (`verify`). |
 | `cli` | Typer application (`dakc`). |
 | `api` | FastAPI read-only service over the same queries. |
 
@@ -106,10 +106,26 @@ output directory.
 
 ## Concurrency
 
-Within a layer, artifacts are independent by construction: an artifact
-depends only on lower layers. Provider calls in a layer run on a
-`ThreadPoolExecutor` (`--jobs`). Results are collected and applied in sorted
-id order, so output does not depend on scheduling.
+**Within a build.** Within a layer, artifacts are independent by
+construction: an artifact depends only on lower layers. Provider calls in a
+layer run on a `ThreadPoolExecutor` (`--jobs`). Results are collected and
+applied in sorted id order, so output does not depend on scheduling.
+
+**Between processes.** A workspace build lock (`.dakc/build.lock`, an OS file
+lock holding the owner's PID) covers a whole build:
+
+- recovery of crashed builds;
+- loading state, compute and commit;
+- wiki projection.
+
+Behaviour of other processes:
+- A second writer fails immediately (exit code 3), or waits with
+  `--wait SECONDS`.
+- The commit transaction also checks that HEAD has not moved since the state
+  was loaded, so even a writer that bypasses the lock cannot cause a lost
+  update.
+- Readers never take the lock; SQLite WAL gives them a consistent snapshot
+  during a build.
 
 ## What is deliberately not here
 

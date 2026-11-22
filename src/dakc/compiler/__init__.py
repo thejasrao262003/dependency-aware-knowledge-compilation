@@ -17,6 +17,7 @@ Strategies (see docs/benchmark.md):
 
 from __future__ import annotations
 
+import json
 import re
 import time
 from collections import Counter, defaultdict
@@ -43,8 +44,11 @@ from dakc.hashing import claim_id, entity_key, h, h_obj, normalize_claim, normal
 from dakc.ingestion import FileInfo, ScanResult, SourceRecord, new_source_id, scan
 from dakc.parsing import ParseError, parse_bytes
 from dakc.providers import ClaimView, PageLead, ProviderBundle
+from dakc.provenance.trace import ground_body
 from dakc.storage import KBState, Store
 from dakc.transactions import ChangeSet, FaultInjector, commit
+from dakc.transactions.lock import workspace_lock
+from dakc import versions
 
 STRATEGIES = ("dakc", "file", "full")
 RELATED_LIMIT = 10
@@ -143,6 +147,9 @@ class Compiler:
         fault: FaultInjector | None = None,
         exclude: tuple[Path, ...] = (),
         sentence_reuse: bool = True,
+        acquire_lock: bool = True,
+        lock_timeout: float = 0.0,
+        provenance: str = "report",
     ):
         if strategy not in STRATEGIES:
             raise ValueError(f"strategy must be one of {STRATEGIES}")
@@ -150,7 +157,12 @@ class Compiler:
         self.provider = provider
         self.source_root = source_root
         self.alias_map = aliases or {}
-        self.config_fingerprint = config_fingerprint or h_obj({"aliases": self.alias_map})
+        if provenance not in ("report", "strict"):
+            raise ValueError("provenance must be 'report' or 'strict'")
+        self.provenance = provenance
+        self.config_fingerprint = config_fingerprint or h_obj(
+            {"aliases": self.alias_map, "entity_resolution": versions.ENTITY_RESOLUTION, "provenance": provenance}
+        )
         self.strategy = strategy
         self.jobs = max(1, jobs)
         self.dry_run = dry_run
@@ -158,13 +170,24 @@ class Compiler:
         self.exclude = exclude
         self.forced = strategy in ("file", "full")
         self.sentence_reuse = sentence_reuse
+        self.acquire_lock = acquire_lock
+        self.lock_timeout = lock_timeout
 
     # ================================================================== run
     def run(self) -> tuple[BuildReport, KBState | None]:
+        """Compile. Holds the workspace build lock unless ``acquire_lock=False``
+        (the caller already holds it) or this is a dry run (read-only)."""
+        if self.dry_run or not self.acquire_lock:
+            return self._run()
+        with workspace_lock(self.store.path, self.lock_timeout):
+            return self._run()
+
+    def _run(self) -> tuple[BuildReport, KBState | None]:
         t0 = time.perf_counter()
         report = BuildReport(self.strategy, self.dry_run)
         if not self.dry_run:
-            self.store.recover_aborted_builds()
+            self.store.recover_aborted_builds()  # safe: we hold the build lock
+        head_at_load = self.store.head
         old = self.store.load_state()
         result = scan(self.source_root, old.sources, detect_renames=self.strategy != "file", exclude=self.exclude)
         report.scan = {
@@ -185,19 +208,21 @@ class Compiler:
                 "config_fingerprint": self.config_fingerprint,
                 "provider": self.provider.name,
                 "fingerprints": self.provider.fingerprints(),
+                "compiler_versions": versions.current(),
             }
             if self.dry_run:
                 report.status = "planned"
-            elif cs.empty and old.config_fingerprint == self.config_fingerprint:
+            elif cs.empty and old.config_fingerprint == self.config_fingerprint and old.compiler_versions == versions.current():
                 report.status = "noop"
                 report.duration_s = time.perf_counter() - t0
                 stats["duration_s"] = round(report.duration_s, 4)
                 self.store.finish_build(build_id, "noop", stats)
             else:
                 cs.meta["config_fingerprint"] = self.config_fingerprint
+                cs.meta["compiler_versions"] = json.dumps(versions.current(), sort_keys=True)
                 report.duration_s = time.perf_counter() - t0
                 stats["duration_s"] = round(report.duration_s, 4)
-                commit(self.store, build_id, cs, old.versions, stats, self.fault)
+                commit(self.store, build_id, cs, old.versions, stats, self.fault, expected_head=head_at_load)
                 report.status = "committed"
         except BaseException as exc:
             report.status = "failed"
@@ -210,6 +235,15 @@ class Compiler:
     # ============================================================== compute
     def _compute(self, old: KBState, sr: ScanResult, report: BuildReport) -> tuple[ChangeSet, KBState]:
         full = self.strategy == "full"
+        # A store with history but no recorded versions predates versioning: treat every layer as outdated.
+        has_history = bool(old.sources) or any(old.artifacts.values())
+        stored_v = old.compiler_versions if old.compiler_versions or not has_history else {k: "unknown" for k in versions.current()}
+        parser_changed = has_history and not full and stored_v.get("parser") != versions.PARSER
+        identity_changed = has_history and not full and stored_v.get("claim_identity") != versions.CLAIM_IDENTITY
+        render_changed = has_history and not full and stored_v.get("render") != versions.RENDER
+        for layer, changed in (("parser", parser_changed), ("claim identity", identity_changed), ("rendering", render_changed)):
+            if changed:
+                report.notes.append(f"{layer} logic changed since HEAD ({stored_v.get(layer.replace(' ', '_').replace('rendering', 'render'))} -> current): affected layer recomputed")
         P = self.provider
         base_passages: dict[str, PassageArt] = {} if full else dict(old.of("passage"))  # type: ignore[arg-type]
         base_claims: dict[str, ClaimArt] = {} if full else dict(old.of("claim"))  # type: ignore[arg-type]
@@ -252,7 +286,7 @@ class Compiler:
             sid = new_source_id(path, taken)
             to_parse.append((sid, sr.files[path]))
             report.op("source_new", sid)
-        if full:
+        if full or parser_changed:
             for sid in sr.unchanged:
                 to_parse.append((sid, sr.files[old.sources[sid].path]))
 
@@ -288,10 +322,10 @@ class Compiler:
         # algorithm changed) are stale even though their text is unchanged.
         for pid in sorted(passages):
             p = passages[pid]
-            if pid not in removed_pids and pid not in added and p.extracted_by != P.extractor.fingerprint:
+            if pid not in removed_pids and pid not in added and (p.extracted_by != P.extractor.fingerprint or identity_changed):
                 removed_pids.add(pid)
                 added[pid] = replace(p, extracted_by=P.extractor.fingerprint)
-                report.op("extractor_changed", pid)
+                report.op("extractor_changed" if p.extracted_by != P.extractor.fingerprint else "claim_identity_changed", pid)
 
         # --------------------------------------------------------- extraction
         ex = P.extractor
@@ -398,7 +432,7 @@ class Compiler:
                 cid = claim_id(ec.text)
                 prev = claims.get(cid)
                 supports = {s[0]: s for s in prev.supports} if prev else {}
-                supports[pid] = (pid, normalize_text(ec.text), tuple(sorted(set(ec.mentions))))
+                supports[pid] = (pid, normalize_text(ec.text), tuple(sorted(set(ec.mentions))), tuple(sorted(set(ec.evidence))))
                 claims[cid] = ClaimArt(cid, tuple(sorted(supports.values())))
                 claims_by_passage[pid].add(cid)
                 touched_claims.add(cid)
@@ -421,7 +455,7 @@ class Compiler:
         # -------------------------------------------- entities & relationships
         config_changed = bool(old.config_fingerprint) and old.config_fingerprint != self.config_fingerprint and not full
         if config_changed:
-            report.notes.append("entity alias configuration changed: entity resolution re-run for all claims")
+            report.notes.append("configuration changed (aliases, entity resolution or provenance mode): entities re-resolved and pages re-checked")
         members: dict[str, set[str]] = {}
         rel_members: dict[str, set[str]] = {}
         touched_entities: set[str] = set()
@@ -506,8 +540,13 @@ class Compiler:
                 for cid in claims_by_passage.get(pid, ()):
                     if cid in claims:
                         candidates |= self._entity_ids(claims[cid])
-        if full:
+        if full or render_changed:
             candidates |= set(entities)
+        # Pages written by a different writer (model, prompt) are stale even if no source changed.
+        drifted = {p.entity_id for p in pages.values() if p.generator != P.writer.fingerprint}
+        if drifted:
+            report.notes.append(f"{len(drifted)} page(s) were written by a different page writer: regenerated")
+            candidates |= drifted
 
         W = P.writer
         page_plans: list[tuple[str, EntityArt, list[str], str]] = []  # (page id, entity, claim order, gen_sig)
@@ -544,7 +583,12 @@ class Compiler:
         changed_pages: set[str] = set(report.ops.get("delete_page", []))
         for pid, ent, order, gen_sig in page_plans:
             prev = pages.get(pid)
-            body, lead = bodies.get(pid) or (prev.body, prev.lead)  # type: ignore[union-attr]
+            body = bodies[pid][0] if pid in bodies else prev.body  # type: ignore[union-attr]
+            dropped: list[str] = []
+            display = body
+            if self.provenance == "strict":
+                display, dropped = ground_body(body, len(order))
+            lead = first_paragraph(display)
             related = self._related(ent.id, rels_by_entity, rels, entities)
             citations = []
             topic_votes: Counter[str] = Counter()
@@ -553,11 +597,12 @@ class Compiler:
                 citations.append(paths)
                 topic_votes.update(topic_of(p) for p in paths)
             topic = sorted(topic_votes.items(), key=lambda kv: (-kv[1], kv[0]))[0][0]
-            render_sig = h_obj([gen_sig, related, citations])
-            rendered = self._render_page(ent.name, body, related, citations)
+            render_sig = h_obj([gen_sig, versions.RENDER, self.provenance, related, citations])
+            rendered = self._render_page(ent.name, display, related, citations)
             page = PageArt(
                 pid, ent.id, ent.name, body, lead, rendered, tuple(order),
                 tuple(sorted(set(rels_by_entity.get(ent.id, ())) & rels.keys())), topic, gen_sig, render_sig, W.fingerprint,
+                tuple(dropped),
             )
             if prev is None or prev.state_hash != page.state_hash:
                 changed_pages.add(pid)
@@ -576,8 +621,9 @@ class Compiler:
                 topics.add(old_pages[pid].topic)  # type: ignore[attr-defined]
             if pid in pages:
                 topics.add(pages[pid].topic)
-        if full:
+        if full or render_changed:
             topics |= {p.topic for p in pages.values()}
+        topics |= {sm.topic for sm in summaries.values() if sm.generator != S.fingerprint}  # summarizer drift
         pages_by_topic: dict[str, list[PageArt]] = defaultdict(list)
         if topics:
             for p in pages.values():
@@ -595,7 +641,7 @@ class Compiler:
             sig = h_obj([S.fingerprint, topic, [(p.id, p.title, h(p.lead)) for p in members_]])
             prev_s = summaries.get(sid)
             sum_plans.append((sid, topic, members_, sig))
-            if self.forced or prev_s is None or prev_s.sig != sig:
+            if self.forced or prev_s is None or prev_s.sig != sig or not prev_s.body:
                 leads = tuple(PageLead(p.title, p.id.split(":", 1)[1], p.lead) for p in members_)
                 sum_regen.append((sid, topic, leads))
                 report.op("regenerate_summary", sid)
@@ -614,15 +660,21 @@ class Compiler:
             prev_s = summaries.get(sid)
             body = sum_bodies.get(sid)
             if body is None:
-                continue  # unchanged signature: keep previous version
+                body = prev_s.body  # generation signature unchanged: reuse the generated text
             links = "\n".join(f"- [{p.title}](../pages/{p.id.split(':', 1)[1]}.md)" for p in members_)
+            render_sig = h_obj([sig, versions.RENDER, links])
+            if sid not in sum_bodies and prev_s is not None and prev_s.render_sig == render_sig:
+                continue  # nothing to do: keep the previous version
             rendered = f"# Topic: {topic}\n\n{body}\n\n## Pages\n\n{links}\n"
-            summaries[sid] = SummaryArt(sid, topic, f"Topic: {topic}", rendered, tuple(p.id for p in members_), sig, S.fingerprint)
+            if sid not in sum_bodies:
+                report.op("rerender_summary", sid)
+            summaries[sid] = SummaryArt(sid, topic, f"Topic: {topic}", rendered, tuple(p.id for p in members_), sig,
+                                        S.fingerprint, body, render_sig)
 
         # -------------------------------------------------------------- index
         page_entries = sorted(((p.title, p.id) for p in pages.values()), key=lambda t: (t[0].casefold(), t[1]))
         sum_entries = sorted(((s.title, s.id) for s in summaries.values()), key=lambda t: (t[0].casefold(), t[1]))
-        index_sig = h_obj([page_entries, sum_entries])
+        index_sig = h_obj([versions.RENDER, page_entries, sum_entries])
         old_index = old.of("index").get(INDEX_ID)
         index: IndexArt | None = None
         if page_entries or sum_entries:

@@ -21,6 +21,7 @@ class Config:
     output_dir: str = "wiki"
     provider: str = "heuristic"
     jobs: int = 4
+    provenance: str = "report"
     provider_options: dict[str, dict[str, Any]] = field(default_factory=dict)
     aliases: dict[str, str] = field(default_factory=dict)
 
@@ -32,7 +33,9 @@ class Config:
     @property
     def fingerprint(self) -> str:
         """Hash of configuration that changes derived content (entity aliases)."""
-        return h_obj({"aliases": self.alias_map})
+        from dakc import versions
+
+        return h_obj({"aliases": self.alias_map, "entity_resolution": versions.ENTITY_RESOLUTION, "provenance": self.provenance})
 
     def to_toml(self) -> str:
         lines = [
@@ -41,6 +44,7 @@ class Config:
             f'output_dir = "{self.output_dir}"',
             f'provider = "{self.provider}"   # heuristic | mock | openai | anthropic',
             f"jobs = {self.jobs}",
+            f'provenance = "{self.provenance}"   # report | strict (strict: pages keep only sentences that cite a claim)',
             "",
             "# Options for LLM providers (only the selected provider is used).",
             "[provider.openai]",
@@ -84,6 +88,7 @@ class Workspace:
             output_dir=core.get("output_dir", "wiki"),
             provider=core.get("provider", "heuristic"),
             jobs=int(core.get("jobs", 4)),
+            provenance=core.get("provenance", "report"),
             provider_options=data.get("provider", {}),
             aliases=dict(data.get("aliases", {})),
         )

@@ -169,6 +169,36 @@ conservative: it re-extracts more than strictly necessary rather than reuse
 a claim whose antecedent changed. The coreference experiment in the
 benchmark tests it.
 
+## What a signature covers besides inputs
+
+- **Provider fingerprints** cover model, temperature, prompt and output
+  schema. Every passage records the extractor that produced its claims, and
+  every page and summary records the writer or summarizer that generated it.
+  An artifact built by a different provider is rebuilt even if no source
+  changed.
+- **DAKC's own logic** is versioned per layer (`dakc/versions.py`: parser,
+  claim identity, entity resolution, rendering) and recorded with every
+  build. A version change re-runs exactly that layer:
+  - re-parse the sources;
+  - re-derive claims from the extraction cache;
+  - re-resolve entities;
+  - re-render, with no provider calls.
+
+  A store whose history predates versioning is treated as outdated in every
+  layer.
+- **Configuration** (entity aliases, provenance mode) is part of the config
+  fingerprint.
+
+## Provenance
+
+Each claim support records `(passage, surface text, mentions, evidence
+sentence indices)`. `dakc trace PAGE` maps every displayed sentence to the
+claims it cites (`[^Cn]`), and every claim to the exact evidence sentences, the
+passage, the source path, and the source version (content hash and the
+build that registered it). Under `provenance = "strict"`, rendering keeps only
+sentences that cite one of the page's own claims. Removed sentences stay in
+the page record as an audit list, and switching modes needs no LLM calls.
+
 ## Dry-run precision
 
 Deterministic layers (scan, segmentation, sentence reuse planning, cache

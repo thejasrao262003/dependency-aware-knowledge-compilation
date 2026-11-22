@@ -1,9 +1,16 @@
 # DAKC: Dependency-Aware Knowledge Compiler
 
-DAKC keeps an LLM-maintained knowledge base (claims, entity pages, topic
-summaries, an index) up to date as its source documents change. It
-**recomputes only what has become invalid** and proves that the result is the
-same as a full rebuild.
+**DAKC is an incremental compiler for AI-generated knowledge.** It tracks
+claim-level dependencies, selectively rebuilds invalidated artifacts, and
+verifies incremental results against full rebuilds.
+
+Given a directory of documents, it builds and maintains an LLM-generated
+knowledge base: claims, entity pages, topic summaries and an index. When the
+sources change, it **recomputes only what has become invalid** and can prove
+that the result equals a full rebuild. The same problem appears wherever
+LLM-derived knowledge must track evolving inputs: documentation generated
+from codebases, research knowledge bases built from papers, policy and
+compliance repositories, and long-lived agent memory.
 
 It does this with a build-system model applied to knowledge:
 
@@ -32,12 +39,15 @@ you all of this before anything is spent.
 
 The research phase audited twelve open-source LLM-wiki and graph-RAG projects
 at the code level ([competitive analysis](research/COMPETITIVE_ANALYSIS.md),
-[gap report](research/TECHNICAL_GAP.md)). None does all of the following:
+[gap report](research/TECHNICAL_GAP.md)). In those twelve, we did not find
+one that does all of the following. That is a statement about what we
+audited, not proof that no such system exists.
 
 - tracks dependencies below the file level, or between derived artifacts
   (page → summary → index);
 - stops propagation when a recomputed artifact is unchanged;
-- tests incremental output against a full rebuild.
+- tests incremental output against a full rebuild;
+- keeps claim identity stable when an LLM rewords unchanged text.
 
 The usual pattern is "a file changed, re-ingest it, and let the LLM merge the
 result into existing pages". That pattern is costly, and it keeps facts the
@@ -133,16 +143,33 @@ make them, and labels downstream numbers as an **upper bound**.
 | `dakc compile --strategy file` | The file-level baseline used in the benchmark |
 | `dakc graph [--source X] [--format text\|json\|dot\|reactflow]` | Inspect or export the dependency graph |
 | `dakc explain ID` | Dependencies, dependents, upstream sources, signatures, history, VALID/STALE |
+| `dakc trace PAGE` | Each displayed sentence → cited claims → passage → source version → exact evidence sentence |
+| `dakc duplicates` | Advisory list of claims that are likely the same fact in other words (nothing is merged) |
 | `dakc status` | HEAD, counts, and what is stale against the current sources |
 | `dakc builds` / `dakc diff A [B]` | Audit log; artifact-level diff between builds |
 | `dakc rollback [--to N]` | Restore any earlier committed build |
-| `dakc verify [--against-full]` | Invariant checks; equality with a full rebuild |
+| `dakc verify [--against-full]` | Invariant and provenance checks, citation coverage, equality with a full rebuild |
 | `dakc serve` | Read-only REST API (`/status /check /plan /graph /artifacts/{id} /builds /diff`) |
 | `dakc watch` | Recompile incrementally on file changes |
 
 IDs can be given in friendly form: `page:database-architecture`,
 `entity_postgresql`, `source:databases/redis.md`, a source path, or a page
-title.
+title. Commands that write (`ingest`, `compile`, `rollback`) take the
+workspace build lock; pass `--wait SECONDS` to queue behind a running build
+instead of failing.
+
+## Guarantees, and how each is checked
+
+| Concern | What DAKC does | Checked by |
+|---|---|---|
+| Incremental = full | Signatures, early cutoff, support counting | `dakc verify --against-full`; regression suite (every scenario, random edit sequences); benchmark oracle |
+| Concurrent builds | A workspace build lock covers the whole build; the commit also refuses if HEAD moved since the state was loaded. Readers are never blocked (SQLite WAL) | `tests/integration/test_concurrency.py` (interleaving, two real processes) |
+| Model / prompt drift | Extractor, page-writer and summarizer fingerprints (model, prompt, schema) are recorded per artifact; anything built by a different provider is rebuilt | `tests/integration/test_model_drift.py` |
+| DAKC's own logic changing | Versioned layers (`dakc.versions`: parser, claim identity, entity resolution, rendering) are recorded with every build; a change re-runs exactly that layer, and rendering changes need no provider calls | `tests/integration/test_model_drift.py` |
+| Provenance | Every claim records the exact evidence sentences in each supporting passage. `dakc trace` follows displayed sentence → claim → passage → source version. `provenance = "strict"` renders only sentences that cite a claim | `tests/integration/test_provenance.py`; `dakc verify` reports citation coverage |
+| Contradictions | Conflicting claims are both kept, each with its own sources; deleting a source retracts exactly the claims it alone supported | `tests/integration/test_contradictions.py`; benchmark scenario S9 |
+| Claim identity | Exact after normalization (never merged by similarity); paraphrases are only *reported* | `benchmarks/equivalence.py` (precision/recall incl. hard negatives) |
+| Failures and crashes | All-or-nothing commit; the extraction cache survives for retries; rollback to any build | failure-injection and process-kill tests |
 
 ## How it decides what to rebuild
 
@@ -194,8 +221,11 @@ Seeded synthetic corpus, **5,000 documents** (48,933 claims, 2,501 pages, 279,40
 | S6 new source → popular entity | 33,121 / 13 / **7** | 2,501 / 5 / **2** | 0 | yes |
 | S7 contradicting source | 33,119 / 3 / **3** | 2,501 / 1 / **1** | 0 | yes |
 | S8 edit touching 7 entities | 33,118 / 73 / **22** | 2,501 / 50 / **11** | 0 | yes |
+| S9 contradiction, then original deleted | 33,117 / 13 / **8** | 2,501 / 6 / **4** | 0 | yes |
 
-Across all sizes (100, 1,000, 5,000 documents) and scenarios, every strategy's result was identical to an independent full rebuild, and DAKC never regenerated an artifact whose inputs were unchanged. The smallest LLM-call savings versus file-level at 5,000 documents: S7 contradicting source: 0% (a brand-new fact must be extracted and written under any strategy); S3 one source deleted: 44% (retracted facts genuinely require regenerating the pages that stated them). Full tables, method and caveats are in [docs/benchmark.md](docs/benchmark.md). Raw data: [benchmarks/results/latest.json](benchmarks/results/latest.json).
+Across all sizes (100, 1,000, 5,000 documents) and scenarios, every strategy's result was identical to an independent full rebuild, and DAKC never regenerated an artifact whose inputs were unchanged. The smallest LLM-call savings versus file-level at 5,000 documents: S7 contradicting source: 0% (a brand-new fact must be extracted and written under any strategy); S9 contradiction, then original deleted: 38%. Full tables, method and caveats are in [docs/benchmark.md](docs/benchmark.md). Raw data: [benchmarks/results/latest.json](benchmarks/results/latest.json).
+
+**At 20,000 documents** (realistic length and topic distributions; 329,123 claims, 10,002 pages, 1,906,814 dependency edges), LLM calls full / file-level / DAKC: S0 no change 177,546 / 0 / **0**; S1 one source modified 177,546 / 45 / **5**; S3 one source deleted 177,522 / 78 / **39**; S4 one source renamed 177,546 / 44 / **0**; S5 one claim modified 177,546 / 42 / **2**; S9 contradiction, then original deleted 177,546 / 14 / **11**. Every strategy was identical to a full rebuild with 0 stale artifacts. Raw data: [benchmarks/results/scale-realistic.json](benchmarks/results/scale-realistic.json).
 
 **With a real LLM** (`hosted-agent:gpt-4o-mini:t0.0`, 30 synthetic documents; full build 232 calls, 176,260 input tokens). Tokens are provider-reported:
 
@@ -222,6 +252,16 @@ Unchanged facts kept with identical claim ids after a one-sentence edit, whole-p
   that, but was measured to leave stale facts in pronoun cases.
 - **Claims must name at least one entity or concept** to attach to a page.
   Statements about nothing nameable are dropped.
+- **LLM-written pages are not fully grounded by default.** With the measured
+  model, about 28% of generated page sentences cited no claim (see
+  docs/benchmark.md). `provenance = "strict"` removes them from the rendered
+  page, which keeps an audit list.
+- **Paraphrases across sources are not merged.** They appear as separate
+  claims, which is redundant but never wrong. `dakc duplicates` lists likely
+  pairs.
+- **Single host.** The build lock is a local file lock, and SQLite is a
+  single-writer store. Concurrent builds on one machine are serialized; there
+  is no multi-host mode.
 - **Heuristic extraction is crude** (see above).
 - **Contradictions are kept, not resolved.** Both claims appear on the page
   with their own sources.
@@ -229,6 +269,22 @@ Unchanged facts kept with identical claim ids after a one-sentence edit, whole-p
   React Flow data for one.
 - **Single writer.** SQLite `BEGIN IMMEDIATE` serializes compiles; there is
   no distributed mode by design.
+
+## Reproduce everything
+
+```bash
+make install        # locked environment (uv.lock)
+make test           # all test suites
+make bench          # deterministic benchmark (100 / 1,000 / 5,000 docs) and regenerated docs
+make bench-verify   # re-run 100 docs; every non-timing metric must match benchmarks/results/latest.json (CI runs this)
+make scale          # 20,000 docs with realistic document-length and topic distributions
+make equivalence    # claim-equivalence evaluation (PROVIDER_CONFIG=... adds the LLM judge)
+make llm-bench PROVIDER_CONFIG=provider.toml   # real-LLM experiment (costs provider calls)
+```
+
+Deterministic results are exactly reproducible. Real-LLM results are not,
+because hosted models are not deterministic, and the docs report them as
+indicative.
 
 ## Project layout
 

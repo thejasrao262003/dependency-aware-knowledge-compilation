@@ -19,6 +19,7 @@ from dakc.graph import build_graph, downstream, export, resolve_id, stats, title
 from dakc.invalidation import render
 from dakc.provenance import changed_sources, explain
 from dakc.transactions import FaultInjector, InjectedFault, RollbackError, rollback, state_digest
+from dakc.transactions.lock import BuildLocked, workspace_lock
 from dakc.workspace import CONFIG_NAME, Workspace
 
 app = typer.Typer(
@@ -45,14 +46,27 @@ def _emit_json(obj) -> None:
     sys.stdout.write(json.dumps(obj, indent=1, sort_keys=True, default=str) + "\n")
 
 
-def _compile(ws: Workspace, strategy: str, dry_run: bool, provider: str | None, jobs: int | None, as_json: bool, fault: str | None = None) -> int:
+def _compile(ws: Workspace, strategy: str, dry_run: bool, provider: str | None, jobs: int | None, as_json: bool,
+             fault: str | None = None, wait: float = 0.0) -> int:
+    if dry_run:  # read-only: no lock
+        return _compile_locked(ws, strategy, dry_run, provider, jobs, as_json, fault)
+    try:
+        with workspace_lock(ws.db_path, wait):
+            return _compile_locked(ws, strategy, dry_run, provider, jobs, as_json, fault)
+    except BuildLocked as exc:
+        err.print(f"[red]error:[/red] {exc}")
+        return 3
+
+
+def _compile_locked(ws: Workspace, strategy: str, dry_run: bool, provider: str | None, jobs: int | None, as_json: bool,
+                    fault: str | None = None) -> int:
     store = ws.store()
     bundle = ws.provider(provider)
     comp = Compiler(
         store, bundle, ws.source_root,
         aliases=ws.config.alias_map, config_fingerprint=ws.config.fingerprint,
         strategy=strategy, jobs=jobs or ws.config.jobs, dry_run=dry_run,
-        fault=FaultInjector(fault), exclude=ws.excluded,
+        fault=FaultInjector(fault), exclude=ws.excluded, acquire_lock=False, provenance=ws.config.provenance,
     )
     before = state_digest(store)
     try:
@@ -116,6 +130,7 @@ def ingest(
     provider: Annotated[Optional[str], typer.Option(help="Override the configured provider.")] = None,
     jobs: Annotated[Optional[int], typer.Option(help="Concurrent provider calls.")] = None,
     as_json: Annotated[bool, typer.Option("--json")] = False,
+    wait: Annotated[float, typer.Option("--wait", help="Seconds to wait for another running build on this workspace.")] = 0.0,
 ) -> None:
     """Register a corpus and compile it (incrementally if already compiled)."""
     if not directory.is_dir():
@@ -131,7 +146,7 @@ def ingest(
     ws = _ws(root)
     if ws.source_root != directory.resolve():
         err.print(f"[yellow]note:[/yellow] workspace source_dir is {ws.source_root}; compiling that directory")
-    raise typer.Exit(_compile(ws, "dakc", False, provider, jobs, as_json))
+    raise typer.Exit(_compile(ws, "dakc", False, provider, jobs, as_json, wait=wait))
 
 
 @app.command()
@@ -187,6 +202,7 @@ def compile(  # noqa: A001 - CLI verb
     jobs: Annotated[Optional[int], typer.Option(help="Concurrent provider calls.")] = None,
     as_json: Annotated[bool, typer.Option("--json")] = False,
     fault: Annotated[Optional[str], typer.Option(hidden=True, help="Inject a failure, e.g. commit:100 (testing).")] = None,
+    wait: Annotated[float, typer.Option("--wait", help="Seconds to wait for another running build on this workspace.")] = 0.0,
 ) -> None:
     """Compile the knowledge base: only invalidated artifacts are rebuilt."""
     ws = _ws(workspace)
@@ -194,7 +210,7 @@ def compile(  # noqa: A001 - CLI verb
     if strat not in STRATEGIES:
         err.print(f"[red]error:[/red] strategy must be one of {', '.join(STRATEGIES)}")
         raise typer.Exit(2)
-    raise typer.Exit(_compile(ws, strat, dry_run, provider, jobs, as_json, fault))
+    raise typer.Exit(_compile(ws, strat, dry_run, provider, jobs, as_json, fault, wait))
 
 
 @app.command()
@@ -308,6 +324,80 @@ def explain_cmd(
 
 
 @app.command()
+def trace(
+    artifact: Annotated[str, typer.Argument(help="A page or claim, e.g. page:postgresql or a page title")],
+    workspace: WS = Path("."),
+    as_json: Annotated[bool, typer.Option("--json")] = False,
+) -> None:
+    """Sentence-level provenance: generated sentence -> claim -> passage -> source version -> evidence sentence."""
+    from dakc.provenance.trace import trace_claim, trace_page
+
+    ws = _ws(workspace)
+    store = ws.store()
+    aid = resolve_id(store, artifact) or artifact
+    cur = store.current_artifact(aid)
+    if cur is None or cur[0].kind not in ("page", "claim"):
+        err.print(f"[red]error:[/red] trace needs a current page or claim; {artifact!r} is not one")
+        raise typer.Exit(2)
+    art = cur[0]
+    if art.kind == "claim":
+        t = trace_claim(store, art)
+        if as_json:
+            _emit_json(t.__dict__ | {"evidence": [e.__dict__ for e in t.evidence]})
+            return
+        console.print(f"Claim: [bold]{t.claim_id}[/bold]\n  {t.text}")
+        for e in t.evidence:
+            console.print(f"  <- {e.source_path} @ {e.source_raw_hash} (registered in build {e.source_version_build}), {e.passage_id}")
+            for s in e.sentences:
+                console.print(f"       [dim]\"{s}\"[/dim]")
+        return
+    t = trace_page(store, art)
+    if as_json:
+        _emit_json(t.to_dict())
+        return
+    console.print(f"Page: [bold]{t.page_id}[/bold]  ({t.title})\n\nGenerated sentences:")
+    for i, s in enumerate(t.sentences, 1):
+        tag = ("-> " + ", ".join(s.cites)) if s.cites else "[yellow]uncited[/yellow]"
+        bad = f"  [red]invalid: {', '.join(s.invalid)}[/red]" if s.invalid else ""
+        console.print(f"  {i}. {s.sentence[:110]}  {tag}{bad}")
+    console.print("\nClaims:")
+    for c in t.claims:
+        console.print(f"  {c.ref}  {c.claim_id}  {c.text[:100]}")
+        for e in c.evidence:
+            console.print(f"       <- {e.source_path} @ {e.source_raw_hash} (build {e.source_version_build}), {e.passage_id}"
+                          + (f", section '{e.heading}'" if e.heading else ""))
+            for s in e.sentences:
+                console.print(f"          [dim]\"{s[:140]}\"[/dim]")
+    n = len(t.sentences)
+    console.print(f"\n{n - len(t.uncited)} of {n} displayed sentences cite a claim; {len(t.invalid_markers)} invalid citation marker(s).")
+    if t.dropped:
+        console.print(f"Removed by strict provenance ({len(t.dropped)}):")
+        for d in t.dropped[:10]:
+            console.print(f"  [dim]- {d[:140]}[/dim]")
+
+
+@app.command()
+def duplicates(
+    workspace: WS = Path("."),
+    limit: Annotated[int, typer.Option(help="Max pairs listed.")] = 30,
+    as_json: Annotated[bool, typer.Option("--json")] = False,
+) -> None:
+    """Report claims that are likely the same fact in different words (advisory; nothing is merged)."""
+    from dakc.claims import duplicate_candidates
+
+    ws = _ws(workspace)
+    state = ws.store().load_state()
+    claims = state.of("claim")
+    pairs = duplicate_candidates([(cid, c.text) for cid, c in claims.items()])  # type: ignore[attr-defined]
+    if as_json:
+        _emit_json([{"a": a, "b": b, "a_text": claims[a].text, "b_text": claims[b].text} for a, b in pairs])  # type: ignore[attr-defined]
+        return
+    console.print(f"{len(pairs)} likely duplicate pair(s) among {len(claims)} claims (deterministic, conservative; nothing is merged):")
+    for a, b in pairs[:limit]:
+        console.print(f"  - {claims[a].text}\n    {claims[b].text}")  # type: ignore[attr-defined]
+
+
+@app.command()
 def status(workspace: WS = Path(".")) -> None:
     """Head build, artifact counts and staleness against the current sources."""
     ws = _ws(workspace)
@@ -378,9 +468,19 @@ def diff(
 def rollback_cmd(
     workspace: WS = Path("."),
     to: Annotated[Optional[int], typer.Option("--to", help="Committed build to restore (default: the one before HEAD).")] = None,
+    wait: Annotated[float, typer.Option("--wait", help="Seconds to wait for another running build on this workspace.")] = 0.0,
 ) -> None:
     """Restore the knowledge base to an earlier committed build (sources are untouched)."""
     ws = _ws(workspace)
+    try:
+        with workspace_lock(ws.db_path, wait):
+            _rollback(ws, to)
+    except BuildLocked as exc:
+        err.print(f"[red]error:[/red] {exc}")
+        raise typer.Exit(3) from exc
+
+
+def _rollback(ws: Workspace, to: int | None) -> None:
     store = ws.store()
     if to is None:
         committed = [b.id for b in store.builds() if b.status == "committed" and b.id < store.head]
@@ -411,14 +511,15 @@ def verify(
     ws = _ws(workspace)
     store = ws.store()
     res = verify_store(store, ws.output_root, ws.state_dir)
-    out = {"checks": res.checks, "problems": res.problems}
+    out = {"checks": res.checks, "problems": res.problems, "metrics": res.metrics}
     ok = res.ok
     if against_full:
         bundle = ws.provider()
         if not bundle.free and not allow_cost:
             err.print("[red]error:[/red] --against-full with an LLM provider re-pays every call; add --allow-cost")
             raise typer.Exit(2)
-        equal, detail = verify_against_full(store, ws.source_root, bundle, ws.config.alias_map, ws.excluded)
+        equal, detail = verify_against_full(store, ws.source_root, bundle, ws.config.alias_map, ws.excluded,
+                                            ws.config.provenance, ws.config.fingerprint)
         out["equal_to_full_rebuild"] = equal
         out["full_rebuild_diff"] = detail
         ok = ok and equal
@@ -429,6 +530,10 @@ def verify(
             console.print(f"{'[green]PASS[/green]' if passed else '[red]FAIL[/red]'}  {name}")
             for p in res.problems.get(name, [])[:5]:
                 console.print(f"        {p}")
+        cov = res.metrics.get("citation_coverage")
+        if cov:
+            console.print(f"INFO  {cov['cited']} of {cov['sentences']} generated page sentences cite a claim "
+                          f"({100 * cov['coverage']:.1f}%); `dakc trace PAGE` shows which do not")
         if against_full:
             what = "content and structure" if out["full_rebuild_diff"]["content_compared"] else "structure (sources/passages)"
             console.print(f"{'[green]PASS[/green]' if out['equal_to_full_rebuild'] else '[red]FAIL[/red]'}  equal to a full rebuild ({what})")

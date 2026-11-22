@@ -261,6 +261,61 @@ itself. The LLM is only asked about sentences that actually changed.
 checks size and mtime." with an empty entity list. DAKC then discarded it
 because it had no page to attach to. Quote style also varied between calls.
 
+## ADR-19: Workspace build lock plus a HEAD check at commit
+
+**Decision.**
+- An OS file lock (`.dakc/build.lock`) covers each whole build: recovery,
+  load, compute, commit and projection.
+- The commit transaction also refuses to commit if HEAD moved since the state
+  was loaded.
+- Readers never lock.
+
+**Why.** SQLite serialized only the commit. Two builds computed from the same
+HEAD would both commit, losing an update. Crash recovery could also have
+marked another process's live build as aborted. The HEAD check is defence in
+depth for writers that bypass the lock.
+
+**Rejected.** Database-level advisory locks: SQLite has none, and holding a
+write transaction during LLM calls would block readers for minutes.
+
+## ADR-20: Version DAKC's own logic, per layer
+
+**Decision.** `dakc/versions.py` holds versions for the parser, claim
+identity, entity resolution and rendering. They are recorded with every build
+and restored by rollback. A mismatch re-runs only that layer. Page-writer and
+summarizer drift is detected per artifact (`generator` field), like the
+extractor's `extracted_by`.
+
+**Why.** Provider fingerprints covered models and prompts, but not DAKC's
+own deterministic code. A renderer or normalizer change would have left old
+artifacts marked current, and a page-writer model change regenerated nothing
+unless a source changed. Both are covered by `test_model_drift.py`.
+
+## ADR-21: Strict provenance is a rendering mode, not a generation constraint
+
+**Decision.** With `provenance = "strict"`, rendering drops any generated
+sentence that cites none of the page's claims, and keeps the dropped list for
+audit. The default is `report`: the generated text is shown as written, and
+coverage is reported by `dakc verify`.
+
+**Why.** With the measured model, about 28% of LLM-written page sentences
+cited no claim, often embellishments no source supports. Filtering
+deterministically at render time makes "every displayed sentence is
+traceable" hold by construction, at no LLM cost. It is not the default
+because it removes text. That is a product decision for the user.
+
+## ADR-22: Claim identity stays exact; equivalence is advisory only
+
+**Decision.** Claims are never merged by similarity. `dakc duplicates`
+reports likely paraphrase pairs using a conservative deterministic matcher.
+
+**Why.** On a labelled set with hard negatives (`benchmarks/equivalence.py`),
+naive fuzzy matching merged negations, value changes and reversed relations
+(64 false merges). The guarded matcher made no false merges, but found only a
+third of the true paraphrases. An LLM judge did well on the templated set,
+but real text is harder, and a false merge silently corrupts knowledge.
+Redundant claims are the safer failure.
+
 ## Libraries reused rather than reimplemented
 
 | Need | Library |

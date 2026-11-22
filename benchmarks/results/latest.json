@@ -2,12 +2,13 @@
  "machine": {
   "cpu": "Apple M5",
   "cpu_count": 10,
-  "date": "2026-11-22T06:27:22Z",
-  "git_commit": "6c2cc88",
+  "date": "2026-11-22T06:55:03Z",
+  "git_commit": "4dde25d",
   "platform": "macOS-27.2-arm64-arm-64bit",
   "provider": "mock (deterministic; tokens estimated as ceil(chars/4))",
   "python": "3.12.13"
  },
+ "profile": "uniform",
  "reps": 3,
  "sizes": [
   {
@@ -24,9 +25,10 @@
      "summary": 2
     },
     "llm_calls": 663,
-    "seconds": 0.135
+    "seconds": 0.15
    },
    "n_docs": 100,
+   "profile": "uniform",
    "reps": 3,
    "scenarios": {
     "S0_no_change": {
@@ -50,11 +52,11 @@
        "passages_reextracted": 0,
        "processed_sources": 0,
        "seconds_all": [
-        0.0138,
-        0.0158,
+        0.0141,
+        0.0148,
         0.0135
        ],
-       "seconds_median": 0.0138,
+       "seconds_median": 0.0141,
        "stale_artifacts_retained": 0,
        "status": "noop",
        "summaries_regenerated": 0,
@@ -76,11 +78,11 @@
        "passages_reextracted": 0,
        "processed_sources": 0,
        "seconds_all": [
-        0.0205,
-        0.0341,
-        0.0137
+        0.014,
+        0.0154,
+        0.0154
        ],
-       "seconds_median": 0.0205,
+       "seconds_median": 0.0154,
        "stale_artifacts_retained": 0,
        "status": "noop",
        "summaries_regenerated": 0,
@@ -102,11 +104,11 @@
        "passages_reextracted": 608,
        "processed_sources": 100,
        "seconds_all": [
-        0.0992,
-        0.0926,
-        0.0895
+        0.1047,
+        0.0957,
+        0.0978
        ],
-       "seconds_median": 0.0926,
+       "seconds_median": 0.0978,
        "stale_artifacts_retained": 0,
        "status": "noop",
        "summaries_regenerated": 2,
@@ -138,11 +140,11 @@
        "passages_reextracted": 1,
        "processed_sources": 1,
        "seconds_all": [
-        0.0224,
-        0.0226,
-        0.0251
+        0.0234,
+        0.0241,
+        0.025
        ],
-       "seconds_median": 0.0226,
+       "seconds_median": 0.0241,
        "stale_artifacts_retained": 0,
        "status": "committed",
        "summaries_regenerated": 2,
@@ -164,11 +166,11 @@
        "passages_reextracted": 4,
        "processed_sources": 1,
        "seconds_all": [
-        0.0242,
-        0.0251,
-        0.0295
+        0.028,
+        0.0249,
+        0.0277
        ],
-       "seconds_median": 0.0251,
+       "seconds_median": 0.0277,
        "stale_artifacts_retained": 0,
        "status": "committed",
        "summaries_regenerated": 2,
@@ -190,11 +192,11 @@
        "passages_reextracted": 608,
        "processed_sources": 100,
        "seconds_all": [
-        0.098,
-        0.0933,
-        0.0933
+        0.1164,
+        0.0947,
+        0.0992
        ],
-       "seconds_median": 0.0933,
+       "seconds_median": 0.0992,
        "stale_artifacts_retained": 0,
        "status": "committed",
        "summaries_regenerated": 2,
@@ -230,11 +232,11 @@
        "passages_reextracted": 5,
        "processed_sources": 5,
        "seconds_all": [
-        0.0364,
-        0.0364,
-        0.0348
+        0.0367,
+        0.0366,
+        0.0429
        ],
-       "seconds_median": 0.0364,
+       "seconds_median": 0.0367,
        "stale_artifacts_retained": 0,
        "status": "committed",
        "summaries_regenerated": 2,
@@ -256,11 +258,11 @@
        "passages_reextracted": 29,
        "processed_sources": 5,
        "seconds_all": [
-        0.0402,
-        0.0446,
-        0.0402
+        0.0401,
+        0.0403,
+        0.0412
        ],
-       "seconds_median": 0.0402,
+       "seconds_median": 0.0403,
        "stale_artifacts_retained": 0,
        "status": "committed",
        "summaries_regenerated": 2,
@@ -282,11 +284,11 @@
        "passages_reextracted": 608,
        "processed_sources": 100,
        "seconds_all": [
-        0.1072,
-        0.0977,
-        0.098
+        0.1247,
+        0.1015,
+        0.111
        ],
-       "seconds_median": 0.098,
+       "seconds_median": 0.111,
        "stale_artifacts_retained": 0,
        "status": "committed",
        "summaries_regenerated": 2,
@@ -318,11 +320,11 @@
        "passages_reextracted": 0,
        "processed_sources": 0,
        "seconds_all": [
-        0.0232,
-        0.024,
-        0.0229
+        0.03,
+        0.0247,
+        0.0263
        ],
-       "seconds_median": 0.0232,
+       "seconds_median": 0.0263,
        "stale_artifacts_retained": 0,
        "status": "committed",
        "summaries_regenerated": 1,
@@ -344,11 +346,11 @@
        "passages_reextracted": 0,
        "processed_sources": 0,
        "seconds_all": [
-        0.0243,
-        0.0238,
-        0.024
+        0.0246,
+        0.0244,
+        0.026
        ],
-       "seconds_median": 0.024,
+       "seconds_median": 0.0246,
        "stale_artifacts_retained": 0,
        "status": "committed",
        "summaries_regenerated": 2,
@@ -370,11 +372,11 @@
        "passages_reextracted": 603,
        "processed_sources": 99,
        "seconds_all": [
-        0.0979,
-        0.0954,
-        0.0993
+        0.1093,
+        0.0992,
+        0.0941
        ],
-       "seconds_median": 0.0979,
+       "seconds_median": 0.0992,
        "stale_artifacts_retained": 0,
        "status": "committed",
        "summaries_regenerated": 2,
@@ -409,11 +411,11 @@
        "passages_reextracted": 0,
        "processed_sources": 0,
        "seconds_all": [
-        0.0216,
-        0.0215,
-        0.0221
+        0.0211,
+        0.0234,
+        0.0224
        ],
-       "seconds_median": 0.0216,
+       "seconds_median": 0.0224,
        "stale_artifacts_retained": 0,
        "status": "committed",
        "summaries_regenerated": 0,
@@ -435,11 +437,11 @@
        "passages_reextracted": 4,
        "processed_sources": 1,
        "seconds_all": [
-        0.0263,
-        0.0359,
-        0.0253
+        0.0259,
+        0.0276,
+        0.0238
        ],
-       "seconds_median": 0.0263,
+       "seconds_median": 0.0259,
        "stale_artifacts_retained": 0,
        "status": "committed",
        "summaries_regenerated": 2,
@@ -461,11 +463,11 @@
        "passages_reextracted": 608,
        "processed_sources": 100,
        "seconds_all": [
-        0.0957,
-        0.0947,
-        0.096
+        0.0996,
+        0.091,
+        0.0921
        ],
-       "seconds_median": 0.0957,
+       "seconds_median": 0.0921,
        "stale_artifacts_retained": 0,
        "status": "committed",
        "summaries_regenerated": 2,
@@ -498,11 +500,11 @@
        "passages_reextracted": 1,
        "processed_sources": 1,
        "seconds_all": [
-        0.0316,
-        0.0238,
-        0.0206
+        0.0223,
+        0.0202,
+        0.0212
        ],
-       "seconds_median": 0.0238,
+       "seconds_median": 0.0212,
        "stale_artifacts_retained": 0,
        "status": "committed",
        "summaries_regenerated": 0,
@@ -524,11 +526,11 @@
        "passages_reextracted": 4,
        "processed_sources": 1,
        "seconds_all": [
-        0.0237,
-        0.0352,
-        0.0525
+        0.0263,
+        0.0259,
+        0.0254
        ],
-       "seconds_median": 0.0352,
+       "seconds_median": 0.0259,
        "stale_artifacts_retained": 0,
        "status": "committed",
        "summaries_regenerated": 1,
@@ -550,11 +552,11 @@
        "passages_reextracted": 608,
        "processed_sources": 100,
        "seconds_all": [
-        0.0917,
-        0.0944,
-        0.0969
+        0.1115,
+        0.0926,
+        0.1028
        ],
-       "seconds_median": 0.0944,
+       "seconds_median": 0.1028,
        "stale_artifacts_retained": 0,
        "status": "committed",
        "summaries_regenerated": 2,
@@ -586,11 +588,11 @@
        "passages_reextracted": 3,
        "processed_sources": 1,
        "seconds_all": [
-        0.024,
-        0.0239,
-        0.024
+        0.0241,
+        0.0242,
+        0.044
        ],
-       "seconds_median": 0.024,
+       "seconds_median": 0.0242,
        "stale_artifacts_retained": 0,
        "status": "committed",
        "summaries_regenerated": 2,
@@ -612,11 +614,11 @@
        "passages_reextracted": 3,
        "processed_sources": 1,
        "seconds_all": [
-        0.0271,
-        0.0248,
-        0.0243
+        0.0251,
+        0.0227,
+        0.0263
        ],
-       "seconds_median": 0.0248,
+       "seconds_median": 0.0251,
        "stale_artifacts_retained": 0,
        "status": "committed",
        "summaries_regenerated": 2,
@@ -638,11 +640,11 @@
        "passages_reextracted": 611,
        "processed_sources": 101,
        "seconds_all": [
-        0.0996,
-        0.0949,
-        0.0994
+        0.0971,
+        0.0945,
+        0.0992
        ],
-       "seconds_median": 0.0994,
+       "seconds_median": 0.0971,
        "stale_artifacts_retained": 0,
        "status": "committed",
        "summaries_regenerated": 2,
@@ -676,11 +678,11 @@
        "passages_reextracted": 1,
        "processed_sources": 1,
        "seconds_all": [
-        0.017,
-        0.0177,
-        0.0181
+        0.0169,
+        0.0183,
+        0.018
        ],
-       "seconds_median": 0.0177,
+       "seconds_median": 0.018,
        "stale_artifacts_retained": 0,
        "status": "committed",
        "summaries_regenerated": 2,
@@ -702,11 +704,11 @@
        "passages_reextracted": 1,
        "processed_sources": 1,
        "seconds_all": [
-        0.0175,
-        0.0194,
-        0.0177
+        0.016,
+        0.0171,
+        0.0179
        ],
-       "seconds_median": 0.0177,
+       "seconds_median": 0.0171,
        "stale_artifacts_retained": 0,
        "status": "committed",
        "summaries_regenerated": 2,
@@ -728,11 +730,11 @@
        "passages_reextracted": 609,
        "processed_sources": 101,
        "seconds_all": [
-        0.094,
-        0.0921,
-        0.0944
+        0.0933,
+        0.0905,
+        0.0965
        ],
-       "seconds_median": 0.094,
+       "seconds_median": 0.0933,
        "stale_artifacts_retained": 0,
        "status": "committed",
        "summaries_regenerated": 2,
@@ -764,11 +766,11 @@
        "passages_reextracted": 1,
        "processed_sources": 1,
        "seconds_all": [
-        0.0273,
-        0.0289,
-        0.0308
+        0.0284,
+        0.0284,
+        0.0311
        ],
-       "seconds_median": 0.0289,
+       "seconds_median": 0.0284,
        "stale_artifacts_retained": 0,
        "status": "committed",
        "summaries_regenerated": 2,
@@ -790,11 +792,11 @@
        "passages_reextracted": 4,
        "processed_sources": 1,
        "seconds_all": [
-        0.0281,
-        0.0281,
-        0.0289
+        0.0305,
+        0.0301,
+        0.0314
        ],
-       "seconds_median": 0.0281,
+       "seconds_median": 0.0305,
        "stale_artifacts_retained": 0,
        "status": "committed",
        "summaries_regenerated": 2,
@@ -816,16 +818,108 @@
        "passages_reextracted": 608,
        "processed_sources": 100,
        "seconds_all": [
-        0.097,
-        0.0947,
-        0.1041
+        0.1067,
+        0.1007,
+        0.0966
        ],
-       "seconds_median": 0.097,
+       "seconds_median": 0.1007,
        "stale_artifacts_retained": 0,
        "status": "committed",
        "summaries_regenerated": 2,
        "unaffected_artifacts_modified": 0,
        "unnecessary_regenerations": 41
+      }
+     }
+    },
+    "S9_contradiction_then_delete": {
+     "change": {
+      "added": [
+       "topic-000/doc-correction.md"
+      ],
+      "claim": "Belengrid stores data in: an append-only journal -> a log-structured merge tree",
+      "deleted": [
+       "topic-000/doc-00008.md"
+      ]
+     },
+     "oracle_changed_artifacts": 55,
+     "strategies": {
+      "dakc": {
+       "artifact_versions_written": 38,
+       "claims_regenerated": 1,
+       "edge_mismatches": 0,
+       "equivalent_to_full_rebuild": true,
+       "extraction_cache_hits": 0,
+       "input_tokens_est": 9601,
+       "llm_calls": 14,
+       "output_tokens_est": 10166,
+       "pages_cutoff": 0,
+       "pages_regenerated": 11,
+       "pages_rerendered_no_llm": 2,
+       "passages_reextracted": 1,
+       "processed_sources": 1,
+       "seconds_all": [
+        0.0342,
+        0.0319,
+        0.0298
+       ],
+       "seconds_median": 0.0319,
+       "stale_artifacts_retained": 0,
+       "status": "committed",
+       "summaries_regenerated": 2,
+       "unaffected_artifacts_modified": 0,
+       "unnecessary_regenerations": 0
+      },
+      "file": {
+       "artifact_versions_written": 38,
+       "claims_regenerated": 1,
+       "edge_mismatches": 0,
+       "equivalent_to_full_rebuild": true,
+       "extraction_cache_hits": 0,
+       "input_tokens_est": 11588,
+       "llm_calls": 16,
+       "output_tokens_est": 12266,
+       "pages_cutoff": 0,
+       "pages_regenerated": 13,
+       "pages_rerendered_no_llm": 0,
+       "passages_reextracted": 1,
+       "processed_sources": 1,
+       "seconds_all": [
+        0.0294,
+        0.03,
+        0.0303
+       ],
+       "seconds_median": 0.03,
+       "stale_artifacts_retained": 0,
+       "status": "committed",
+       "summaries_regenerated": 2,
+       "unaffected_artifacts_modified": 0,
+       "unnecessary_regenerations": 0
+      },
+      "full": {
+       "artifact_versions_written": 38,
+       "claims_regenerated": 1480,
+       "edge_mismatches": 0,
+       "equivalent_to_full_rebuild": true,
+       "extraction_cache_hits": 0,
+       "input_tokens_est": 71635,
+       "llm_calls": 659,
+       "output_tokens_est": 42550,
+       "pages_cutoff": 0,
+       "pages_regenerated": 53,
+       "pages_rerendered_no_llm": 0,
+       "passages_reextracted": 604,
+       "processed_sources": 100,
+       "seconds_all": [
+        0.0969,
+        0.1143,
+        0.0961
+       ],
+       "seconds_median": 0.0969,
+       "stale_artifacts_retained": 0,
+       "status": "committed",
+       "summaries_regenerated": 2,
+       "unaffected_artifacts_modified": 0,
+       "unnecessary_regenerations": 40
       }
      }
     }
@@ -845,9 +939,10 @@
      "summary": 20
     },
     "llm_calls": 6391,
-    "seconds": 1.277
+    "seconds": 1.189
    },
    "n_docs": 1000,
+   "profile": "uniform",
    "reps": 3,
    "scenarios": {
     "S0_no_change": {
@@ -871,9 +966,9 @@
        "passages_reextracted": 0,
        "processed_sources": 0,
        "seconds_all": [
-        0.1204,
-        0.1291,
-        0.1295
+        0.1229,
+        0.136,
+        0.1291
        ],
        "seconds_median": 0.1291,
        "stale_artifacts_retained": 0,
@@ -897,11 +992,11 @@
        "passages_reextracted": 0,
        "processed_sources": 0,
        "seconds_all": [
-        0.1284,
-        0.1253,
-        0.1282
+        0.1395,
+        0.1414,
+        0.1268
        ],
-       "seconds_median": 0.1282,
+       "seconds_median": 0.1395,
        "stale_artifacts_retained": 0,
        "status": "noop",
        "summaries_regenerated": 0,
@@ -923,11 +1018,11 @@
        "passages_reextracted": 5868,
        "processed_sources": 1000,
        "seconds_all": [
-        0.9189,
-        0.9153,
-        0.8952
+        0.9371,
+        0.9233,
+        0.9385
        ],
-       "seconds_median": 0.9153,
+       "seconds_median": 0.9371,
        "stale_artifacts_retained": 0,
        "status": "noop",
        "summaries_regenerated": 20,
@@ -959,11 +1054,11 @@
        "passages_reextracted": 1,
        "processed_sources": 1,
        "seconds_all": [
-        0.1786,
-        0.1782,
-        0.1771
+        0.1837,
+        0.1898,
+        0.1757
        ],
-       "seconds_median": 0.1782,
+       "seconds_median": 0.1837,
        "stale_artifacts_retained": 0,
        "status": "committed",
        "summaries_regenerated": 6,
@@ -985,11 +1080,11 @@
        "passages_reextracted": 7,
        "processed_sources": 1,
        "seconds_all": [
-        0.2131,
-        0.2121,
-        0.2119
+        0.2185,
+        0.21,
+        0.2076
        ],
-       "seconds_median": 0.2121,
+       "seconds_median": 0.21,
        "stale_artifacts_retained": 0,
        "status": "committed",
        "summaries_regenerated": 7,
@@ -1011,11 +1106,11 @@
        "passages_reextracted": 5868,
        "processed_sources": 1000,
        "seconds_all": [
-        0.9307,
-        0.9825,
-        0.9556
+        0.9519,
+        0.9935,
+        0.9541
        ],
-       "seconds_median": 0.9556,
+       "seconds_median": 0.9541,
        "stale_artifacts_retained": 0,
        "status": "committed",
        "summaries_regenerated": 20,
@@ -1051,11 +1146,11 @@
        "passages_reextracted": 5,
        "processed_sources": 5,
        "seconds_all": [
-        0.2375,
-        0.241,
-        0.2341
+        0.238,
+        0.2288,
+        0.2486
        ],
-       "seconds_median": 0.2375,
+       "seconds_median": 0.238,
        "stale_artifacts_retained": 0,
        "status": "committed",
        "summaries_regenerated": 10,
@@ -1077,11 +1172,11 @@
        "passages_reextracted": 34,
        "processed_sources": 5,
        "seconds_all": [
-        0.2834,
-        0.2833,
-        0.2702
+        0.2738,
+        0.2791,
+        0.2731
        ],
-       "seconds_median": 0.2833,
+       "seconds_median": 0.2738,
        "stale_artifacts_retained": 0,
        "status": "committed",
        "summaries_regenerated": 15,
@@ -1103,11 +1198,11 @@
        "passages_reextracted": 5868,
        "processed_sources": 1000,
        "seconds_all": [
-        0.9525,
-        0.9557,
-        0.9531
+        0.9567,
+        0.9417,
+        0.9439
        ],
-       "seconds_median": 0.9531,
+       "seconds_median": 0.9439,
        "stale_artifacts_retained": 0,
        "status": "committed",
        "summaries_regenerated": 20,
@@ -1139,11 +1234,11 @@
        "passages_reextracted": 0,
        "processed_sources": 0,
        "seconds_all": [
-        0.2181,
-        0.2192,
-        0.2226
+        0.2379,
+        0.2322,
+        0.2263
        ],
-       "seconds_median": 0.2192,
+       "seconds_median": 0.2322,
        "stale_artifacts_retained": 0,
        "status": "committed",
        "summaries_regenerated": 13,
@@ -1165,11 +1260,11 @@
        "passages_reextracted": 0,
        "processed_sources": 0,
        "seconds_all": [
-        0.2233,
-        0.2247,
-        0.2268
+        0.2395,
+        0.2276,
+        0.2325
        ],
-       "seconds_median": 0.2247,
+       "seconds_median": 0.2325,
        "stale_artifacts_retained": 0,
        "status": "committed",
        "summaries_regenerated": 14,
@@ -1191,11 +1286,11 @@
        "passages_reextracted": 5859,
        "processed_sources": 999,
        "seconds_all": [
-        0.9459,
-        0.948,
-        0.9364
+        0.9648,
+        0.9656,
+        1.0093
        ],
-       "seconds_median": 0.9459,
+       "seconds_median": 0.9656,
        "stale_artifacts_retained": 0,
        "status": "committed",
        "summaries_regenerated": 20,
@@ -1230,11 +1325,11 @@
        "passages_reextracted": 0,
        "processed_sources": 0,
        "seconds_all": [
-        0.1905,
-        0.1868,
-        0.1854
+        0.1881,
+        0.1846,
+        0.193
        ],
-       "seconds_median": 0.1868,
+       "seconds_median": 0.1881,
        "stale_artifacts_retained": 0,
        "status": "committed",
        "summaries_regenerated": 0,
@@ -1256,11 +1351,11 @@
        "passages_reextracted": 7,
        "processed_sources": 1,
        "seconds_all": [
-        0.2034,
-        0.1986,
-        0.198
+        0.2118,
+        0.2065,
+        0.2016
        ],
-       "seconds_median": 0.1986,
+       "seconds_median": 0.2065,
        "stale_artifacts_retained": 0,
        "status": "committed",
        "summaries_regenerated": 13,
@@ -1282,11 +1377,11 @@
        "passages_reextracted": 5868,
        "processed_sources": 1000,
        "seconds_all": [
-        0.918,
-        0.9052,
-        0.9298
+        0.9373,
+        0.9709,
+        0.9583
        ],
-       "seconds_median": 0.918,
+       "seconds_median": 0.9583,
        "stale_artifacts_retained": 0,
        "status": "committed",
        "summaries_regenerated": 20,
@@ -1319,11 +1414,11 @@
        "passages_reextracted": 1,
        "processed_sources": 1,
        "seconds_all": [
-        0.1463,
-        0.1338,
-        0.1289
+        0.1356,
+        0.1348,
+        0.1313
        ],
-       "seconds_median": 0.1338,
+       "seconds_median": 0.1348,
        "stale_artifacts_retained": 0,
        "status": "committed",
        "summaries_regenerated": 0,
@@ -1345,11 +1440,11 @@
        "passages_reextracted": 7,
        "processed_sources": 1,
        "seconds_all": [
-        0.1879,
-        0.1981,
-        0.2
+        0.1954,
+        0.1933,
+        0.1883
        ],
-       "seconds_median": 0.1981,
+       "seconds_median": 0.1933,
        "stale_artifacts_retained": 0,
        "status": "committed",
        "summaries_regenerated": 1,
@@ -1371,11 +1466,11 @@
        "passages_reextracted": 5868,
        "processed_sources": 1000,
        "seconds_all": [
-        0.9136,
-        0.9011,
-        0.8937
+        0.9095,
+        0.986,
+        0.917
        ],
-       "seconds_median": 0.9011,
+       "seconds_median": 0.917,
        "stale_artifacts_retained": 0,
        "status": "committed",
        "summaries_regenerated": 20,
@@ -1407,11 +1502,11 @@
        "passages_reextracted": 3,
        "processed_sources": 1,
        "seconds_all": [
-        0.1751,
-        0.1745,
-        0.1747
+        0.1944,
+        0.1816,
+        0.1756
        ],
-       "seconds_median": 0.1747,
+       "seconds_median": 0.1816,
        "stale_artifacts_retained": 0,
        "status": "committed",
        "summaries_regenerated": 1,
@@ -1433,11 +1528,11 @@
        "passages_reextracted": 3,
        "processed_sources": 1,
        "seconds_all": [
-        0.1722,
-        0.1772,
-        0.1755
+        0.1974,
+        0.1856,
+        0.1842
        ],
-       "seconds_median": 0.1755,
+       "seconds_median": 0.1856,
        "stale_artifacts_retained": 0,
        "status": "committed",
        "summaries_regenerated": 4,
@@ -1459,11 +1554,11 @@
        "passages_reextracted": 5871,
        "processed_sources": 1001,
        "seconds_all": [
-        0.9205,
-        0.965,
-        0.9138
+        1.0611,
+        0.9864,
+        0.97
        ],
-       "seconds_median": 0.9205,
+       "seconds_median": 0.9864,
        "stale_artifacts_retained": 0,
        "status": "committed",
        "summaries_regenerated": 20,
@@ -1497,11 +1592,11 @@
        "passages_reextracted": 1,
        "processed_sources": 1,
        "seconds_all": [
-        0.1321,
-        0.1435,
-        0.1412
+        0.1454,
+        0.1575,
+        0.1342
        ],
-       "seconds_median": 0.1412,
+       "seconds_median": 0.1454,
        "stale_artifacts_retained": 0,
        "status": "committed",
        "summaries_regenerated": 1,
@@ -1523,11 +1618,11 @@
        "passages_reextracted": 1,
        "processed_sources": 1,
        "seconds_all": [
-        0.14,
-        0.1448,
-        0.134
+        0.1346,
+        0.1397,
+        0.1346
        ],
-       "seconds_median": 0.14,
+       "seconds_median": 0.1346,
        "stale_artifacts_retained": 0,
        "status": "committed",
        "summaries_regenerated": 1,
@@ -1549,11 +1644,11 @@
        "passages_reextracted": 5869,
        "processed_sources": 1001,
        "seconds_all": [
-        0.9084,
-        0.9019,
-        0.9396
+        0.9879,
+        0.9266,
+        0.9685
        ],
-       "seconds_median": 0.9084,
+       "seconds_median": 0.9685,
        "stale_artifacts_retained": 0,
        "status": "committed",
        "summaries_regenerated": 20,
@@ -1585,11 +1680,11 @@
        "passages_reextracted": 1,
        "processed_sources": 1,
        "seconds_all": [
-        0.1688,
-        0.1709,
-        0.1627
+        0.1672,
+        0.1672,
+        0.174
        ],
-       "seconds_median": 0.1688,
+       "seconds_median": 0.1672,
        "stale_artifacts_retained": 0,
        "status": "committed",
        "summaries_regenerated": 7,
@@ -1611,11 +1706,11 @@
        "passages_reextracted": 7,
        "processed_sources": 1,
        "seconds_all": [
-        0.2164,
-        0.2088,
-        0.2087
+        0.2133,
+        0.231,
+        0.2131
        ],
-       "seconds_median": 0.2088,
+       "seconds_median": 0.2133,
        "stale_artifacts_retained": 0,
        "status": "committed",
        "summaries_regenerated": 7,
@@ -1637,16 +1732,108 @@
        "passages_reextracted": 5868,
        "processed_sources": 1000,
        "seconds_all": [
-        0.938,
-        0.9415,
-        0.987
+        0.9589,
+        0.9171,
+        0.9396
        ],
-       "seconds_median": 0.9415,
+       "seconds_median": 0.9396,
        "stale_artifacts_retained": 0,
        "status": "committed",
        "summaries_regenerated": 20,
        "unaffected_artifacts_modified": 0,
        "unnecessary_regenerations": 501
+      }
+     }
+    },
+    "S9_contradiction_then_delete": {
+     "change": {
+      "added": [
+       "topic-004/doc-correction.md"
+      ],
+      "claim": "Moramesh has a default port of: 15006 -> 65101",
+      "deleted": [
+       "topic-004/doc-00004.md"
+      ]
+     },
+     "oracle_changed_artifacts": 83,
+     "strategies": {
+      "dakc": {
+       "artifact_versions_written": 59,
+       "claims_regenerated": 1,
+       "edge_mismatches": 0,
+       "equivalent_to_full_rebuild": true,
+       "extraction_cache_hits": 0,
+       "input_tokens_est": 40660,
+       "llm_calls": 27,
+       "output_tokens_est": 44699,
+       "pages_cutoff": 0,
+       "pages_regenerated": 16,
+       "pages_rerendered_no_llm": 7,
+       "passages_reextracted": 1,
+       "processed_sources": 1,
+       "seconds_all": [
+        0.2274,
+        0.2275,
+        0.2247
+       ],
+       "seconds_median": 0.2274,
+       "stale_artifacts_retained": 0,
+       "status": "committed",
+       "summaries_regenerated": 10,
+       "unaffected_artifacts_modified": 0,
+       "unnecessary_regenerations": 0
+      },
+      "file": {
+       "artifact_versions_written": 59,
+       "claims_regenerated": 1,
+       "edge_mismatches": 0,
+       "equivalent_to_full_rebuild": true,
+       "extraction_cache_hits": 0,
+       "input_tokens_est": 55935,
+       "llm_calls": 38,
+       "output_tokens_est": 61490,
+       "pages_cutoff": 0,
+       "pages_regenerated": 23,
+       "pages_rerendered_no_llm": 0,
+       "passages_reextracted": 1,
+       "processed_sources": 1,
+       "seconds_all": [
+        0.247,
+        0.2334,
+        0.2222
+       ],
+       "seconds_median": 0.2334,
+       "stale_artifacts_retained": 0,
+       "status": "committed",
+       "summaries_regenerated": 14,
+       "unaffected_artifacts_modified": 0,
+       "unnecessary_regenerations": 4
+      },
+      "full": {
+       "artifact_versions_written": 59,
+       "claims_regenerated": 14766,
+       "edge_mismatches": 0,
+       "equivalent_to_full_rebuild": true,
+       "extraction_cache_hits": 0,
+       "input_tokens_est": 700301,
+       "llm_calls": 6386,
+       "output_tokens_est": 420615,
+       "pages_cutoff": 0,
+       "pages_regenerated": 503,
+       "pages_rerendered_no_llm": 0,
+       "passages_reextracted": 5863,
+       "processed_sources": 1000,
+       "seconds_all": [
+        0.9622,
+        0.9684,
+        0.999
+       ],
+       "seconds_median": 0.9684,
+       "stale_artifacts_retained": 0,
+       "status": "committed",
+       "summaries_regenerated": 20,
+       "unaffected_artifacts_modified": 0,
+       "unnecessary_regenerations": 490
       }
      }
     }
@@ -1666,9 +1853,10 @@
      "summary": 100
     },
     "llm_calls": 33118,
-    "seconds": 6.456
+    "seconds": 6.736
    },
    "n_docs": 5000,
+   "profile": "uniform",
    "reps": 1,
    "scenarios": {
     "S0_no_change": {
@@ -1692,9 +1880,9 @@
        "passages_reextracted": 0,
        "processed_sources": 0,
        "seconds_all": [
-        0.6502
+        0.6878
        ],
-       "seconds_median": 0.6502,
+       "seconds_median": 0.6878,
        "stale_artifacts_retained": 0,
        "status": "noop",
        "summaries_regenerated": 0,
@@ -1716,9 +1904,9 @@
        "passages_reextracted": 0,
        "processed_sources": 0,
        "seconds_all": [
-        0.6591
+        0.6492
        ],
-       "seconds_median": 0.6591,
+       "seconds_median": 0.6492,
        "stale_artifacts_retained": 0,
        "status": "noop",
        "summaries_regenerated": 0,
@@ -1740,9 +1928,9 @@
        "passages_reextracted": 30517,
        "processed_sources": 5000,
        "seconds_all": [
-        5.3491
+        5.3241
        ],
-       "seconds_median": 5.3491,
+       "seconds_median": 5.3241,
        "stale_artifacts_retained": 0,
        "status": "noop",
        "summaries_regenerated": 100,
@@ -1774,9 +1962,9 @@
        "passages_reextracted": 1,
        "processed_sources": 1,
        "seconds_all": [
-        0.8264
+        0.8655
        ],
-       "seconds_median": 0.8264,
+       "seconds_median": 0.8655,
        "stale_artifacts_retained": 0,
        "status": "committed",
        "summaries_regenerated": 5,
@@ -1798,9 +1986,9 @@
        "passages_reextracted": 10,
        "processed_sources": 1,
        "seconds_all": [
-        1.0466
+        1.1247
        ],
-       "seconds_median": 1.0466,
+       "seconds_median": 1.1247,
        "stale_artifacts_retained": 0,
        "status": "committed",
        "summaries_regenerated": 7,
@@ -1822,9 +2010,9 @@
        "passages_reextracted": 30517,
        "processed_sources": 5000,
        "seconds_all": [
-        5.2765
+        5.2892
        ],
-       "seconds_median": 5.2765,
+       "seconds_median": 5.2892,
        "stale_artifacts_retained": 0,
        "status": "committed",
        "summaries_regenerated": 100,
@@ -1860,9 +2048,9 @@
        "passages_reextracted": 5,
        "processed_sources": 5,
        "seconds_all": [
-        1.0718
+        1.1669
        ],
-       "seconds_median": 1.0718,
+       "seconds_median": 1.1669,
        "stale_artifacts_retained": 0,
        "status": "committed",
        "summaries_regenerated": 12,
@@ -1884,9 +2072,9 @@
        "passages_reextracted": 35,
        "processed_sources": 5,
        "seconds_all": [
-        1.2872
+        1.2437
        ],
-       "seconds_median": 1.2872,
+       "seconds_median": 1.2437,
        "stale_artifacts_retained": 0,
        "status": "committed",
        "summaries_regenerated": 21,
@@ -1908,9 +2096,9 @@
        "passages_reextracted": 30517,
        "processed_sources": 5000,
        "seconds_all": [
-        5.3685
+        5.4572
        ],
-       "seconds_median": 5.3685,
+       "seconds_median": 5.4572,
        "stale_artifacts_retained": 0,
        "status": "committed",
        "summaries_regenerated": 100,
@@ -1942,9 +2130,9 @@
        "passages_reextracted": 0,
        "processed_sources": 0,
        "seconds_all": [
-        1.0045
+        1.0197
        ],
-       "seconds_median": 1.0045,
+       "seconds_median": 1.0197,
        "stale_artifacts_retained": 0,
        "status": "committed",
        "summaries_regenerated": 13,
@@ -1966,9 +2154,9 @@
        "passages_reextracted": 0,
        "processed_sources": 0,
        "seconds_all": [
-        1.0256
+        1.0104
        ],
-       "seconds_median": 1.0256,
+       "seconds_median": 1.0104,
        "stale_artifacts_retained": 0,
        "status": "committed",
        "summaries_regenerated": 21,
@@ -1990,9 +2178,9 @@
        "passages_reextracted": 30510,
        "processed_sources": 4999,
        "seconds_all": [
-        5.272
+        5.477
        ],
-       "seconds_median": 5.272,
+       "seconds_median": 5.477,
        "stale_artifacts_retained": 0,
        "status": "committed",
        "summaries_regenerated": 100,
@@ -2027,9 +2215,9 @@
        "passages_reextracted": 0,
        "processed_sources": 0,
        "seconds_all": [
-        0.9372
+        1.0456
        ],
-       "seconds_median": 0.9372,
+       "seconds_median": 1.0456,
        "stale_artifacts_retained": 0,
        "status": "committed",
        "summaries_regenerated": 0,
@@ -2051,9 +2239,9 @@
        "passages_reextracted": 10,
        "processed_sources": 1,
        "seconds_all": [
-        0.9559
+        1.0127
        ],
-       "seconds_median": 0.9559,
+       "seconds_median": 1.0127,
        "stale_artifacts_retained": 0,
        "status": "committed",
        "summaries_regenerated": 31,
@@ -2075,9 +2263,9 @@
        "passages_reextracted": 30517,
        "processed_sources": 5000,
        "seconds_all": [
-        5.3183
+        5.3276
        ],
-       "seconds_median": 5.3183,
+       "seconds_median": 5.3276,
        "stale_artifacts_retained": 0,
        "status": "committed",
        "summaries_regenerated": 100,
@@ -2110,9 +2298,9 @@
        "passages_reextracted": 1,
        "processed_sources": 1,
        "seconds_all": [
-        0.7068
+        0.6607
        ],
-       "seconds_median": 0.7068,
+       "seconds_median": 0.6607,
        "stale_artifacts_retained": 0,
        "status": "committed",
        "summaries_regenerated": 1,
@@ -2134,9 +2322,9 @@
        "passages_reextracted": 10,
        "processed_sources": 1,
        "seconds_all": [
-        0.9763
+        0.9534
        ],
-       "seconds_median": 0.9763,
+       "seconds_median": 0.9534,
        "stale_artifacts_retained": 0,
        "status": "committed",
        "summaries_regenerated": 1,
@@ -2158,9 +2346,9 @@
        "passages_reextracted": 30517,
        "processed_sources": 5000,
        "seconds_all": [
-        5.382
+        5.5618
        ],
-       "seconds_median": 5.382,
+       "seconds_median": 5.5618,
        "stale_artifacts_retained": 0,
        "status": "committed",
        "summaries_regenerated": 100,
@@ -2192,9 +2380,9 @@
        "passages_reextracted": 3,
        "processed_sources": 1,
        "seconds_all": [
-        0.9499
+        0.9101
        ],
-       "seconds_median": 0.9499,
+       "seconds_median": 0.9101,
        "stale_artifacts_retained": 0,
        "status": "committed",
        "summaries_regenerated": 2,
@@ -2216,9 +2404,9 @@
        "passages_reextracted": 3,
        "processed_sources": 1,
        "seconds_all": [
-        0.9902
+        0.8895
        ],
-       "seconds_median": 0.9902,
+       "seconds_median": 0.8895,
        "stale_artifacts_retained": 0,
        "status": "committed",
        "summaries_regenerated": 5,
@@ -2240,9 +2428,9 @@
        "passages_reextracted": 30520,
        "processed_sources": 5001,
        "seconds_all": [
-        5.5314
+        5.5945
        ],
-       "seconds_median": 5.5314,
+       "seconds_median": 5.5945,
        "stale_artifacts_retained": 0,
        "status": "committed",
        "summaries_regenerated": 100,
@@ -2276,9 +2464,9 @@
        "passages_reextracted": 1,
        "processed_sources": 1,
        "seconds_all": [
-        0.8958
+        0.8157
        ],
-       "seconds_median": 0.8958,
+       "seconds_median": 0.8157,
        "stale_artifacts_retained": 0,
        "status": "committed",
        "summaries_regenerated": 1,
@@ -2300,9 +2488,9 @@
        "passages_reextracted": 1,
        "processed_sources": 1,
        "seconds_all": [
-        0.8303
+        0.8213
        ],
-       "seconds_median": 0.8303,
+       "seconds_median": 0.8213,
        "stale_artifacts_retained": 0,
        "status": "committed",
        "summaries_regenerated": 1,
@@ -2324,9 +2512,9 @@
        "passages_reextracted": 30518,
        "processed_sources": 5001,
        "seconds_all": [
-        5.6612
+        5.3842
        ],
-       "seconds_median": 5.6612,
+       "seconds_median": 5.3842,
        "stale_artifacts_retained": 0,
        "status": "committed",
        "summaries_regenerated": 100,
@@ -2358,9 +2546,9 @@
        "passages_reextracted": 1,
        "processed_sources": 1,
        "seconds_all": [
-        0.8382
+        0.8034
        ],
-       "seconds_median": 0.8382,
+       "seconds_median": 0.8034,
        "stale_artifacts_retained": 0,
        "status": "committed",
        "summaries_regenerated": 10,
@@ -2382,9 +2570,9 @@
        "passages_reextracted": 10,
        "processed_sources": 1,
        "seconds_all": [
-        1.0453
+        1.0866
        ],
-       "seconds_median": 1.0453,
+       "seconds_median": 1.0866,
        "stale_artifacts_retained": 0,
        "status": "committed",
        "summaries_regenerated": 13,
@@ -2406,14 +2594,100 @@
        "passages_reextracted": 30517,
        "processed_sources": 5000,
        "seconds_all": [
-        5.6982
+        5.2843
        ],
-       "seconds_median": 5.6982,
+       "seconds_median": 5.2843,
        "stale_artifacts_retained": 0,
        "status": "committed",
        "summaries_regenerated": 100,
        "unaffected_artifacts_modified": 0,
        "unnecessary_regenerations": 2577
+      }
+     }
+    },
+    "S9_contradiction_then_delete": {
+     "change": {
+      "added": [
+       "topic-005/doc-correction.md"
+      ],
+      "claim": "Draodock has a default port of: 56433 -> 65101",
+      "deleted": [
+       "topic-005/doc-00005.md"
+      ]
+     },
+     "oracle_changed_artifacts": 24,
+     "strategies": {
+      "dakc": {
+       "artifact_versions_written": 16,
+       "claims_regenerated": 1,
+       "edge_mismatches": 0,
+       "equivalent_to_full_rebuild": true,
+       "extraction_cache_hits": 0,
+       "input_tokens_est": 16761,
+       "llm_calls": 8,
+       "output_tokens_est": 18337,
+       "pages_cutoff": 0,
+       "pages_regenerated": 4,
+       "pages_rerendered_no_llm": 2,
+       "passages_reextracted": 1,
+       "processed_sources": 1,
+       "seconds_all": [
+        0.8357
+       ],
+       "seconds_median": 0.8357,
+       "stale_artifacts_retained": 0,
+       "status": "committed",
+       "summaries_regenerated": 3,
+       "unaffected_artifacts_modified": 0,
+       "unnecessary_regenerations": 0
+      },
+      "file": {
+       "artifact_versions_written": 16,
+       "claims_regenerated": 1,
+       "edge_mismatches": 0,
+       "equivalent_to_full_rebuild": true,
+       "extraction_cache_hits": 0,
+       "input_tokens_est": 76792,
+       "llm_calls": 13,
+       "output_tokens_est": 85053,
+       "pages_cutoff": 0,
+       "pages_regenerated": 6,
+       "pages_rerendered_no_llm": 0,
+       "passages_reextracted": 1,
+       "processed_sources": 1,
+       "seconds_all": [
+        0.8696
+       ],
+       "seconds_median": 0.8696,
+       "stale_artifacts_retained": 0,
+       "status": "committed",
+       "summaries_regenerated": 6,
+       "unaffected_artifacts_modified": 0,
+       "unnecessary_regenerations": 3
+      },
+      "full": {
+       "artifact_versions_written": 16,
+       "claims_regenerated": 76358,
+       "edge_mismatches": 0,
+       "equivalent_to_full_rebuild": true,
+       "extraction_cache_hits": 0,
+       "input_tokens_est": 3579527,
+       "llm_calls": 33117,
+       "output_tokens_est": 2121454,
+       "pages_cutoff": 0,
+       "pages_regenerated": 2501,
+       "pages_rerendered_no_llm": 0,
+       "passages_reextracted": 30516,
+       "processed_sources": 5000,
+       "seconds_all": [
+        6.5978
+       ],
+       "seconds_median": 6.5978,
+       "stale_artifacts_retained": 0,
+       "status": "committed",
+       "summaries_regenerated": 100,
+       "unaffected_artifacts_modified": 0,
+       "unnecessary_regenerations": 2592
       }
      }
     }

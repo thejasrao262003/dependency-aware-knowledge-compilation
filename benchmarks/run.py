@@ -49,11 +49,11 @@ def _compile(db: Path, corpus: Path, strategy: str):
     return store, report, elapsed
 
 
-def run_size(n_docs: int, reps: int, work: Path, log) -> dict:
+def run_size(n_docs: int, reps: int, work: Path, log, scenarios: list[str] | None = None, profile: str = "uniform") -> dict:
     wd = work / f"n{n_docs}"
     shutil.rmtree(wd, ignore_errors=True)
     wd.mkdir(parents=True)
-    generate(wd / "corpus", n_docs)
+    generate(wd / "corpus", n_docs, profile=profile)
     manifest = json.loads((wd / "corpus.manifest.json").read_text())
 
     store_a, rep_a, t_a = _compile(wd / "A.db", wd / "corpus", "full")
@@ -63,8 +63,8 @@ def run_size(n_docs: int, reps: int, work: Path, log) -> dict:
     _close(store_a)
     log(f"[{n_docs}] initial full build: {t_a:.2f}s, {rep_a.usage.llm_calls} LLM calls, {counts_a}")
 
-    out = {"n_docs": n_docs, "initial_build": {"seconds": round(t_a, 3), "llm_calls": rep_a.usage.llm_calls, "counts": counts_a}, "scenarios": {}}
-    for scenario in SCENARIOS:
+    out = {"n_docs": n_docs, "profile": profile, "initial_build": {"seconds": round(t_a, 3), "llm_calls": rep_a.usage.llm_calls, "counts": counts_a}, "scenarios": {}}
+    for scenario in scenarios or list(SCENARIOS):
         corpus = wd / f"corpus-{scenario}"
         shutil.copytree(wd / "corpus", corpus)
         change = apply_scenario(corpus, manifest, scenario)
@@ -150,18 +150,64 @@ def machine() -> dict:
     }
 
 
+TIMING_KEYS = ("seconds_median", "seconds_all", "seconds")
+
+
+def strip_timing(obj):
+    if isinstance(obj, dict):
+        return {k: strip_timing(v) for k, v in obj.items() if k not in TIMING_KEYS}
+    if isinstance(obj, list):
+        return [strip_timing(x) for x in obj]
+    return obj
+
+
+def verify_against(results: dict, reference: dict) -> list[str]:
+    """Every non-timing metric of every (size, scenario, strategy) must reproduce exactly."""
+    ref_sizes = {s["n_docs"]: s for s in reference["sizes"]}
+    problems = []
+    for size in results["sizes"]:
+        ref = ref_sizes.get(size["n_docs"])
+        if ref is None:
+            problems.append(f"size {size['n_docs']} not in reference")
+            continue
+        for key, sc in size["scenarios"].items():
+            if key not in ref["scenarios"]:
+                problems.append(f"{size['n_docs']}/{key}: not in reference")
+                continue
+            a, b = strip_timing(sc), strip_timing(ref["scenarios"][key])
+            if a != b:
+                for strat in a.get("strategies", {}):
+                    for metric, v in a["strategies"][strat].items():
+                        rv = b.get("strategies", {}).get(strat, {}).get(metric)
+                        if rv != v:
+                            problems.append(f"{size['n_docs']}/{key}/{strat}/{metric}: {v} != reference {rv}")
+                if a.get("change") != b.get("change") or a.get("oracle_changed_artifacts") != b.get("oracle_changed_artifacts"):
+                    problems.append(f"{size['n_docs']}/{key}: corpus mutation or oracle differs")
+    return problems
+
+
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--sizes", default="100,1000,5000")
-    ap.add_argument("--reps", type=int, default=3, help="timing repetitions (median reported)")
+    ap.add_argument("--reps", type=int, default=3, help="timing repetitions (median reported; sizes > 1000 use 1)")
+    ap.add_argument("--scenarios", default="", help="comma-separated subset (default: all)")
+    ap.add_argument("--profile", default="uniform", choices=["uniform", "realistic"])
     ap.add_argument("--work", type=Path, default=ROOT / "bench-work")
     ap.add_argument("--out", type=Path, default=ROOT / "benchmarks" / "results" / "latest.json")
+    ap.add_argument("--verify-against", type=Path, help="fail unless every non-timing metric matches this results file")
     args = ap.parse_args()
-    results = {"machine": machine(), "reps": args.reps, "sizes": []}
+    scenarios = [s for s in args.scenarios.split(",") if s] or None
+    results = {"machine": machine(), "reps": args.reps, "profile": args.profile, "sizes": []}
     for n in (int(s) for s in args.sizes.split(",")):
         reps = args.reps if n <= 1000 else 1
-        results["sizes"].append(run_size(n, reps, args.work, lambda m: print(m, flush=True)))
+        results["sizes"].append(run_size(n, reps, args.work, lambda m: print(m, flush=True), scenarios, args.profile))
         results["sizes"][-1]["reps"] = reps
+    if args.verify_against:
+        problems = verify_against(results, json.loads(args.verify_against.read_text(encoding="utf-8")))
+        for p in problems[:50]:
+            print("MISMATCH", p)
+        print("benchmark reproduced exactly (all non-timing metrics)" if not problems else f"{len(problems)} mismatch(es)")
+        raise SystemExit(1 if problems else 0)
     args.out.parent.mkdir(parents=True, exist_ok=True)
     args.out.write_text(json.dumps(results, indent=1, sort_keys=True), encoding="utf-8")
     print(f"wrote {args.out}")

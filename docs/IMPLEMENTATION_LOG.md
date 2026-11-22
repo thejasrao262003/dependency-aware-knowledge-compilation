@@ -158,6 +158,55 @@ unless noted.
     sentence reuse changes extraction call counts. A deleted sentence no
     longer costs a call.
 
+## Release hardening (2026-11-22)
+
+An external review asked five questions before going public: claim identity,
+contradictions, provenance, concurrency, model drift. It also asked for a
+reproducible benchmark command and a clean CI run.
+
+32. **Concurrency (two real bugs).** Concurrent builds could both commit from
+    the same HEAD (a lost update), and crash recovery could mark a live build
+    as aborted. Fixed with the workspace build lock and the HEAD check
+    (ADR-19). Tests cover interleaving and two real processes.
+33. **Model drift (two real bugs).** A page-writer or summarizer change
+    regenerated nothing unless a source changed. DAKC's own logic (parser,
+    claim normalization, rendering) was not versioned. Fixed with per-artifact
+    generator checks and per-layer logic versions (ADR-20). Seven drift tests.
+34. **Provenance.**
+    - Evidence sentence indices are now stored on every claim support.
+    - New `dakc trace`.
+    - `verify` checks citation markers and evidence ranges, and reports
+      citation coverage.
+    - Real-model finding: about 72% of LLM-written page sentences cite a
+      claim.
+    - Added the `strict` provenance mode (ADR-21).
+35. **Contradictions.** Explicit tests, plus benchmark scenario S9
+    (contradiction, then the original source deleted).
+36. **Claim identity.** A labelled equivalence evaluation with hard negatives,
+    covering exact, naive fuzzy, guarded and LLM-judge matchers. Policy:
+    identity stays exact, and duplicates are advisory (ADR-22, `dakc
+    duplicates`).
+37. **Reproducibility.**
+    - `uv.lock` and a Makefile.
+    - `benchmarks.run --verify-against`, which CI uses to require the 100-doc
+      benchmark to reproduce every non-timing metric.
+    - A realistic corpus profile and a 20,000-document scale run.
+38. **Wording.** The competitive conclusion is now stated as "not found in
+    the twelve projects audited".
+39. **Corpus generator at 20,000 documents.**
+    - The first scale run never started compiling. A 20,000-document corpus
+      needs 10,000 distinct entity names, but three-part names can only make
+      4,800, so the rejection loop could not finish.
+    - Fix: past three quarters of the three-part name space, the generator
+      switches to five-part names.
+    - Entity sampling also rebuilt its cumulative weights on every draw
+      (O(entities) per call). They are now computed once; the random stream
+      is unchanged.
+    - Every published corpus (100, 1,000 and 5,000 documents, both profiles)
+      was checked byte for byte against the old generator and is identical.
+      20,000 documents now generate in about 4 s.
+    - A regression test covers this.
+
 ## Not done (deliberately or for lack of resources)
 
 - No React frontend. The API exposes React-Flow-shaped graph JSON for one.

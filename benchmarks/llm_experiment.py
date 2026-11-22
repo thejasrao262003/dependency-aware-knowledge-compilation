@@ -52,6 +52,7 @@ from dakc.compiler import Compiler
 from dakc.hashing import claim_id, normalize_claim
 from dakc.parsing import parse_bytes
 from dakc.providers import ProviderBundle, make_provider
+from dakc.provenance.trace import citation_coverage
 from dakc.provenance.verify import verify_store
 from dakc.storage import Store
 
@@ -317,7 +318,8 @@ def part_b(config: Path, n_docs: int, jobs: int, work: Path, log) -> dict:
     store = Store(wd / "A.db")
     t0 = time.perf_counter()
     rep_a, _ = Compiler(store, load_bundle(config), wd / "corpus", strategy="full", jobs=jobs).run()
-    full = {"seconds": round(time.perf_counter() - t0, 2), **rep_a.usage.as_dict(), "counts": store.counts()}
+    full = {"seconds": round(time.perf_counter() - t0, 2), **rep_a.usage.as_dict(), "counts": store.counts(),
+            "citation_coverage": citation_coverage(store)}
     store.conn.execute("PRAGMA wal_checkpoint(TRUNCATE)")
     store.close()
     log(f"[B] full build: {full['llm_calls']} calls, {full['input_tokens']}/{full['output_tokens']} tokens, {full['seconds']}s")

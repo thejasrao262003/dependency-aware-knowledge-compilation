@@ -19,6 +19,7 @@ from dakc.storage import Store
 class VerifyResult:
     checks: dict[str, bool] = field(default_factory=dict)
     problems: dict[str, list[str]] = field(default_factory=dict)
+    metrics: dict[str, object] = field(default_factory=dict)  # informative, not pass/fail
 
     @property
     def ok(self) -> bool:
@@ -58,6 +59,23 @@ def verify_store(store: Store, output_root: Path | None = None, state_dir: Path 
     res.add("no valid claim without support", empty_claims)
     res.add("no entity/relationship without claims", empty_entities)
 
+    # provenance
+    from dakc.claims import split_sentences
+    from dakc.provenance.trace import citation_coverage
+
+    passages = {aid: json.loads(p) for aid, p in store.conn.execute("SELECT id, payload FROM artifacts WHERE kind='passage' AND to_build IS NULL")}
+    bad_evidence = []
+    for aid, payload in store.conn.execute("SELECT id, payload FROM artifacts WHERE kind='claim' AND to_build IS NULL"):
+        for s in json.loads(payload)["supports"]:
+            ev = s[3] if len(s) > 3 else []
+            n = len(split_sentences(passages[s[0]]["text"])) if s[0] in passages else 0
+            if any(not 0 <= i < n for i in ev):
+                bad_evidence.append(f"{aid} -> {s[0]} {ev}")
+    res.add("claim evidence sentences lie inside their passage", bad_evidence)
+    cov = citation_coverage(store)
+    res.add("page citation markers point to the page's own claims", [f"{cov['invalid_markers']} invalid marker(s)"] if cov["invalid_markers"] else [])
+    res.metrics["citation_coverage"] = cov
+
     if output_root is not None and state_dir is not None:
         problems = []
         manifest_path = state_dir / MANIFEST
@@ -74,14 +92,16 @@ def verify_store(store: Store, output_root: Path | None = None, state_dir: Path 
     return res
 
 
-def verify_against_full(store: Store, source_root: Path, provider, aliases: dict[str, str], exclude: tuple[Path, ...] = ()) -> tuple[bool, dict]:
+def verify_against_full(store: Store, source_root: Path, provider, aliases: dict[str, str], exclude: tuple[Path, ...] = (),
+                        provenance: str = "report", config_fingerprint: str = "") -> tuple[bool, dict]:
     """Rebuild from scratch into a temporary store and compare canonical states."""
     from dakc.compiler import Compiler
 
     with tempfile.TemporaryDirectory(prefix="dakc-verify-") as tmp:
         ref_store = Store(Path(tmp) / "full.db")
         try:
-            Compiler(ref_store, provider, source_root, aliases=aliases, strategy="full", exclude=exclude).run()
+            Compiler(ref_store, provider, source_root, aliases=aliases, strategy="full", exclude=exclude,
+                     provenance=provenance, config_fingerprint=config_fingerprint).run()
             ref, cand = canonical_state(ref_store), canonical_state(store)
         finally:
             ref_store.close()

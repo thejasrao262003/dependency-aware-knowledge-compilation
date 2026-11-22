@@ -1,0 +1,170 @@
+{
+ "false_merge_examples": {
+  "fuzzy": [
+   {
+    "a": "Sylabase integrates with Halecast.",
+    "b": "Sylabase does not integrate with Halecast.",
+    "same": false,
+    "type": "negated"
+   },
+   {
+    "a": "Ulosql was first released in 1997.",
+    "b": "The first release of Ulosql was in 1998.",
+    "same": false,
+    "type": "value changed"
+   },
+   {
+    "a": "Ulosql was first released in 1997.",
+    "b": "Ulosql was not released in 1997.",
+    "same": false,
+    "type": "negated"
+   }
+  ],
+  "guarded": []
+ },
+ "llm_model": "hosted-agent:gpt-4o-mini:t0.0",
+ "matchers": {
+  "exact": {
+   "by_type": {
+    "direction reversed": {
+     "matched": 0,
+     "pairs": 22
+    },
+    "negated": {
+     "matched": 0,
+     "pairs": 60
+    },
+    "object swapped": {
+     "matched": 0,
+     "pairs": 30
+    },
+    "paraphrase": {
+     "matched": 0,
+     "pairs": 60
+    },
+    "relation changed": {
+     "matched": 0,
+     "pairs": 30
+    },
+    "subject swapped": {
+     "matched": 0,
+     "pairs": 30
+    },
+    "value changed": {
+     "matched": 0,
+     "pairs": 30
+    }
+   },
+   "false_merges": 0,
+   "precision": 1.0,
+   "recall": 0.0
+  },
+  "fuzzy": {
+   "by_type": {
+    "direction reversed": {
+     "matched": 14,
+     "pairs": 22
+    },
+    "negated": {
+     "matched": 33,
+     "pairs": 60
+    },
+    "object swapped": {
+     "matched": 1,
+     "pairs": 30
+    },
+    "paraphrase": {
+     "matched": 19,
+     "pairs": 60
+    },
+    "relation changed": {
+     "matched": 0,
+     "pairs": 30
+    },
+    "subject swapped": {
+     "matched": 6,
+     "pairs": 30
+    },
+    "value changed": {
+     "matched": 10,
+     "pairs": 30
+    }
+   },
+   "false_merges": 64,
+   "precision": 0.2289,
+   "recall": 0.3167
+  },
+  "guarded": {
+   "by_type": {
+    "direction reversed": {
+     "matched": 0,
+     "pairs": 22
+    },
+    "negated": {
+     "matched": 0,
+     "pairs": 60
+    },
+    "object swapped": {
+     "matched": 0,
+     "pairs": 30
+    },
+    "paraphrase": {
+     "matched": 20,
+     "pairs": 60
+    },
+    "relation changed": {
+     "matched": 0,
+     "pairs": 30
+    },
+    "subject swapped": {
+     "matched": 0,
+     "pairs": 30
+    },
+    "value changed": {
+     "matched": 0,
+     "pairs": 30
+    }
+   },
+   "false_merges": 0,
+   "precision": 1.0,
+   "recall": 0.3333
+  },
+  "llm": {
+   "by_type": {
+    "direction reversed": {
+     "matched": 0,
+     "pairs": 22
+    },
+    "negated": {
+     "matched": 0,
+     "pairs": 60
+    },
+    "object swapped": {
+     "matched": 0,
+     "pairs": 30
+    },
+    "paraphrase": {
+     "matched": 60,
+     "pairs": 60
+    },
+    "relation changed": {
+     "matched": 0,
+     "pairs": 30
+    },
+    "subject swapped": {
+     "matched": 0,
+     "pairs": 30
+    },
+    "value changed": {
+     "matched": 0,
+     "pairs": 30
+    }
+   },
+   "false_merges": 0,
+   "precision": 1.0,
+   "recall": 1.0
+  }
+ },
+ "pairs": 262,
+ "positives": 60
+}

@@ -80,8 +80,8 @@ class PassageArt(Artifact):
 
 @dataclass(frozen=True)
 class ClaimArt(Artifact):
-    # (passage id, surface text, mentions) sorted by passage id
-    supports: tuple[tuple[str, str, tuple[str, ...]], ...] = ()
+    # (passage id, surface text, mentions, evidence sentence indices in that passage), sorted by passage id
+    supports: tuple[tuple[str, str, tuple[str, ...], tuple[int, ...]], ...] = ()
     kind: ClassVar[str] = "claim"
 
     @cached_property
@@ -100,7 +100,7 @@ class ClaimArt(Artifact):
         return {"text": self.text, "mentions": list(self.mentions)}
 
     def payload(self):
-        return {"supports": [[p, t, list(m)] for p, t, m in self.supports]}
+        return {"supports": [[p, t, list(m), list(e)] for p, t, m, e in self.supports]}
 
     def deps(self):
         return [(p, "supported_by") for p in self.passage_ids]
@@ -158,6 +158,7 @@ class PageArt(Artifact):
     gen_sig: str = ""
     render_sig: str = ""
     generator: str = ""
+    dropped: tuple[str, ...] = ()  # generated sentences removed by strict provenance (audit trail)
     kind: ClassVar[str] = "page"
 
     def content(self):
@@ -176,6 +177,7 @@ class PageArt(Artifact):
             "gen_sig": self.gen_sig,
             "render_sig": self.render_sig,
             "generator": self.generator,
+            "dropped": list(self.dropped),
         }
 
     def deps(self):
@@ -194,6 +196,8 @@ class SummaryArt(Artifact):
     page_ids: tuple[str, ...] = ()
     sig: str = ""
     generator: str = ""
+    body: str = ""
+    render_sig: str = ""
     kind: ClassVar[str] = "summary"
 
     def content(self):
@@ -207,6 +211,8 @@ class SummaryArt(Artifact):
             "page_ids": list(self.page_ids),
             "sig": self.sig,
             "generator": self.generator,
+            "body": self.body,
+            "render_sig": self.render_sig,
         }
 
     def deps(self):
@@ -243,7 +249,7 @@ def from_payload(kind: str, id_: str, p: dict[str, Any]) -> Artifact:
     if kind == "passage":
         return PassageArt(id_, p["source_id"], p["text"], p["text_hash"], p.get("heading", ""), p.get("occurrence", 0), p.get("extracted_by", ""))
     if kind == "claim":
-        return ClaimArt(id_, tuple((s[0], s[1], tuple(s[2])) for s in p["supports"]))
+        return ClaimArt(id_, tuple((s[0], s[1], tuple(s[2]), tuple(s[3]) if len(s) > 3 else ()) for s in p["supports"]))
     if kind == "entity":
         return EntityArt(id_, p["name"], tuple(p["claim_ids"]))
     if kind == "relationship":
@@ -251,10 +257,11 @@ def from_payload(kind: str, id_: str, p: dict[str, Any]) -> Artifact:
     if kind == "page":
         return PageArt(
             id_, p["entity_id"], p["title"], p["body"], p["lead"], p["rendered"], tuple(p["claim_ids"]),
-            tuple(p["rel_ids"]), p["topic"], p["gen_sig"], p["render_sig"], p.get("generator", ""),
+            tuple(p["rel_ids"]), p["topic"], p["gen_sig"], p["render_sig"], p.get("generator", ""), tuple(p.get("dropped", ())),
         )
     if kind == "summary":
-        return SummaryArt(id_, p["topic"], p["title"], p["rendered"], tuple(p["page_ids"]), p["sig"], p.get("generator", ""))
+        return SummaryArt(id_, p["topic"], p["title"], p["rendered"], tuple(p["page_ids"]), p["sig"], p.get("generator", ""),
+                          p.get("body", ""), p.get("render_sig", ""))
     if kind == "index":
         return IndexArt(id_, p["rendered"], tuple(p["page_ids"]), tuple(p["summary_ids"]), p["sig"])
     raise KeyError(kind)

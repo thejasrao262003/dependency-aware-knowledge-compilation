@@ -38,3 +38,17 @@ def test_idempotent_and_rename_free(results):
     assert results["scenarios"]["S0_no_change"]["strategies"]["dakc"]["status"] == "noop"
     assert results["scenarios"]["S0_no_change"]["strategies"]["dakc"]["llm_calls"] == 0
     assert results["scenarios"]["S4_one_renamed"]["strategies"]["dakc"]["llm_calls"] == 0
+
+
+def test_entity_names_beyond_the_three_part_name_space():
+    """20,000-doc corpora need 10,000 names; three-part names only give 4,800.
+    Generation must terminate quickly with distinct names (it used to loop forever)."""
+    import random
+    import time
+
+    from benchmarks.corpus import _entity_names
+
+    t = time.perf_counter()
+    names = _entity_names(10_000, random.Random(7))
+    assert len(names) == len(set(names)) == 10_000
+    assert time.perf_counter() - t < 5

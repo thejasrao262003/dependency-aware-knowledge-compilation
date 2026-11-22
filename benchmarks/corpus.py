@@ -17,6 +17,7 @@ import json
 import random
 import shutil
 from dataclasses import dataclass, field
+from itertools import accumulate
 from pathlib import Path
 
 PREFIXES = [
@@ -73,12 +74,22 @@ class Corpus:
 def _entity_names(n: int, rng: random.Random) -> list[str]:
     names: set[str] = set()
     out: list[str] = []
-    while len(out) < n:
-        name = rng.choice(PREFIXES) + rng.choice(MIDDLES) + rng.choice(SUFFIXES)
+
+    def add(name: str) -> None:
         name = name[0].upper() + name[1:]
         if name not in names:
             names.add(name)
             out.append(name)
+
+    # Three-part names: 4,800 combinations. Rejection sampling stalls as the space
+    # fills (and never ends past it), so stop at three quarters of the space and
+    # continue with five-part names. Corpora needing <= 3,600 names (up to 7,200
+    # documents) are byte-identical to those generated before this limit existed.
+    simple_limit = min(n, len(PREFIXES) * len(MIDDLES) * len(SUFFIXES) * 3 // 4)
+    while len(out) < simple_limit:
+        add(rng.choice(PREFIXES) + rng.choice(MIDDLES) + rng.choice(SUFFIXES))
+    while len(out) < n:
+        add(rng.choice(PREFIXES) + rng.choice(MIDDLES) + rng.choice(SUFFIXES) + rng.choice(MIDDLES) + rng.choice(SUFFIXES))
     return out
 
 
@@ -86,10 +97,12 @@ class _Sampler:
     def __init__(self, entities: list[str], rng: random.Random, exponent: float = 1.05):
         self.entities = entities
         self.rng = rng
-        self.weights = [1.0 / (i + 1) ** exponent for i in range(len(entities))]
+        # Cumulative weights computed once: passing ``weights=`` would rebuild them on
+        # every draw (O(entities) per call). Same random stream, same choices.
+        self.cum_weights = list(accumulate(1.0 / (i + 1) ** exponent for i in range(len(entities))))
 
     def entity(self) -> str:
-        return self.rng.choices(self.entities, weights=self.weights, k=1)[0]
+        return self.rng.choices(self.entities, cum_weights=self.cum_weights, k=1)[0]
 
     def other(self, a: str) -> str:
         while True:
@@ -109,7 +122,10 @@ class _Sampler:
         return " ".join(self.sentence() for _ in range(k))
 
 
-def generate(root: Path, n_docs: int, seed: int = 7) -> Corpus:
+def generate(root: Path, n_docs: int, seed: int = 7, profile: str = "uniform") -> Corpus:
+    """``profile="uniform"``: every document has 2-4 sections of 1-3 paragraphs.
+    ``profile="realistic"``: heavy-tailed document lengths (most short, a few very
+    long), uneven topic sizes, and 1-6 sentences per paragraph."""
     """Write a corpus of ``n_docs`` Markdown files under ``root`` (recreated)."""
     if root.exists():
         shutil.rmtree(root)
@@ -122,19 +138,24 @@ def generate(root: Path, n_docs: int, seed: int = 7) -> Corpus:
     paragraphs_so_far: list[tuple[str, str]] = []  # (doc, paragraph)
 
     for i in range(n_docs):
-        topic = f"topic-{i % n_topics:03d}"
+        if profile == "realistic":
+            # Zipf-like topic sizes: a few big folders, many small ones
+            topic = f"topic-{min(n_topics - 1, int(n_topics * rng.random() ** 2.5)):03d}"
+        else:
+            topic = f"topic-{i % n_topics:03d}"
         rel = f"{topic}/doc-{i:05d}.md"
         a, b = sampler.entity(), sampler.entity()
         lines = [f"# Notes on {a} and {b}", ""]
-        for s in range(rng.randint(2, 4)):
+        n_sections = (min(30, max(1, int(rng.lognormvariate(1.0, 0.8)))) if profile == "realistic" else rng.randint(2, 4))
+        for s in range(n_sections):
             lines += [f"## {SECTION_TITLES[(i + s) % len(SECTION_TITLES)]}", ""]
-            for _ in range(rng.randint(1, 3)):
+            for _ in range(rng.randint(1, 4) if profile == "realistic" else rng.randint(1, 3)):
                 if paragraphs_so_far and rng.random() < 0.05:
                     src_doc, para = paragraphs_so_far[rng.randrange(len(paragraphs_so_far))]
                     if src_doc != rel:
                         corpus.shared_paragraph_docs.append([src_doc, rel])
                 else:
-                    para = sampler.paragraph()
+                    para = sampler.paragraph(rng.randint(1, 6) if profile == "realistic" else None)
                 paragraphs_so_far.append((rel, para))
                 lines += [para, ""]
         path = root / rel
@@ -189,6 +210,7 @@ SCENARIOS = {
     "S6_new_source_popular_entity": "New source contributing to the most popular entity",
     "S7_contradiction": "New source contradicting an existing claim",
     "S8_many_pages": "One paragraph rewritten to mention 7 entities",
+    "S9_contradiction_then_delete": "A source contradicts a claim, then the original source is deleted",
 }
 
 
@@ -270,6 +292,27 @@ def apply_scenario(root: Path, corpus_manifest: dict, scenario: str, seed: int =
                             )
                             return {"added": [rel], "contradicts": d, "claim": f"{subject} {attr}: {old} vs {new}"}
         raise RuntimeError("no attribute claim found")
+    if scenario == "S9_contradiction_then_delete":
+        # Pick an attribute claim stated by exactly one document, contradict it in
+        # a new document, then delete the original: only the new value may remain.
+        texts = {d: (root / d).read_text(encoding="utf-8") for d in docs}
+        corpus_text = "\n".join(texts.values())
+        for d in docs:
+            for line in texts[d].split("\n"):
+                if line.startswith("#"):
+                    continue
+                for sent in line.split(". "):
+                    sent = sent.rstrip(".")
+                    for attr in CONTRADICTION_VALUES:
+                        if f" {attr} " in sent and corpus_text.count(sent) == 1 and d not in {x for pair in corpus_manifest["shared_paragraph_docs"] for x in pair}:
+                            subject = sent.split(f" {attr} ")[0].strip()
+                            old = sent.split(f" {attr} ")[1]
+                            new = CONTRADICTION_VALUES[attr]
+                            rel = f"{d.split('/')[0]}/doc-correction.md"
+                            (root / rel).write_text(f"# Correction\n\n{subject} {attr} {new}.\n", encoding="utf-8")
+                            (root / d).unlink()
+                            return {"added": [rel], "deleted": [d], "claim": f"{subject} {attr}: {old} -> {new}"}
+        raise RuntimeError("no single-source attribute claim found")
     if scenario == "S8_many_pages":
         _rewrite_paragraph(root / pick, rng, sampler, many_entities=True)
         return {"modified": [pick]}

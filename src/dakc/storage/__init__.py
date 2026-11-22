@@ -91,6 +91,7 @@ class KBState:
     artifacts: dict[str, dict[str, Artifact]] = field(default_factory=dict)  # kind -> id -> artifact
     versions: dict[str, int] = field(default_factory=dict)  # artifact id -> current version
     config_fingerprint: str = ""
+    compiler_versions: dict[str, str] = field(default_factory=dict)  # dakc.versions recorded at HEAD
 
     def of(self, kind: str) -> dict[str, Artifact]:
         return self.artifacts.setdefault(kind, {})
@@ -173,7 +174,10 @@ class Store:
 
     # ------------------------------------------------------------ load state
     def load_state(self) -> KBState:
-        state = KBState(config_fingerprint=self.get_meta("config_fingerprint") or "")
+        state = KBState(
+            config_fingerprint=self.get_meta("config_fingerprint") or "",
+            compiler_versions=json.loads(self.get_meta("compiler_versions") or "{}"),
+        )
         for r in self.conn.execute("SELECT id,path,raw_hash,text_hash,size,type FROM sources WHERE to_build IS NULL"):
             state.sources[r[0]] = SourceRecord(*r)
         for id_, kind, version, payload in self.conn.execute(

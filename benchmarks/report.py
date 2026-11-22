@@ -292,6 +292,8 @@ def readme_summary(results: dict, scale: dict | None = None) -> str:
     n = big["n_docs"]
     lines = [
         README_START,
+        "### Deterministic benchmark (mock provider)",
+        "",
         f"Seeded synthetic corpus, **{n:,} documents** ({big['initial_build']['counts'].get('claim', 0):,} claims, "
         f"{big['initial_build']['counts'].get('page', 0):,} pages, {big['initial_build']['counts'].get('edges', 0):,} dependency edges). "
         "Deterministic mock provider: LLM calls are counted exactly, tokens are estimated. All three strategies run in the same "
@@ -364,8 +366,11 @@ def readme_summary(results: dict, scale: dict | None = None) -> str:
             b = llm["part_b"]
             lines += [
                 "",
-                f"**With a real LLM** (`{model}`, {b['n_docs']} synthetic documents; full build "
-                f"{b['full_build']['llm_calls']} calls, {b['full_build']['input_tokens']:,} input tokens). Tokens are provider-reported:",
+                "### Real-model measurements",
+                "",
+                f"`{model}`, {b['n_docs']} synthetic documents (full build: "
+                f"{b['full_build']['llm_calls']} calls, {b['full_build']['input_tokens']:,} input tokens). "
+                "Calls and tokens are provider-reported; hosted models are not deterministic, so these are indicative:",
                 "",
                 "| Scenario | LLM calls: file-level / DAKC | Input tokens: file-level / DAKC | Pages regenerated: file-level / DAKC |",
                 "|---|---|---|---|",

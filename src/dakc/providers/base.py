@@ -19,9 +19,13 @@ class ClaimView:
 
 @dataclass(frozen=True)
 class PageLead:
+    """One input line of a summary: a page and its lead, or (in a hierarchical
+    summary) a section of pages and its overview, standing for ``count`` pages."""
+
     title: str
     slug: str
     lead: str
+    count: int = 1
 
 
 @dataclass

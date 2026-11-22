@@ -123,7 +123,8 @@ def main() -> None:
         f'  C --> G["{len(regen)} pages regenerated<br/>{", ".join(p.split(":", 1)[1] for p in regen[:6])}'
         f'{" …" if len(regen) > 6 else ""}"]',
         f'  C -.-> K["{len(cut)} pages checked,<br/>unchanged: rebuild stops here"]',
-        f'  G --> S["{len(ops.get("regenerate_summary", []))} topic summar{"y" if len(ops.get("regenerate_summary", [])) == 1 else "ies"}"] --> I["index"]',
+        f'  G --> S["{len(ops.get("regenerate_summary", []))} topic summar{"y" if len(ops.get("regenerate_summary", [])) == 1 else "ies"} regenerated'
+        + (f'<br/>{len(ops["rerender_summary"])} re-rendered' if ops.get("rerender_summary") else "") + '"] --> I["index"]',
         f'  U["{total_pages - len(regen) - len(cut):,} other pages<br/>never touched"]',
         "```",
         "",

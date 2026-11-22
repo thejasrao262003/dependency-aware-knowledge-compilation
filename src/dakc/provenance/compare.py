@@ -42,7 +42,7 @@ def canonical_state(store: Store) -> dict[str, str]:
     for aid, kind, content_hash, state_hash, payload in rows:
         if kind == "passage":
             p = json.loads(payload)
-            out[f"passage:{psg[aid]}"] = h_text(p["text"])
+            out[f"passage:{psg[aid]}"] = h_text(p["text"]) + ":" + h_text(p.get("heading", ""))
         elif kind == "claim":
             p = json.loads(payload)
             supports = sorted([canon(s[0]), s[1], s[2], s[3] if len(s) > 3 else []] for s in p["supports"])

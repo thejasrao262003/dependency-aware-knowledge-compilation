@@ -6,6 +6,7 @@ Usage: python examples/fastapi-docs/report.py
 from __future__ import annotations
 
 import json
+import statistics
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
@@ -22,6 +23,7 @@ def group(rows: list[dict], label: str) -> str:
 def main() -> None:
     d = json.loads((HERE / "results" / "replay.json").read_text(encoding="utf-8"))
     rows = d["commits"]
+    ref = next(r for r in rows if r["commit"].startswith("af628068"))
     notes_only = [r for r in rows if r["files"] == ["release-notes.md"]]
     content = [r for r in rows if r["files"] != ["release-notes.md"]]
     ib = d["initial_build"]
@@ -60,33 +62,46 @@ def main() -> None:
         f"- **LLM calls:** DAKC {t['dakc']['llm_calls']:,}, re-processing changed files {t['file']['llm_calls']:,}, "
         f"full rebuilds {t['full']['llm_calls']:,}.",
         f"- **Estimated input tokens:** DAKC {t['dakc']['input_tokens_est']:,}, file-level {t['file']['input_tokens_est']:,} "
-        f"({t['file']['input_tokens_est'] / t['dakc']['input_tokens_est']:.1f} times as many). The token gap is much smaller "
-        "than the call gap; the next section explains why.",
+        f"({t['file']['input_tokens_est'] / t['dakc']['input_tokens_est']:.0f} times as many). The token gap is smaller "
+        f"than the call gap: DAKC's calls average {t['dakc']['input_tokens_est'] / t['dakc']['llm_calls']:,.0f} input tokens, "
+        "mostly page sections and summaries, while file-level work is dominated by small extraction calls "
+        f"({t['file']['input_tokens_est'] / t['file']['llm_calls']:,.0f} on average).",
         "",
         "### Why the totals look like this",
         "",
         f"- **The release notes.** {len(notes_only)} of the {len(rows)} commits only append a line or two to "
         "`release-notes.md`, an 8,000-line file. Most of those commits are made by a bot.",
-        "  - A file-level tool re-processes the whole file every time: about 5,800 LLM calls and 1,569 pages per commit.",
-        "  - DAKC re-extracts the new paragraph and regenerates the few pages it touches: 0 to 6 calls.",
+        "  - A file-level tool re-processes the whole file every time: about "
+        f"{round(statistics.median(r['file']['llm_calls'] for r in notes_only), -2):,.0f} LLM calls and "
+        f"{statistics.median(r['file']['pages_regenerated'] for r in notes_only):,.0f} pages per commit.",
+        "  - DAKC re-extracts the new paragraph and regenerates the few pages it touches: "
+        f"{min(r['dakc']['llm_calls'] for r in notes_only)} to {max(r['dakc']['llm_calls'] for r in notes_only)} calls, "
+        f"a median of {statistics.median(r['dakc']['input_tokens_est'] for r in notes_only):,.0f} input tokens.",
         "  - Most of the total difference comes from this pattern. It is common in real repositories: changelogs,",
         "    ADR logs and meeting notes.",
         "- **Content edits.** The other commits change docs pages, and there the difference is smaller:",
     ]
     for r in content:
         lines.append(f"  - `{r['commit'][:8]}` \"{r['subject'][:70]}\" (+{r['lines_added']}/-{r['lines_removed']} lines in "
-                     f"{len(r['files'])} file(s)): {r['file']['llm_calls']:,} calls file-level, "
-                     f"**{r['dakc']['llm_calls']:,} DAKC**.")
+                     f"{len(r['files'])} file(s)): file-level {r['file']['llm_calls']:,} calls and "
+                     f"{r['file']['input_tokens_est']:,} input tokens, **DAKC {r['dakc']['llm_calls']:,} calls and "
+                     f"{r['dakc']['input_tokens_est']:,} tokens**.")
     lines += [
-        "  - When a commit is mostly new text in one file, the two converge, because new text has to be extracted under",
-        "    any strategy.",
+        "  - When a commit is mostly new text in one file, both strategies re-extract and regenerate about the same",
+        "    passages and pages, because new text has to be read under any strategy (`55ee14be`: 17 vs 16 passages,",
+        "    14 vs 14 pages). The remaining gap is in hub pages and large summaries: every strategy writes them in",
+        "    sections, but only DAKC skips the sections whose inputs did not change.",
         "  - When it changes a few lines across files, or a few lines in a long page, DAKC does several times less work.",
-        "- **Where DAKC's tokens go.** Almost all of DAKC's tokens are spent on one artifact: the summary of the docs root",
-        "  folder, which lists about 1,660 pages.",
-        "  - Every commit that changes a page in that folder regenerates the summary, with a prompt of about 55,000",
-        "    tokens.",
-        "  - A topic summary's prompt grows with the size of its folder. This is DAKC's most expensive artifact on large,",
-        "    flat folders, and a known limitation (see Limitations in the main README).",
+        "  - Compare tokens rather than calls here: a call to rewrite one section is small, so file-level call counts",
+        "    grew with sections (v0.5) while its tokens barely moved.",
+        "- **Where DAKC's tokens go.** Two artifacts have very many inputs: the summary of the docs root folder",
+        "  (about 1,660 pages) and the hub page `page:pr` (3,491 claims, because the free heuristic extractor turns",
+        "  the \"PR\" in nearly every release-notes line into an entity).",
+        "  - Both are built in sections (bounded fan-in, `docs/dependency-model.md`). An edit rewrites the sections",
+        "    it touched and then the parent, from section overviews.",
+        "  - On `af628068`, the commit measured stage by stage for v0.4.0, that is "
+        f"{ref['dakc']['input_tokens_est']:,} input tokens in {ref['dakc']['llm_calls']} calls. Before sections the same",
+        "    commit cost 58,689: one 29,968-token summary prompt and one 28,574-token page prompt.",
         "",
         "## Every commit",
         "",

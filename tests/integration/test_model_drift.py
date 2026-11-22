@@ -23,7 +23,7 @@ class WriterV2(TemplatePageWriter):
 
 
 class SummarizerV2(TemplateSummarizer):
-    fingerprint = "template-summarizer/2"
+    fingerprint = "template-summarizer/test-drift"
 
 
 def bundle(writer=None, summarizer=None):

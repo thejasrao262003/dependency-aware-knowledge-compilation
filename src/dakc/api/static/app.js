@@ -191,8 +191,9 @@ async function overview(view) {
   let head, lede;
   if (plan) {
     const oc = plan.operation_counts || {};
-    head = `${plural(changedSources, "source changed", "sources changed")} since build ${st.head}.`;
-    lede = `A compile would redo <strong>${plural(llmCalls(plan), "LLM call", "LLM calls")}</strong> and regenerate
+    head = changedSources ? `${plural(changedSources, "source changed", "sources changed")} since build ${st.head}.`
+      : `Sources unchanged since build ${st.head}; DAKC or its settings changed.`;
+    lede = (st.outdated?.length ? `${esc(st.outdated.join("; "))}. ` : "") + `A compile would redo <strong>${plural(llmCalls(plan), "LLM call", "LLM calls")}</strong> and regenerate
       <strong>${fmt(oc.regenerate_page)} of ${fmt(st.counts.page)} pages</strong>. Everything else stays exactly as it is.
       <a href="#/changes">See the plan</a>.`;
   } else {
@@ -233,6 +234,8 @@ const OPS = {
   regenerate_summary: "summaries regenerated", rerender_summary: "summaries re-rendered",
   cutoff_summary: "summaries checked, unchanged", delete_summary: "summaries deleted",
   rerender_index: "index re-rendered", cutoff_index: "index checked, unchanged",
+  passage_heading_changed: "passages under a changed heading", source_revised: "sources with a new revision, same content", regenerate_section: "sections rewritten",
+  cutoff_section: "sections checked, unchanged",
 };
 
 function statusPill(status, head, id) {
@@ -481,12 +484,14 @@ async function changes(view) {
     `<li><a class="row" href="#/a/${enc(i)}">${swatch(i.startsWith("sum:") ? "summary" : "page")}<span class="t">${esc(names[i] || i.split(":")[1])}${names[i] ? "" : ' <span class="pill valid">new</span>'}</span><span class="id">${esc(i)}</span></a></li>`).join("")}</ul>${ids.length > 30 ? `<p class="muted">and ${fmt(ids.length - 30)} more</p>` : ""}</section>` : "";
   view.innerHTML = `
     <p class="eyebrow">${swatch("source")} Changes since build ${st.head}</p>
-    <h1 class="title">${plural(files.length, "source changed", "sources changed")}. ${plural(calls, "LLM call", "LLM calls")} to catch up.</h1>
-    <p class="lede">This is the plan a compile would run, computed without writing or spending anything${plan.exact ? "" : " (an upper bound: an LLM provider may find fewer changes)"}.
+    <h1 class="title">${files.length ? plural(files.length, "source changed", "sources changed") : "No source changed"}. ${plural(calls, "LLM call", "LLM calls")} to catch up.</h1>
+    ${st.outdated?.length ? `<p class="lede">${esc(st.outdated.join("; "))}.</p>` : ""}
+    <p class="lede">This is the plan a compile would run, computed without writing or spending anything${plan.exact ? "" : " (an estimate: the facts in new text are estimated until the model reads it)"}.
       <button type="button" class="pill" id="full" style="cursor:pointer;background:var(--surface)">Compare with a full rebuild</button> <span id="full-out" class="muted"></span></p>
     <ul class="list card" style="padding:4px 12px;margin:18px 0">${files.map(([how, p]) =>
       `<li class="row" style="grid-template-columns:auto 1fr">${`<span class="pill ${how === "deleted" ? "deleted" : how === "new" ? "valid" : "changed"}">${how}</span>`}<span class="mono">${how === "modified" ? link(p, p) : esc(p)}</span></li>`).join("")}</ul>
     ${stack(st.counts, overlay(plan, "pending"))}
+    ${(oc.regenerate_section || oc.cutoff_section) ? `<p class="coverage" style="margin:14px 0 0 126px">Hub pages and large topics are built in sections: <strong>${fmt(oc.regenerate_section || 0)}</strong> to rewrite, ${fmt(oc.cutoff_section || 0)} reused.</p>` : ""}
     <div class="grid-2" style="margin-top:30px">
       ${pageList(ops.regenerate_page, "Pages to regenerate")}
       ${pageList(ops.cutoff_page, "Pages checked, found unchanged")}

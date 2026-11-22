@@ -34,7 +34,7 @@ screen. Use a large terminal font, and clear the screen before each scene.
 dakc status -w demo-kb
 ```
 > "These are FastAPI's 159 documentation pages, compiled into 11,000 facts and
-> 2,300 entity pages. A full build is about 13,800 LLM calls."
+> 2,300 entity pages. A full build is about 14,200 LLM calls."
 
 **0:35–1:00. Ask the agent** (Claude Code)
 > *What happens when a form upload exceeds FastAPI's parsing limits, and how
@@ -59,11 +59,11 @@ Point at these lines:
 - `Passages to (re-)extract: 8`
 - `Affected Knowledge Pages: 9`
 - `Unaffected Knowledge Pages: 2327`
-- `Estimated LLM Calls: 20 (exact)`
+- `Estimated LLM Calls: 25 (exact)`
 
-> "Twenty LLM calls instead of thirteen thousand eight hundred. Eight
-> paragraphs, nine pages, and nothing else is touched. And DAKC shows this
-> before spending anything."
+> "Twenty-five LLM calls instead of fourteen thousand. Eight paragraphs,
+> nine pages, and nothing else is touched. And DAKC shows this before
+> spending anything."
 
 Optionally, cut to the diagram in `results/walkthrough.md`.
 

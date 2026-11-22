@@ -16,11 +16,11 @@ Modification times are never used to decide anything.
 from __future__ import annotations
 
 import os
-from collections import defaultdict
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from dakc.hashing import hash_file, slugify
+from dakc.hashing import slugify
 from dakc.parsing import source_type_for
 
 
@@ -32,18 +32,38 @@ class SourceRecord:
     text_hash: str
     size: int
     type: str
+    key: str | None = None  # the connector's native id, if it has stable ones (RFC 0001)
+    revision: str | None = None  # the connector's version marker, when it is not a content hash
 
     def payload(self) -> dict:
-        return {"path": self.path, "raw_hash": self.raw_hash, "text_hash": self.text_hash, "size": self.size, "type": self.type}
+        out = {"path": self.path, "raw_hash": self.raw_hash, "text_hash": self.text_hash, "size": self.size, "type": self.type}
+        if self.key is not None:
+            out["key"] = self.key
+        if self.revision is not None:
+            out["revision"] = self.revision
+        return out
 
 
 @dataclass(frozen=True)
 class FileInfo:
-    path: str  # POSIX path relative to the source root
-    abspath: Path
+    """One listed source item, as the compiler sees it: a path in the workspace's
+    namespace, its content hash, and how to read it."""
+
+    path: str  # POSIX path in the workspace namespace (source prefix + path within the source)
+    abspath: Path | None
     raw_hash: str
     size: int
     source_type: str
+    key: str | None = None
+    revision: str | None = None
+    origin: str = ""  # name of the source that listed it
+    reader: Callable[[], bytes] | None = field(default=None, compare=False, repr=False)
+
+    def read(self) -> bytes:
+        if self.reader is not None:
+            return self.reader()
+        assert self.abspath is not None
+        return self.abspath.read_bytes()
 
 
 @dataclass
@@ -55,6 +75,7 @@ class ScanResult:
     renamed: list[tuple[str, str, str]] = field(default_factory=list)  # (source id, old, new)
     unchanged: list[str] = field(default_factory=list)  # source ids
     duplicates: list[list[str]] = field(default_factory=list)  # groups of paths with equal bytes
+    revised: list[tuple[str, str]] = field(default_factory=list)  # (source id, path): new revision, same bytes
 
     @property
     def has_changes(self) -> bool:
@@ -90,49 +111,10 @@ def discover(root: Path, exclude: tuple[Path, ...] = ()) -> list[Path]:
 
 
 def scan(root: Path, registry: dict[str, SourceRecord], *, detect_renames: bool = True, exclude: tuple[Path, ...] = ()) -> ScanResult:
-    root = root.resolve()
-    result = ScanResult()
-    for p in discover(root, exclude):
-        rel = p.relative_to(root).as_posix()
-        result.files[rel] = FileInfo(rel, p, hash_file(p), p.stat().st_size, source_type_for(p) or "text")
+    """Scan one directory (the single-source case of :meth:`dakc.sources.SourceSet.scan`)."""
+    from dakc.sources import SourceSet
 
-    by_path = {rec.path: rec for rec in registry.values()}
-    vanished = [rec for rec in registry.values() if rec.path not in result.files]
-    unknown = [path for path in result.files if path not in by_path]
-
-    for path, info in result.files.items():
-        rec = by_path.get(path)
-        if rec is None:
-            continue
-        if rec.raw_hash == info.raw_hash:
-            result.unchanged.append(rec.id)
-        else:
-            result.modified.append((rec.id, path))
-
-    if detect_renames:
-        vanished_by_hash: dict[str, list[SourceRecord]] = defaultdict(list)
-        for rec in sorted(vanished, key=lambda r: r.path):
-            vanished_by_hash[rec.raw_hash].append(rec)
-        still_unknown: list[str] = []
-        for path in sorted(unknown):
-            candidates = vanished_by_hash.get(result.files[path].raw_hash)
-            if candidates:
-                rec = candidates.pop(0)
-                result.renamed.append((rec.id, rec.path, path))
-            else:
-                still_unknown.append(path)
-        renamed_ids = {r[0] for r in result.renamed}
-        vanished = [rec for rec in vanished if rec.id not in renamed_ids]
-        unknown = still_unknown
-
-    result.new = sorted(unknown)
-    result.deleted = sorted(rec.id for rec in vanished)
-
-    by_hash: dict[str, list[str]] = defaultdict(list)
-    for path, info in result.files.items():
-        by_hash[info.raw_hash].append(path)
-    result.duplicates = sorted(sorted(group) for group in by_hash.values() if len(group) > 1)
-    return result
+    return SourceSet.from_root(root, exclude).scan(registry, detect_renames=detect_renames)
 
 
 def new_source_id(path: str, taken: set[str]) -> str:

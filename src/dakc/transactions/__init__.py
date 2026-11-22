@@ -120,8 +120,8 @@ def commit(
             ids = [r.id for r in cs.source_upserts] + cs.source_deletes
             c.executemany("UPDATE sources SET to_build=? WHERE id=? AND to_build IS NULL", [(build_id, i) for i in ids])
             c.executemany(
-                "INSERT INTO sources(id,path,raw_hash,text_hash,size,type,from_build) VALUES(?,?,?,?,?,?,?)",
-                [(r.id, r.path, r.raw_hash, r.text_hash, r.size, r.type, build_id) for r in cs.source_upserts],
+                "INSERT INTO sources(id,path,raw_hash,text_hash,size,type,key,revision,from_build) VALUES(?,?,?,?,?,?,?,?,?)",
+                [(r.id, r.path, r.raw_hash, r.text_hash, r.size, r.type, r.key, r.revision, build_id) for r in cs.source_upserts],
             )
             tick(len(ids))
 

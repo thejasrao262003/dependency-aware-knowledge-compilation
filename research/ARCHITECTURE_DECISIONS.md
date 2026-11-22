@@ -353,8 +353,11 @@ digests.
 
 - **Previewing first** costs nothing, because a dry run is free and exact for
   free providers. It turns an accidental full rebuild into a visible plan.
-- **The cost guard** uses the plan's upper bound, so it can only refuse too
-  much, never too little.
+- **The cost guard** uses the plan's estimate. Extraction calls are exact,
+  and the pages and summaries new facts would touch are estimated with the
+  heuristic extractor, so it catches unexpectedly large builds. It is not a
+  hard ceiling: an earlier version of this ADR said "upper bound", which was
+  wrong for edits that add facts.
 - **Bounding outputs** keeps a hub page or a big build from flooding the
   model's context.
 - **Binding to one workspace** stops an agent from compiling arbitrary
@@ -420,6 +423,90 @@ for one, and the user asked for a UI.
 The UI was checked in a real browser with Playwright: every view on desktop,
 in dark mode and at 390 px wide, with no console errors and no horizontal
 overflow.
+
+## ADR-27: Bound every artifact's input with content-defined sections
+
+**Decision.** Hub pages (more than 64 claims) and large topic summaries (more
+than 64 pages) are built in sections.
+
+- Section boundaries are content-defined: an item ends a section when its
+  key's hash is 0 modulo 32, with a cap of 128 items.
+- Each section is cached by a signature over its inputs.
+- The parent is assembled (pages) or summarized (topics) from the sections.
+- Hub pages number citations per section and renumber them, page-wide, at
+  render time. They have a deterministic lead.
+- Smaller artifacts are unchanged. Versions `page/2` and `summary/2` record
+  the change, so existing knowledge bases migrate on their next build.
+
+**Why.** FastAPI's replay showed where the remaining cost went (measured per
+stage): one topic summary over about 1,660 pages and one hub page over 3,491
+claims were rewritten in full on almost every commit. An external review
+suggested hierarchical summaries; the measurement showed hub pages needed the
+same fix.
+
+- **Content-defined boundaries** were chosen over fixed-size chunks, which
+  shift on every insertion, and over semantic clustering, which is
+  nondeterministic and would break full-rebuild equality.
+- **Hub claims are ordered by claim text**, as on small pages, so a section's
+  membership depends only on its claims. Ordering by source and heading was
+  tried first, because it keeps each section about one document region. But
+  it made sections depend on provenance: a fact whose citations moved could
+  change sections and rewrite two of them. That broke the rule that moved
+  citations only re-render. The 100-document benchmark caught it: a
+  one-paragraph edit cost twice as much as before sections.
+
+**Trade-offs.**
+
+- A full build makes 3–5% more calls.
+- A hub page's lead is no longer LLM-written.
+- An edited fact can move between sections, because its claim id changes, so
+  it may rewrite two sections.
+- A hub section is not one document region. Its heading names the
+  documents it draws on instead.
+- Dry runs with an LLM provider now estimate the facts in new text with the
+  heuristic extractor. Before this change they assumed none, which made their
+  page and summary counts too low. The docs had called those counts an upper
+  bound. The plan is now labelled an estimate.
+
+## ADR-28: Sources and publishers; publishers converge on state
+
+**Decision.** Where content comes from (source connectors) and where compiled
+knowledge goes (publishers) are plugin interfaces, separate from the
+compiler. The full contract is in `docs/rfcs/0001-sources-and-publishers.md`.
+
+- **Connectors.** A connector returns a complete listing of versioned items
+  on every build, and reads them. The filesystem is the first connector.
+- **Namespacing.** Several sources share one namespace, each under its own
+  path prefix.
+- **Identity.** Source identity follows native keys where a system has them,
+  and paths plus content-hash renames where it does not.
+- **The publication ledger.** A publisher's work is the difference between
+  the current state and a ledger of what it has acknowledged. It is not a log
+  of events.
+
+**Why.** Teams keep knowledge in several systems and consume it in several
+places. The compiler's correctness argument depends on none of those
+details, so they should not be inside it.
+
+- **Reconcile against a full listing, instead of trusting change
+  notifications.** A missed event then delays an update but cannot corrupt
+  state.
+- **A ledger, instead of an outbox of events.** Retries, crashes, rollbacks
+  and new publishers become one operation: send the difference. The Markdown
+  projection already worked this way with its manifest.
+
+**Trade-offs.**
+
+- Listing a large remote source on every build costs API calls. Change feeds
+  (a phase 2 capability) can narrow what is listed, but the listing remains
+  the source of truth.
+- Records are per artifact, so a publisher sees a page's whole text when any
+  part of it changes, not a text diff.
+- The ledger grows with the number of published artifacts: one row each, per
+  publisher.
+- Permissions are designed but not implemented. They must propagate through
+  claims, pages and summaries, which is a compiler concern (RFC 0001,
+  phase 3).
 
 ## Libraries reused rather than reimplemented
 

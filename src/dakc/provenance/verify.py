@@ -6,6 +6,7 @@ import json
 import tempfile
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from dakc.artifacts import from_payload
 from dakc.compiler.projection import MANIFEST, rel_path
@@ -13,6 +14,9 @@ from dakc.graph import build_graph, find_cycle, layering_violations
 from dakc.hashing import h
 from dakc.provenance.compare import canonical_state, diff_states
 from dakc.storage import Store
+
+if TYPE_CHECKING:
+    from dakc.sources import SourceSet
 
 
 @dataclass
@@ -92,7 +96,7 @@ def verify_store(store: Store, output_root: Path | None = None, state_dir: Path 
     return res
 
 
-def verify_against_full(store: Store, source_root: Path, provider, aliases: dict[str, str], exclude: tuple[Path, ...] = (),
+def verify_against_full(store: Store, source_root: Path | SourceSet, provider, aliases: dict[str, str], exclude: tuple[Path, ...] = (),
                         provenance: str = "report", config_fingerprint: str = "") -> tuple[bool, dict]:
     """Rebuild from scratch into a temporary store and compare canonical states."""
     from dakc.compiler import Compiler

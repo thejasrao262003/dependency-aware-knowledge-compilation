@@ -263,3 +263,61 @@ def test_neighborhood_is_connected_and_capped(kb):
                 seen.add(o)
                 todo.append(o)
     assert seen == ids
+
+
+def test_status_reports_work_that_is_not_a_source_change(kb, monkeypatch):
+    from dakc import versions
+
+    # DAKC's own logic changed (an upgrade): a compile has work although no source did
+    monkeypatch.setattr(versions, "SUMMARY", "summary/test")
+    st = kb.status()
+    assert not st.up_to_date and st.source_changes["modified"] == 0
+    assert st.outdated == ["summary structure logic changed (summary/2 -> summary/test)"]
+    assert any("summary structure logic changed" in n for n in kb.plan().notes)  # the compile re-checks that layer
+    assert kb.compile().status == "committed"  # and records the new version, even if nothing differs
+    assert kb.status().up_to_date and kb.status().outdated == []
+    monkeypatch.undo()
+    kb.compile()
+
+    # the configuration changed
+    cfg = kb.root / "dakc.toml"
+    cfg.write_text(cfg.read_text() + '"Postgres" = "PostgreSQL"\n')
+    with dakc.open(kb.root) as kb2:
+        assert kb2.status().outdated == ["configuration changed (entity aliases, entity resolution or provenance mode)"]
+        kb2.compile()
+        assert kb2.status().up_to_date
+
+
+def test_status_reports_a_changed_provider_and_no_false_alarm_after_a_rollback(tmp_path):
+    root = paid_workspace(tmp_path)
+    text = (root / "dakc.toml").read_text()
+    (root / "dakc.toml").write_text(text.replace('provider = "custom"', 'provider = "mock"'))
+    with dakc.open(root) as kb:
+        kb.compile()
+        write_files(root / "knowledge", {"queues/nats.md": "# NATS\n\nNATS supports Subjects.\n"})
+        kb.compile()
+        kb.rollback(1)  # HEAD is now a rollback build, which records no fingerprints of its own
+        st = kb.status()
+        assert st.outdated == [] and st.new_sources == 1  # only the source on disk differs
+    (root / "dakc.toml").write_text(text)  # back to the (fake) LLM provider
+    with dakc.open(root) as kb:
+        st = kb.status()
+        assert not st.up_to_date and {r.split(" (")[0] for r in st.outdated} == {
+            "the extractor changed", "the writer changed", "the summarizer changed"}
+
+
+def test_watch_needs_a_filesystem_source(tmp_path):
+    pytest.importorskip("watchdog")
+    from typer.testing import CliRunner
+
+    from dakc.cli import app
+
+    (tmp_path / "plugins").mkdir()
+    (tmp_path / "plugins" / "nothing.py").write_text(
+        "class Empty:\n    kind = 'empty'\n    capabilities = frozenset()\n"
+        "    def list(self):\n        return []\n    def read(self, item):\n        return b''\n"
+        "def make(name, options, root):\n    return Empty()\n")
+    (tmp_path / "dakc.toml").write_text(
+        '[dakc]\nprovider = "mock"\n\n[[sources]]\nname = "x"\ntype = "custom"\nfactory = "nothing:make"\nplugin_path = "plugins"\n')
+    r = CliRunner().invoke(app, ["watch", "-w", str(tmp_path)])
+    assert r.exit_code == 2 and "no filesystem source to watch" in r.output

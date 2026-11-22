@@ -76,11 +76,25 @@ def _emit_json(obj) -> None:
     sys.stdout.write(json.dumps(obj, indent=1, sort_keys=True, default=str) + "\n")
 
 
+def _print_publications(pubs: list[dict]) -> None:
+    for p in pubs:
+        if p.get("error"):
+            console.print(f"[red]Publisher {p['name']} ({p['kind']}) failed[/red]: {p['error']}. "
+                          f"{p['pending']} change(s) still pending; `dakc publish` retries.")
+        elif p.get("dry_run"):
+            console.print(f"Publisher {p['name']} ({p['kind']}): {p['pending']} change(s) pending")
+        elif p["upserted"] or p["deleted"]:
+            console.print(f"Published to {p['name']} ({p['kind']}): {p['upserted']} upserted, {p['deleted']} deleted")
+        else:
+            console.print(f"Publisher {p['name']} ({p['kind']}): up to date")
+
+
 def _print_report(report, as_json: bool) -> None:
     if as_json:
         _emit_json(report.to_dict())
         return
     console.print(render(report))
+    _print_publications(report.publications)
     if report.status == "noop":
         console.print("\nNothing changed. Knowledge base is up to date.")
 
@@ -352,10 +366,15 @@ def status(workspace: WS = Path("."), as_json: JSON = False) -> None:
     if st.up_to_date:
         console.print("[green]Up to date[/green]: no source changes since HEAD.")
         return
-    console.print(f"[yellow]Stale[/yellow]: {st.source_changes}")
-    console.print("  artifacts downstream of changed sources: " + ", ".join(f"{k} {v}" for k, v in st.stale.items()))
-    if st.new_sources:
-        console.print(f"  plus {st.new_sources} new source(s) not yet compiled")
+    if any(st.source_changes[k] for k in ("new", "modified", "deleted", "renamed")):
+        console.print(f"[yellow]Stale[/yellow]: {st.source_changes}")
+        if st.stale:
+            console.print("  artifacts downstream of changed sources: " + ", ".join(f"{k} {v}" for k, v in st.stale.items()))
+        if st.new_sources:
+            console.print(f"  plus {st.new_sources} new source(s) not yet compiled")
+    for reason in st.outdated:
+        console.print(f"[yellow]Outdated[/yellow]: {reason}")
+    console.print("  `dakc compile --dry-run` shows exactly what a compile would redo.")
 
 
 @app.command()
@@ -404,6 +423,42 @@ def diff(
         console.print("No differences.")
 
 
+@app.command()
+def sources(workspace: WS = Path("."), as_json: JSON = False) -> None:
+    """The configured sources: type, path prefix, location and documents at HEAD."""
+    with _open(workspace) as kb:
+        infos = kb.sources()
+    if as_json:
+        _emit_json([i.to_dict() for i in infos])
+        return
+    table = Table("Source", "Type", "Prefix", "Location", "Documents", "Capabilities")
+    for i in infos:
+        table.add_row(i.name, i.type, i.prefix or "(none)", i.location, str(i.documents), ", ".join(i.capabilities) or "-")
+    console.print(table)
+
+
+@app.command()
+def publish(
+    workspace: WS = Path("."),
+    name: Annotated[Optional[str], typer.Argument(help="One publisher (default: all configured).")] = None,
+    dry_run: Annotated[bool, typer.Option("--dry-run", help="Only count pending work.")] = False,
+    reset: Annotated[bool, typer.Option("--reset", help="Forget what was published and send everything again.")] = False,
+    as_json: JSON = False,
+    wait: WAIT = 0.0,
+) -> None:
+    """Send what changed since each publisher's last acknowledged state (retries failures)."""
+    with _open(workspace) as kb:
+        results = kb.publish(name, dry_run=dry_run, reset=reset, wait=wait)
+    if as_json:
+        _emit_json([r.to_dict() for r in results])
+        return
+    if not results:
+        console.print("No publishers configured: add a [[publishers]] table to dakc.toml.")
+    _print_publications([r.to_dict() for r in results])
+    if any(not r.ok for r in results):
+        raise typer.Exit(1)
+
+
 @app.command(name="rollback")
 def rollback_cmd(
     workspace: WS = Path("."),
@@ -415,6 +470,7 @@ def rollback_cmd(
         r = kb.rollback(to, wait=wait)
     console.print(f"Restored state of build {r.restored_build} as build {r.new_build}. "
                   f"Wiki files written: {r.projection['written']}, deleted: {r.projection['deleted']}.")
+    _print_publications(r.publications)
     console.print("Note: sources on disk are unchanged; `dakc status` shows what differs from them.")
 
 
@@ -534,9 +590,15 @@ def watch(
 
     with _open(workspace) as kb:
         obs = Observer()
-        obs.schedule(Handler(), str(kb.source_root), recursive=True)
+        roots = kb.workspace.source_set().filesystem_roots()
+        if not roots:
+            err.print("[red]error:[/red] no filesystem source to watch; compile on a schedule instead (e.g. cron or CI)")
+            raise typer.Exit(2)
+        for root in roots:
+            obs.schedule(Handler(), str(root), recursive=True)
         obs.start()
-        console.print(f"Watching {kb.source_root} (Ctrl-C to stop)")
+        console.print(f"Watching {', '.join(map(str, roots))} (Ctrl-C to stop). "
+                      "Other kinds of source are checked whenever a compile runs.")
         build(kb)
         try:
             while True:

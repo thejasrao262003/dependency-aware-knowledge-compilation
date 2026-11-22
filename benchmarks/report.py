@@ -299,15 +299,16 @@ def readme_summary(results: dict, scale: dict | None = None) -> str:
         "Deterministic mock provider: LLM calls are counted exactly, tokens are estimated. All three strategies run in the same "
         "engine. *File-level* emulates the strategy of existing LLM-wiki tools.",
         "",
-        "| Scenario | LLM calls: full / file-level / DAKC | Pages regenerated: full / file-level / DAKC | Stale artifacts (DAKC) | Equal to full rebuild (DAKC) |",
+        "| Scenario | Input tokens (est.): full / file-level / DAKC | LLM calls: full / file-level / DAKC | Pages regenerated: full / file-level / DAKC | Equal to full rebuild (DAKC) |",
         "|---|---|---|---|---|",
     ]
     for key, sc in big["scenarios"].items():
         s = sc["strategies"]
         lines.append(
-            f"| {SHORT[key]} | {s['full']['llm_calls']:,} / {s['file']['llm_calls']:,} / **{s['dakc']['llm_calls']:,}** | "
+            f"| {SHORT[key]} | {s['full']['input_tokens_est']:,} / {s['file']['input_tokens_est']:,} / "
+            f"**{s['dakc']['input_tokens_est']:,}** | {s['full']['llm_calls']:,} / {s['file']['llm_calls']:,} / **{s['dakc']['llm_calls']:,}** | "
             f"{s['full']['pages_regenerated']:,} / {s['file']['pages_regenerated']:,} / **{s['dakc']['pages_regenerated']:,}** | "
-            f"{s['dakc']['stale_artifacts_retained']} | {'yes' if s['dakc']['equivalent_to_full_rebuild'] else '**NO**'} |"
+            f"{'yes' if s['dakc']['equivalent_to_full_rebuild'] and s['dakc']['stale_artifacts_retained'] == 0 else '**NO**'} |"
         )
     all_eq = all(
         st["equivalent_to_full_rebuild"] and st["stale_artifacts_retained"] == 0
@@ -324,8 +325,8 @@ def readme_summary(results: dict, scale: dict | None = None) -> str:
         "S6_new_source_popular_entity": "new facts about a hub entity must reach its page under any strategy",
     }
     savings = sorted(
-        (1 - sc["strategies"]["dakc"]["llm_calls"] / sc["strategies"]["file"]["llm_calls"], key)
-        for key, sc in big["scenarios"].items() if sc["strategies"]["file"]["llm_calls"]
+        (1 - sc["strategies"]["dakc"]["input_tokens_est"] / sc["strategies"]["file"]["input_tokens_est"], key)
+        for key, sc in big["scenarios"].items() if sc["strategies"]["file"]["input_tokens_est"]
     )
     smallest = "; ".join(
         f"{SHORT[k]}: {100 * s:.0f}%" + (f" ({why[k]})" if k in why else "") for s, k in savings[:2]
@@ -335,7 +336,9 @@ def readme_summary(results: dict, scale: dict | None = None) -> str:
         f"Across all sizes ({sizes} documents) and scenarios, every strategy's result was "
         f"{'identical to an independent full rebuild' if all_eq else '**not always** identical to a full rebuild'}, and DAKC "
         f"{'never regenerated an artifact whose inputs were unchanged' if no_waste else '**did** regenerate some unchanged artifacts'}. "
-        f"The smallest LLM-call savings versus file-level at {n:,} documents: {smallest}. "
+        f"The smallest input-token savings versus file-level at {n:,} documents: {smallest}. "
+        "Compare tokens rather than calls: every strategy writes hub pages and large topics in sections, so "
+        "rebuilding one of them file-level is many small calls. "
         "Full tables, method and caveats are in [docs/benchmark.md](docs/benchmark.md). Raw data: "
         "[benchmarks/results/latest.json](benchmarks/results/latest.json).",
     ]

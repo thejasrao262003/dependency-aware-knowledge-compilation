@@ -120,6 +120,67 @@ Every plan and report separates:
 
 "Affected" is the union of all five. "Needs rebuild" is the first three.
 
+## Bounded fan-in: hub pages and large topics
+
+Early cutoff decides *which* artifacts an edit invalidates. It does not bound
+*how much input* an invalidated artifact is regenerated from. Before v0.5,
+two kinds of artifact had unbounded input:
+
+- an entity page, written from every claim about its entity;
+- a topic summary, written from the lead of every page in its folder.
+
+So one edit near a hub re-sent everything. On FastAPI's docs, a one-line
+release-notes commit cost about 59,000 input tokens: a 30,000-token summary
+prompt over about 1,660 pages, and a 28,600-token page prompt over 3,491
+claims. A large enough folder or hub would also exceed a model's context
+window.
+
+Since v0.5 (`versions.PAGE = "page/2"`, `versions.SUMMARY = "summary/2"`),
+both are built hierarchically once they pass 64 inputs. Smaller pages and
+topics are built exactly as before.
+
+- **Content-defined sections.** Inputs are ordered by a stable key and split
+  where a key's hash is 0 modulo 32 (or at 128 items). The split is a pure
+  function of the set of keys, so an incremental build and a full rebuild
+  produce the same sections. Adding or removing an input changes only the
+  section that holds it. This is the same idea as rsync's rolling chunks and
+  prolly trees.
+- **Hub pages** (more than 64 claims). Claims are in the same order as on a
+  small page, by claim text and then claim id, and split into sections.
+  - Section membership depends only on the claims. A fact whose citations
+    move, or whose heading changes, stays in its section, and the page is only
+    re-rendered, as any page would be.
+  - Each section's heading gives its page-wide fact numbers and the documents
+    it draws on, for example "Facts 129–256, from release-notes.md". It is
+    computed from the citations, so it too changes only on a re-render.
+  - Each section is written by the page writer, from at most 128 claims, with
+    its own citation numbers, and cached by a signature over its claims.
+  - Page-wide citation numbers are assigned when the page is assembled, so a
+    new claim renumbers later citations without rewriting any text.
+  - The lead is deterministic ("X has N documented facts…"). No LLM call
+    reads the whole hub.
+- **Large topics** (more than 64 pages). Pages are split into sections by page
+  id. Each section is summarized from its pages' leads and cached by a
+  signature over them. The topic summary is written from the section
+  overviews, recursively if there are more than 64 sections.
+  - If a regenerated section's overview comes out unchanged, the topic is cut
+    off: early cutoff one level up.
+- **Cost of an edit.** An edit to one fact rewrites the section that lost the
+  old claim and the section that gained the new one: usually one or two
+  sections, never the whole artifact. Each section has its own signature, so
+  provenance and full-rebuild equality hold exactly as for any other
+  artifact.
+- **Why not group a hub's facts by document?** That was the first design. It
+  made a section depend on its facts' provenance: a fact whose earliest source
+  moved changed position, and rewrote the section it left and the one it
+  joined. That broke the rule that moved citations only re-render, and it
+  doubled DAKC's cost on the 100-document benchmark's one-paragraph edit.
+
+Measured on the same FastAPI commit: 4,699 input tokens instead of 58,689, in
+6 calls instead of 4. Over the 50 replayed commits: 148,030 input tokens
+instead of 2,460,770, in 317 calls instead of 259. A full build makes 3–5%
+more calls, because large artifacts are written in more, smaller pieces.
+
 ## Source change classification
 
 Each scan hashes every file's raw bytes. It does not rely on modification
@@ -204,10 +265,18 @@ the page record as an audit list, and switching modes needs no LLM calls.
 Deterministic layers (scan, segmentation, sentence reuse planning, cache
 lookup, entity resolution, signatures) are computed exactly in a dry run, so
 the number of extraction calls is exact. The claims those calls would
-return cannot be known without making them, so with a *paid* extractor the
-dry run reports downstream counts as an **upper bound derived from the
-current graph**. It labels them that way and does not present them as exact.
-With the free heuristic extractor the whole dry run is exact.
+return cannot be known without making them. With a *paid* extractor, the dry
+run therefore estimates them: it runs the free heuristic extractor over the
+new or edited sentences, and plans the pages and summaries those estimated
+facts would touch. Downstream counts are an **estimate**, labelled as such
+(`exact: false`). They are not a bound: an LLM may find facts, or entities,
+that the heuristic does not. With the free heuristic extractor the whole dry
+run is exact.
+
+Before v0.5 the paid-provider plan treated the new facts as absent, and the
+docs called its downstream counts an upper bound. For edits that add facts
+that was wrong: the plan counted the extraction call but none of the pages it
+would update.
 
 ## Invariants (checked by tests and benchmarks)
 

@@ -32,6 +32,7 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any
 
+from dakc import versions
 from dakc.artifacts import KINDS, LAYER, kind_of
 from dakc.compiler import STRATEGIES, BuildReport, Compiler
 from dakc.compiler.projection import sync_projection
@@ -44,11 +45,14 @@ from dakc.errors import (
     WorkspaceNotFound,
 )
 from dakc.graph import build_graph, downstream, export, resolve_id, stats, titles, upstream
-from dakc.hashing import hash_file
+from dakc.hashing import h
 from dakc.parsing import ParseError, parse_bytes
 from dakc.provenance import Explanation, changed_sources, explain, stale_artifacts
 from dakc.provenance.trace import ClaimTrace, PageTrace, trace_claim, trace_page
 from dakc.providers import ProviderBundle
+from dakc.publishers import PublishResult, forget
+from dakc.publishers import publish as publish_to
+from dakc.sources import SourceSet
 from dakc.storage import BuildRecord, Store
 from dakc.transactions import FaultInjector, rollback
 from dakc.transactions.lock import workspace_lock
@@ -95,6 +99,9 @@ class Status:
     source_changes: dict[str, int]
     stale: dict[str, int] = field(default_factory=dict)  # kind -> artifacts downstream of changed sources
     new_sources: int = 0
+    # Why a compile has work even if no source changed: DAKC's own logic, the
+    # configuration, or the provider changed since HEAD. Empty when there is none.
+    outdated: list[str] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -206,13 +213,34 @@ class VerifyReport:
 
 
 @dataclass
+class SourceInfo:
+    """One configured source (RFC 0001)."""
+
+    name: str
+    type: str
+    prefix: str
+    location: str
+    capabilities: list[str]
+    documents: int  # sources at HEAD that came from it
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass
 class RollbackResult:
     restored_build: int
     new_build: int
     projection: dict[str, int]
+    publications: list[dict[str, Any]] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
+
+
+#: DAKC logic versions a compile compares with HEAD (entity resolution is part of the configuration fingerprint).
+LOGIC_LAYERS = {"parser": "parser", "claim_identity": "claim identity", "render": "rendering",
+                "summary": "summary structure", "page": "page structure"}
 
 
 # --------------------------------------------------------------------------- #
@@ -362,7 +390,7 @@ class KnowledgeBase:
         return msg + (f"; did you mean {', '.join(repr(c) for c in close[:3])}?" if close else "")
 
     def _changed(self) -> dict[str, str]:
-        return changed_sources(self.store, self.source_root, self.workspace.excluded)[1]
+        return changed_sources(self.store, self.workspace.source_set())[1]
 
     def _compiler(self, strategy: str, *, dry_run: bool, provider: str | None, jobs: int | None,
                   fault: str | None = None) -> Compiler:
@@ -370,7 +398,7 @@ class KnowledgeBase:
             raise InvalidArgument(f"strategy must be one of {', '.join(STRATEGIES)}")
         ws = self.workspace
         return Compiler(
-            self.store, self.provider(provider), ws.source_root,
+            self.store, self.provider(provider), ws.source_set(),
             aliases=ws.config.alias_map, config_fingerprint=ws.config.fingerprint,
             strategy=strategy, jobs=jobs or ws.config.jobs, dry_run=dry_run,
             fault=FaultInjector(fault), exclude=ws.excluded, acquire_lock=False, provenance=ws.config.provenance,
@@ -380,11 +408,11 @@ class KnowledgeBase:
     def check(self, root: str | Path | None = None) -> SourceChanges:
         """Compare the sources on disk (the configured source directory, or ``root``)
         with the last committed build."""
-        src = Path(root).resolve() if root is not None else self.source_root
-        sr, _ = changed_sources(self.store, src, self.workspace.excluded)
+        ss = SourceSet.from_root(Path(root).resolve(), self.workspace.excluded) if root is not None else self.workspace.source_set()
+        sr, _ = changed_sources(self.store, ss)
         reg = self.store.load_sources()
         return SourceChanges(
-            root=str(src),
+            root=ss.describe(),
             new=list(sr.new),
             modified=[p for _, p in sr.modified],
             deleted=[reg[s].path for s in sr.deleted],
@@ -395,16 +423,19 @@ class KnowledgeBase:
 
     def status(self) -> Status:
         """HEAD, artifact counts, and what is stale relative to the sources on disk."""
-        sr, changed = changed_sources(self.store, self.source_root, self.workspace.excluded)
+        ss = self.workspace.source_set()
+        sr, changed = changed_sources(self.store, ss)
         stale = stale_artifacts(self.store, changed) if changed else {}
+        outdated = self._outdated()
         return Status(
             workspace=str(self.root),
-            source_root=str(self.source_root),
+            source_root=ss.describe(),
             output_root=str(self.output_root),
             provider=self.workspace.config.provider,
             head=self.store.head,
             counts=self.store.counts(),
-            up_to_date=not sr.has_changes,
+            up_to_date=not sr.has_changes and not outdated,
+            outdated=outdated,
             source_changes=sr.summary(),
             stale={k: len(v) for k, v in sorted(stale.items(), key=lambda kv: LAYER.get(kv[0], 9))},
             new_sources=len(sr.new),
@@ -412,8 +443,10 @@ class KnowledgeBase:
 
     def plan(self, *, full: bool = False, strategy: str | None = None, provider: str | None = None) -> BuildReport:
         """Dry run: what ``compile`` would rebuild and how many LLM calls it would make.
-        Nothing is written and nothing is spent. Exact for free providers, an upper
-        bound for LLM providers (``report.exact``)."""
+        Nothing is written and nothing is spent. Exact for free providers. For LLM
+        providers the extraction calls are exact and the facts in new text are
+        estimated with the heuristic extractor, so page and summary counts are an
+        estimate (``report.exact`` is false)."""
         strat = strategy or ("full" if full else "dakc")
         report, _ = self._compiler(strat, dry_run=True, provider=provider, jobs=None).run()
         return report
@@ -491,6 +524,41 @@ class KnowledgeBase:
         title = titles(self.store, [aid]).get(aid, art.title)
         return ArtifactContent(aid, art.kind, title, version, from_build, text, meta)
 
+    def _outdated(self) -> list[str]:
+        """What a compile would redo besides source changes, read from what HEAD recorded:
+        the versions of DAKC's own logic, the configuration fingerprint, and the
+        provider's component fingerprints."""
+        store = self.store
+        counts = store.counts()
+        if not store.head or not any(v for k, v in counts.items() if k != "edges"):
+            return []
+        out: list[str] = []
+        stored = json.loads(store.get_meta("compiler_versions") or "{}")
+        current = versions.current()
+        if not stored:
+            out.append("built by a DAKC version that predates logic versions: every layer is recomputed")
+        else:
+            for key, label in LOGIC_LAYERS.items():
+                if stored.get(key) != current[key]:
+                    out.append(f"{label} logic changed ({stored.get(key) or 'none'} -> {current[key]})")
+        cfg = store.get_meta("config_fingerprint")
+        if cfg and cfg != self.workspace.config.fingerprint:
+            out.append("configuration changed (entity aliases, entity resolution or provenance mode)")
+        build, seen = store.build(store.head), set()
+        while build is not None and "fingerprints" not in build.stats and build.stats.get("restored_to") and build.id not in seen:
+            seen.add(build.id)  # a rollback records no fingerprints: use the build it restored
+            build = store.build(int(build.stats["restored_to"]))
+        recorded = build.stats.get("fingerprints") if build is not None else None
+        if recorded:
+            try:
+                now = self.provider().fingerprints()
+            except Exception:  # e.g. an optional extra is missing; compile will say so
+                now = {}
+            for comp in ("extractor", "writer", "summarizer"):
+                if now.get(comp) and recorded.get(comp) and recorded[comp] != now[comp]:
+                    out.append(f"the {comp} changed ({recorded[comp]} -> {now[comp]})")
+        return out
+
     def _read_source(self, aid: str) -> ArtifactContent:
         """A source document as it is on disk now (it may differ from the last build;
         ``metadata['changed_since_build']`` says so). Markdown, text and JSON are
@@ -499,14 +567,13 @@ class KnowledgeBase:
         assert src is not None
         row = self.store.conn.execute("SELECT from_build FROM sources WHERE id=? AND to_build IS NULL", (aid,)).fetchone()
         meta: dict[str, Any] = {"path": src.path, "type": src.type, "recorded_raw_hash": src.raw_hash}
-        path = self.source_root / src.path
+        raw = self.workspace.source_set().read_current(src.path)
         text = ""
-        if not path.is_file():
+        if raw is None:
             meta["on_disk"] = "missing (deleted or moved since the last build)"
         else:
             meta["on_disk"] = "present"
-            meta["changed_since_build"] = hash_file(path) != src.raw_hash
-            raw = path.read_bytes()
+            meta["changed_since_build"] = h(raw) != src.raw_hash
             if src.type in ("markdown", "text", "json"):
                 text = raw.decode("utf-8", errors="replace")
             else:
@@ -640,7 +707,7 @@ class KnowledgeBase:
             if not bundle.free and not allow_cost:
                 raise CostNotAllowed("a full-rebuild comparison with an LLM provider re-pays every call; pass allow_cost=True")
             ws = self.workspace
-            equal, detail = verify_against_full(self.store, ws.source_root, bundle, ws.config.alias_map, ws.excluded,
+            equal, detail = verify_against_full(self.store, ws.source_set(), bundle, ws.config.alias_map, ws.excluded,
                                                 ws.config.provenance, ws.config.fingerprint)
             out.equal_to_full_rebuild = equal
             out.full_rebuild_diff = detail
@@ -668,6 +735,7 @@ class KnowledgeBase:
         """
         strat = strategy or ("full" if full else "dakc")
         comp = self._compiler(strat, dry_run=False, provider=provider, jobs=jobs, fault=fault)  # validates first
+        publishers = self.workspace.publishers()  # configuration errors surface before anything is built
         with workspace_lock(self.workspace.db_path, wait):
             head_before = self.store.head
             try:
@@ -677,7 +745,40 @@ class KnowledgeBase:
                 raise CompileFailed(f"{type(exc).__name__}: {exc}", head=head, preserved=head == head_before) from exc
             if report.status in ("committed", "noop") or not self.output_root.exists():
                 report.projection = sync_projection(self.store, self.output_root, self.workspace.state_dir)
+            if report.status in ("committed", "noop"):
+                report.publications = [publish_to(self.store, n, pub).to_dict() for n, pub in publishers]
         return report
+
+    def publish(self, name: str | None = None, *, dry_run: bool = False, reset: bool = False,
+                wait: float = 0.0) -> list[PublishResult]:
+        """Bring configured publishers (all, or the one called ``name``) up to date with
+        HEAD, sending only what their ledger says they have not acknowledged. A
+        failing publisher does not raise: its result carries the error, and the
+        unsent work stays pending for the next run. ``reset`` forgets the ledger
+        first, so everything is sent again. ``dry_run`` only counts pending work."""
+        pubs = self.workspace.publishers()
+        if name is not None:
+            pubs = [(n, p) for n, p in pubs if n == name]
+            if not pubs:
+                raise InvalidArgument(f"no publisher named {name!r}; configured: "
+                                      f"{', '.join(n for n, _ in self.workspace.publishers()) or 'none'}")
+        with workspace_lock(self.workspace.db_path, wait):
+            out = []
+            for n, pub in pubs:
+                if reset and not dry_run:
+                    forget(self.store, n)
+                out.append(publish_to(self.store, n, pub, dry_run=dry_run))
+        return out
+
+    def sources(self) -> list[SourceInfo]:
+        """The configured sources, with how many documents each contributed at HEAD."""
+        ss = self.workspace.source_set()
+        counts: Counter[str] = Counter()
+        for (path,) in self.store.conn.execute("SELECT path FROM sources WHERE to_build IS NULL"):
+            o = ss.owner(path)
+            counts[o.name if o else ""] += 1
+        return [SourceInfo(s.name, s.connector.kind, s.prefix, s.describe(), sorted(s.connector.capabilities), counts[s.name])
+                for s in ss.sources]
 
     def rollback(self, to: int | None = None, *, wait: float = 0.0) -> RollbackResult:
         """Restore the knowledge base (and the wiki) to an earlier committed build,
@@ -695,4 +796,5 @@ class KnowledgeBase:
                 to = earlier[0]
             new_id = rollback(store, to)
             proj = sync_projection(store, self.output_root, self.workspace.state_dir)
-        return RollbackResult(to, new_id, proj)
+            pubs = [publish_to(store, n, pub).to_dict() for n, pub in self.workspace.publishers()]
+        return RollbackResult(to, new_id, proj, pubs)

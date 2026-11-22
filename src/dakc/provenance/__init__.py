@@ -9,12 +9,15 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from dakc.artifacts import kind_of
 from dakc.graph import downstream, titles, upstream
-from dakc.ingestion import ScanResult, scan
+from dakc.ingestion import ScanResult
 from dakc.storage import Store
+
+if TYPE_CHECKING:
+    from dakc.sources import SourceSet
 
 
 @dataclass
@@ -39,10 +42,14 @@ class Explanation:
         return self.__dict__.copy()
 
 
-def changed_sources(store: Store, source_root: Path, exclude: tuple[Path, ...] = ()) -> tuple[ScanResult, dict[str, str]]:
-    """Scan sources; return the scan and {source id: change} for registered sources that changed."""
+def changed_sources(store: Store, sources: Path | SourceSet, exclude: tuple[Path, ...] = ()) -> tuple[ScanResult, dict[str, str]]:
+    """Scan sources (one directory, or every configured source); return the scan and
+    {source id: change} for registered sources that changed."""
+    from dakc.sources import SourceSet
+
+    ss = sources if isinstance(sources, SourceSet) else SourceSet.from_root(sources, exclude)
     registry = store.load_sources()
-    sr = scan(source_root, registry, exclude=exclude)
+    sr = ss.scan(registry)
     changed = {sid: "modified" for sid, _ in sr.modified}
     changed.update({sid: "deleted" for sid in sr.deleted})
     changed.update({sid: "renamed" for sid, _, _ in sr.renamed})

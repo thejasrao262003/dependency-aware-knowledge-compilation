@@ -3,10 +3,10 @@
 A plan is a dry run of the compiler: every deterministic layer (scan,
 segmentation, cache lookup, entity resolution, signatures) is evaluated
 exactly. Provider calls are executed only for providers that are free and
-deterministic. For paid/LLM providers the plan counts the calls it *would*
-make and treats their outputs as unknown, so downstream numbers become an
-upper bound derived from the current graph. Such plans are labelled
-``exact=False`` and are never presented as exact.
+deterministic. For paid/LLM providers the plan counts the extraction calls
+it *would* make exactly, and estimates the facts in new text with the free
+heuristic extractor, so page and summary counts are an estimate. Such plans
+are labelled ``exact=False`` and are never presented as exact.
 """
 
 from __future__ import annotations
@@ -41,15 +41,18 @@ def render(report: BuildReport) -> str:
         f"   (regenerate {n('regenerate_page')}, re-render citations only {n('rerender_page')},"
         f" delete {n('delete_page')}, checked & unchanged {n('cutoff_page')})",
         f"Unaffected Knowledge Pages: {max(0, pages_total - affected_pages - n('cutoff_page'))}",
-        f"Summaries:                  regenerate {n('regenerate_summary')}, delete {n('delete_summary')},"
-        f" checked & unchanged {n('cutoff_summary')}",
+        f"Summaries:                  regenerate {n('regenerate_summary')}, re-render {n('rerender_summary')},"
+        f" delete {n('delete_summary')}, checked & unchanged {n('cutoff_summary')}"
+        + (f"   (sections: regenerate {n('regenerate_section')}, reused {n('cutoff_section')})"
+           if n("regenerate_section") or n("cutoff_section") else ""),
         f"Index:                      {'re-render' if n('rerender_index') else 'unchanged'}",
         "",
         "Planned Operations:" if report.dry_run else "Operations:",
         f"- Re-extract {n('reextract')} passage(s)",
         f"- Reconcile {n('reconcile_entity')} entit{'y' if n('reconcile_entity') == 1 else 'ies'}",
         f"- Regenerate {n('regenerate_page')} page(s), re-render {n('rerender_page')}",
-        f"- Update {n('regenerate_summary')} summar{'y' if n('regenerate_summary') == 1 else 'ies'}",
+        f"- Regenerate {n('regenerate_summary')} summar{'y' if n('regenerate_summary') == 1 else 'ies'},"
+        f" re-render {n('rerender_summary')}",
     ]
     if report.revisions:
         lines.append("")
@@ -61,7 +64,7 @@ def render(report: BuildReport) -> str:
     if report.dry_run:
         planned = sum(report.planned_llm_calls.values())
         est = u.llm_calls + planned
-        qual = "exact" if report.exact else "upper bound"
+        qual = "exact" if report.exact else "estimate"
         lines.append(f"Estimated LLM Calls: {est} ({qual})")
     else:
         lines.append(f"LLM Calls: {u.llm_calls}   Provider calls: {u.calls}   Tokens in/out: {u.input_tokens}/{u.output_tokens}")

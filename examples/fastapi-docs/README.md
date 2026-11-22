@@ -18,28 +18,40 @@ every commit we measured three strategies, all running in the same engine:
   most LLM-wiki tools do.
 - **DAKC.**
 
-| | LLM calls | Pages regenerated | Equal to a full rebuild |
-|---|---|---|---|
-| Full rebuild at every commit | 688,168 | — | (the reference) |
-| Re-process changed files | 267,896 | 72,272 | |
-| **DAKC** | **259** | **100** | **yes, at all 50 commits** |
+| | LLM calls | Input tokens (est.) | Pages regenerated | Equal to a full rebuild |
+|---|---|---|---|---|
+| Full rebuild at every commit | 707,037 | 70,804,758 | — | (the reference) |
+| Re-process changed files | 284,354 | 34,639,766 | 72,272 | |
+| **DAKC** | **317** | **148,030** | **100** | **yes, at all 50 commits** |
 
 Read this table with its context. Full detail is in
 [results/replay.md](results/replay.md).
 
 - **Release notes.** 46 of the 50 commits only append a line or two to
   `release-notes.md`, an 8,000-line file.
-  - Re-processing that file costs about 5,800 LLM calls each time.
-  - DAKC re-extracts the new paragraph: 0 to 6 calls.
+  - Re-processing that file costs about 6,200 LLM calls each time.
+  - DAKC re-extracts the new paragraph and rewrites the few page sections it
+    touches: 0 to 9 calls, a median of about 930 input tokens.
   - This pattern is common: changelogs, decision logs, meeting notes.
-- **Content edits.** On the 4 commits that edit docs pages, DAKC made 127 calls
-  where file-level re-processing made 658. A commit that is mostly new text
-  costs about the same under any strategy (33 vs 34), because new text has to
-  be read.
-- **Tokens.** Calls are not the whole cost. DAKC used about 14 times fewer
-  input tokens than file-level re-processing, not 1,000 times fewer. Most of
-  its tokens go to regenerating one large topic summary that lists about
-  1,660 pages (see Limitations in the main README).
+- **Content edits.** On the 4 commits that edit docs pages, DAKC used 78,005
+  input tokens where file-level re-processing used 454,194 (162 calls vs
+  1,162). New text has to be read under any strategy, so a commit that is
+  mostly new text re-extracts about the same passages either way. The gap left
+  is in hub pages and large summaries, where DAKC rewrites only the sections
+  whose inputs changed.
+- **Tokens.** Compare tokens rather than calls. DAKC used about 234 times fewer
+  input tokens than file-level re-processing, not 897 times fewer: its calls
+  average 467 input tokens, while file-level work is mostly small extraction
+  calls (122 on average).
+  - Two artifacts have very many inputs: the summary of the docs root folder
+    (about 1,660 pages) and a hub page with 3,491 claims, which the free
+    extractor created from the "PR" in release-notes lines. Both are built in
+    sections, so an edit rewrites only the sections it touched.
+  - Before sections (v0.4.0), DAKC used 2,460,770 input tokens over the same
+    50 commits, 14 times fewer than file-level: one release-notes commit cost
+    58,689 tokens, now 4,699.
+  - See [results/replay.md](results/replay.md) and *Bounded fan-in* in
+    [docs/dependency-model.md](../../docs/dependency-model.md).
 - **Provider.** Counts come from DAKC's deterministic mock provider. Calls are
   exactly what each strategy would send to an LLM; tokens are estimated.
 
@@ -50,7 +62,7 @@ real output. It follows fastapi/fastapi@b0a616d9, which adds a section on form
 parsing limits to one docs page:
 
 1. **Compile the 159 pages.** That is 11,468 passages, 11,060 claims and
-   2,334 entity pages; a full build is 13,808 LLM calls.
+   2,334 entity pages; a full build is 14,187 LLM calls.
 2. **Ask** what happens when a form exceeds FastAPI's parser limits. There is
    nothing yet.
 3. **Apply the commit**: 1 file changed, 16 lines added.
@@ -61,11 +73,12 @@ parsing limits to one docs page:
      D["advanced/request-body-limits.md<br/>1 of 159 documents changed"] --> P["8 passages re-extracted<br/>of 11,468"]
      P --> C["5 new claims<br/>0 retracted"]
      C --> G["9 pages regenerated<br/>fastapi, starlette, http, form, file, uploadfile …"]
-     G --> S["3 topic summaries"] --> I["index"]
+     G --> S["1 topic summary regenerated<br/>2 re-rendered"] --> I["index"]
      U["2,325 other pages<br/>never touched"]
    ```
 
-   **20 LLM calls, against 13,808 for a full rebuild.**
+   **25 LLM calls (about 13,300 input tokens), against 14,187 for a full
+   rebuild.**
 5. **Compile.** Exactly that plan runs.
 6. **Ask again.** "Exceeding a parser limit returns HTTP 400." `dakc trace`
    shows the exact sentence, document and version.
@@ -75,6 +88,9 @@ parsing limits to one docs page:
 
 [results/agent-session.md](results/agent-session.md) records two real sessions.
 In each, Claude Code had only DAKC's MCP tools: no shell and no file access.
+They were recorded with v0.4.0, before hub pages and large summaries were built
+in sections, so the preview they show is 20 LLM calls; the same commit is now
+25 calls and about a fifth of the tokens.
 
 - **Before the commit**, the agent searched, found the body-size limit
   documentation, and said plainly that the knowledge base had nothing on
@@ -113,11 +129,11 @@ dakc serve -w examples/fastapi-docs/.work/ui-demo-kb  # then open http://127.0.0
 ```
 
 - **Overview** shows the pending change against the whole knowledge base.
-- **Changes** shows the 20-call plan.
+- **Changes** shows the 25-call plan.
 - **History** shows what build 2 changed.
 - **Any page** lets you select a citation to see the exact source sentence.
 
-![Changes view: one modified document, 20 LLM calls to catch up](../../docs/images/ui-changes.png)
+![Changes view: one modified document, 25 LLM calls to catch up](../../docs/images/ui-changes.png)
 
 ## Reproduce
 

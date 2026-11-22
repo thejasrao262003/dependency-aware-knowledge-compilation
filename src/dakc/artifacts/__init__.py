@@ -159,6 +159,9 @@ class PageArt(Artifact):
     render_sig: str = ""
     generator: str = ""
     dropped: tuple[str, ...] = ()  # generated sentences removed by strict provenance (audit trail)
+    # Hub pages only: (signature, label, text with section-local citations, claim ids) of
+    # every section, in order. Kept so unchanged sections are reused instead of rewritten.
+    sections: tuple[tuple[str, str, str, tuple[str, ...]], ...] = ()
     kind: ClassVar[str] = "page"
 
     def content(self):
@@ -178,6 +181,7 @@ class PageArt(Artifact):
             "render_sig": self.render_sig,
             "generator": self.generator,
             "dropped": list(self.dropped),
+            **({"sections": [[s[0], s[1], s[2], list(s[3])] for s in self.sections]} if self.sections else {}),
         }
 
     def deps(self):
@@ -198,6 +202,9 @@ class SummaryArt(Artifact):
     generator: str = ""
     body: str = ""
     render_sig: str = ""
+    # Hierarchical summaries only: (signature, title, overview) of every section, all
+    # levels, in order. Kept so unchanged sections are reused instead of regenerated.
+    sections: tuple[tuple[str, str, str], ...] = ()
     kind: ClassVar[str] = "summary"
 
     def content(self):
@@ -213,6 +220,7 @@ class SummaryArt(Artifact):
             "generator": self.generator,
             "body": self.body,
             "render_sig": self.render_sig,
+            **({"sections": [list(s) for s in self.sections]} if self.sections else {}),
         }
 
     def deps(self):
@@ -258,10 +266,11 @@ def from_payload(kind: str, id_: str, p: dict[str, Any]) -> Artifact:
         return PageArt(
             id_, p["entity_id"], p["title"], p["body"], p["lead"], p["rendered"], tuple(p["claim_ids"]),
             tuple(p["rel_ids"]), p["topic"], p["gen_sig"], p["render_sig"], p.get("generator", ""), tuple(p.get("dropped", ())),
+            tuple((s[0], s[1], s[2], tuple(s[3])) for s in p.get("sections", ())),
         )
     if kind == "summary":
         return SummaryArt(id_, p["topic"], p["title"], p["rendered"], tuple(p["page_ids"]), p["sig"], p.get("generator", ""),
-                          p.get("body", ""), p.get("render_sig", ""))
+                          p.get("body", ""), p.get("render_sig", ""), tuple(tuple(s) for s in p.get("sections", ())))
     if kind == "index":
         return IndexArt(id_, p["rendered"], tuple(p["page_ids"]), tuple(p["summary_ids"]), p["sig"])
     raise KeyError(kind)

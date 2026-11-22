@@ -9,6 +9,7 @@ from typing import Any
 
 from dakc.hashing import entity_key, h_obj
 from dakc.providers import ProviderBundle, make_provider
+from dakc.sources import FilesystemSource, Source, SourceSet, make_source
 from dakc.storage import Store
 
 CONFIG_NAME = "dakc.toml"
@@ -24,6 +25,8 @@ class Config:
     provenance: str = "report"
     provider_options: dict[str, dict[str, Any]] = field(default_factory=dict)
     aliases: dict[str, str] = field(default_factory=dict)
+    sources: list[dict[str, Any]] = field(default_factory=list)  # [[sources]] tables (RFC 0001); empty: source_dir
+    publishers: list[dict[str, Any]] = field(default_factory=list)  # [[publishers]] tables (RFC 0001)
 
     @property
     def alias_map(self) -> dict[str, str]:
@@ -63,6 +66,21 @@ class Config:
             '# path = "plugins"                     # relative to this file',
             "",
 
+            "# More sources, or other kinds of source (docs/rfcs/0001-sources-and-publishers.md).",
+            "# Without [[sources]], source_dir above is the only source.",
+            "# [[sources]]",
+            '# name = "docs"',
+            '# type = "filesystem"                  # or an installed connector, or "custom" with factory = "module:attr"',
+            '# path = "knowledge"',
+            '# prefix = ""                          # paths appear as prefix/...; defaults to the name',
+            "",
+            "# Where compiled knowledge goes besides wiki/ (a change feed, a vector database plugin, ...).",
+            "# [[publishers]]",
+            '# name = "feed"',
+            '# type = "jsonl"',
+            '# path = "feed/changes.jsonl"',
+            '# kinds = ["claim", "page", "summary"]',
+            "",
             "# Map alternative spellings to one entity, e.g. \"Postgres\" = \"PostgreSQL\".",
             "[aliases]",
         ]
@@ -91,6 +109,8 @@ class Workspace:
             provenance=core.get("provenance", "report"),
             provider_options=data.get("provider", {}),
             aliases=dict(data.get("aliases", {})),
+            sources=[dict(t) for t in data.get("sources", [])],
+            publishers=[dict(t) for t in data.get("publishers", [])],
         )
         return cls(root, cfg)
 
@@ -127,6 +147,23 @@ class Workspace:
 
     def store(self) -> Store:
         return Store(self.db_path)
+
+    def source_set(self) -> SourceSet:
+        """Every configured source; without [[sources]], the one directory ``source_dir``."""
+        if self.config.sources:
+            return SourceSet([make_source(spec, self.root, self.excluded) for spec in self.config.sources])
+        return SourceSet([Source(Path(self.config.source_dir).name or "knowledge", FilesystemSource(self.source_root, self.excluded))])
+
+    def publishers(self) -> list[tuple[str, Any]]:
+        """Configured [[publishers]] as (name, publisher)."""
+        from dakc.errors import PublishError
+        from dakc.publishers import make_publisher
+
+        out = [make_publisher(spec, self.root) for spec in self.config.publishers]
+        names = [n for n, _ in out]
+        if len(set(names)) != len(names):
+            raise PublishError(f"publisher names must be unique: {names}")
+        return out
 
     def provider(self, override: str | None = None) -> ProviderBundle:
         name = override or self.config.provider

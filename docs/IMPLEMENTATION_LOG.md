@@ -310,9 +310,147 @@ reproducible benchmark command and a clean CI run.
       - scroll position carried across views;
       - the provenance panel out of view on mobile.
 
+48. **Correction: where a release-notes commit's tokens go.**
+    - Entry 46 and the v0.4.0 docs said nearly all of DAKC's tokens on
+      FastAPI went to a ~55,000-token root-summary prompt. That attributed a
+      whole commit's cost to one artifact.
+    - Measured per stage on `af628068` (58,689 input tokens), the split is:
+      - root summary: 29,968 tokens (about 1,660 page leads);
+      - one hub page: 28,574 tokens. It is `page:pr`, with 3,491 claims,
+        created because the heuristic extractor treats the "PR" in
+        release-notes lines as an entity;
+      - everything else: 147 tokens.
+    - The general limitation is unbounded fan-in. Both topic summaries and
+      entity pages are regenerated from all of their inputs when any one
+      changes.
+
+49. **Bounded fan-in (ADR-27).**
+    - After the per-stage measurement in entry 48, hub pages and large topic
+      summaries are built in content-defined sections:
+      - boundaries come from the hashes of claim or page ids;
+      - each section is cached by its own signature;
+      - hub pages get page-wide citation numbers at render time and a
+        deterministic lead.
+    - FastAPI release-notes commit: 58,689 to about 4,700 input tokens (6
+      calls instead of 4). Final figures, after entry 50, are there.
+    - Tests caught three of my wrong expectations, each correct behaviour:
+      - a page whose lead does not change cuts the summary off entirely;
+      - a section whose overview does not change cuts the topic off;
+      - an edited fact can move to another section, because its claim id
+        changes.
+    - Writing the dry-run test exposed a pre-existing planner bug. With an LLM
+      provider, a plan treated the facts in new text as absent, so it
+      undercounted pages and summaries while the docs called it an upper
+      bound. It now estimates them with the heuristic extractor, and the docs
+      say "estimate".
+
+50. **Stale passage headings, found by the FastAPI replay.**
+    - The first replay after entry 49 reported every commit unequal to a full
+      rebuild, by six hub pages each. That included the first commit, where
+      DAKC made no calls. Fresh DAKC and full builds were equal, so the
+      divergence was on the incremental path.
+    - Cause: that commit inserts `## 0.162.3` above `### Upgrades` in
+      release-notes.md. Passage ids cover text, not headings, so the 22
+      paragraphs below kept their passages and claims, and their old
+      heading. A full build used the new heading. Hubs order their facts by
+      heading, so they grouped differently.
+    - The stale heading had been wrong since v0.1, and `dakc trace` showed
+      it. Equality never caught it because the canonical state hashed
+      passage text only.
+    - Fix:
+      - re-parsing updates the heading in place, without re-extracting;
+      - the canonical state includes headings;
+      - `parse/3`, so stores built earlier are repaired on upgrade.
+    - Regression tests cover a heading inserted mid-document and the upgrade
+      repair. With the fix disabled, both the op count and
+      `verify --against-full` fail.
+    - Re-checking the UI demo exposed a second, smaller bug. A topic whose
+      overview was cut off but whose section listing changed was reported as
+      both `cutoff_summary` and `rerender_summary`, so the UI showed
+      "3 updated · 2 checked, unchanged · 1 untouched" for 6 summaries when
+      3 were untouched. Summary outcomes are now exclusive, as page outcomes
+      were, and the hierarchical-summary tests assert it on every compile.
+    - The benchmark then showed a design flaw in hub ordering. At 100
+      documents, a one-paragraph edit regenerated 4 pages instead of 2, and
+      cost twice the tokens of v0.4.0.
+      - Cause: hubs ordered facts by source and heading. Claims whose text
+        was unchanged but whose earliest source moved changed position, and
+        rewrote two sections each.
+      - That broke the rule that moved citations only re-render. It was also
+        why the replay's first commit, a heading insert, cost 12 section
+        calls.
+      - Fix: hubs are ordered like small pages, by claim text and then id.
+        Section headings ("Facts 129–256, from release-notes.md") are built
+        from citations at assembly time, so they too only re-render.
+      - New test: a fact stated in two documents loses one, and the hub is
+        re-rendered with no writer call.
+    - Final measurements, against v0.4.0:
+      - FastAPI, 50 commits: DAKC input tokens 2,460,770 → 148,030, calls
+        259 → 317, every commit equal to a full rebuild. The heading-insert
+        commit costs nothing again.
+      - Synthetic benchmark, DAKC tokens summed over the ten scenarios: −26%
+        at 100 documents, −69% at 1,000, −89% at 5,000. The same pages are
+        regenerated in every scenario.
+      - Full builds make 3–5% more calls.
+      - File-level call counts rose (267,896 → 284,354 on FastAPI), because
+        every strategy writes hubs in sections, while its tokens barely
+        moved. So the docs compare tokens.
+
+51. **Sources and publishers (RFC 0001, ADR-28).**
+    - The user asked to make DAKC extensible instead of building one RAG
+      integration. An RFC came first, settling these questions:
+      - identity: native keys versus paths;
+      - namespacing by prefix;
+      - failure semantics;
+      - the publication ledger;
+      - plugin discovery;
+      - permissions, as a design only.
+    - The seams were small:
+      - The compiler consumed one `ScanResult` and read bytes in one place.
+        A `SourceSet` now produces the same `ScanResult` from any number of
+        connectors, and `FileInfo.read()` replaces `abspath.read_bytes()`.
+      - The Markdown projection already reconciled against state with a
+        manifest. Publishers generalize that idea with a `published` ledger.
+    - Behaviour preserved:
+      - all 159 existing tests pass unchanged;
+      - the 100-document benchmark reproduces exactly
+        (`--verify-against`);
+      - a store from before the change opens with no rebuild.
+    - Found while building it:
+      - A source directory that disappeared used to look like the deletion of
+        every document. It now fails the build while the store holds
+        documents from it. A fresh workspace may still start without its
+        directory.
+      - `path` cannot name a custom plugin's import directory, because
+        connectors need it for their own location. That option is
+        `plugin_path`.
+    - New tests: 16 for sources (an in-memory connector with native ids
+      stands in for a cloud drive) and 8 for publishers (failure mid-way,
+      resume, rollback, the jsonl feed through `compile`).
+
+52. **`status` and the rest of the issues found in entries 49–51.**
+    - **What was wrong.** `status` compared only sources. A version bump, an
+      alias change or a provider change left it saying "up to date" while a
+      compile would re-check or regenerate layers. This release itself bumps
+      `parse`, `page` and `summary`.
+    - **The fix.** It now reads what HEAD recorded: logic versions, the
+      configuration fingerprint, and the provider's component fingerprints.
+      It lists each difference in `outdated`. A rollback build records no
+      fingerprints, so the check follows `restored_to`; a test covers the
+      absence of false alarms after a rollback.
+    - **A detail the test exposed.** A logic change that affects no artifact
+      still makes a compile commit: it re-checks the layer and records the
+      version, although the plan shows nothing to regenerate. So the UI says
+      "DAKC or its settings changed" rather than "a compile has work".
+    - **Also fixed:**
+      - summary section labels read "(1 pages)";
+      - `dakc watch` with no filesystem source watched nothing, silently.
+    - The label change alters summary signatures, so every published
+      measurement was regenerated.
+
 ## Not done (deliberately or for lack of resources)
 
-- No React frontend. The API exposes React-Flow-shaped graph JSON for one.
+- No React or other framework frontend. The web UI is dependency-free and read-only (entry 47, ADR-26).
 - Real-LLM results cover one hosted model (`gpt-4o-mini`) on small corpora
   (see docs/benchmark.md). Other models were not measured.
 - Semantic (embedding) claim matching was not added. Deterministic matching

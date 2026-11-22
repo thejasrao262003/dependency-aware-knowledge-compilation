@@ -69,7 +69,7 @@ def create_app(root: Path) -> FastAPI:
 
     @app.get("/plan")
     def plan(kb: KB, full: bool = False):
-        """Dry-run compilation plan. Free providers give an exact plan; LLM providers an upper bound."""
+        """Dry-run compilation plan: exact for free providers, an estimate for LLM providers."""
         return kb.plan(full=full).to_dict(limit=500)
 
     @app.get("/graph")

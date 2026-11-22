@@ -48,7 +48,9 @@ inputs. A Markdown "wiki" directory is a projection of that store.
 |---|---|
 | `hashing` | BLAKE3 helpers, canonical JSON, text normalization, id derivation. |
 | `parsing` | Format detection and text-block extraction (Markdown via markdown-it-py, HTML via BeautifulSoup, PDF via PyMuPDF, JSON, TXT). |
-| `ingestion` | Source scan, raw hashing and change classification, including rename pairing. |
+| `sources` | Source connectors (RFC 0001): the connector protocol, the filesystem connector, and `SourceSet`, which lists every configured source into one prefixed namespace and classifies changes (native-key matching, rename pairing within a source). Plugin loading. |
+| `ingestion` | Source records, file discovery, and the scan result the compiler consumes. |
+| `publishers` | Publishers (RFC 0001): the publication ledger, resumable batches, records, and the built-in `jsonl` change feed. |
 | `claims` | Segmentation into passages and sentences, the heuristic extractor, sentence-grounded reuse planning (`plan_reuse`), claim normalization and deterministic claim matching. |
 | `artifacts` | Pydantic models for every artifact kind; content hashing; dependency derivation from content. |
 | `graph` | Dependency-edge queries, reverse/transitive traversal, cycle detection and export (JSON, DOT, React Flow) on NetworkX. |
@@ -76,10 +78,11 @@ state is `to_build IS NULL`. This gives the following for little extra code:
 | Table | Purpose |
 |---|---|
 | `builds` | id, parent, mode/strategy, status (`running`, `committed`, `failed`, `aborted`, `rolled_back`), timings, stats JSON, error |
-| `sources` | temporal source registry (path, raw hash, text hash, type, size) |
+| `sources` | temporal source registry (path, raw hash, text hash, type, size; a connector's native key and revision when it has them) |
 | `artifacts` | temporal artifact versions (id, kind, content, content hash, signatures, meta) |
 | `edges` | temporal dependency edges (dependent → dependency) |
 | `extraction_cache` | content-addressed provider results. It is not knowledge, so it is never rolled back. |
+| `published` | per publisher, the state hash of every artifact it has acknowledged: its ledger. Not knowledge, so it is never rolled back. |
 | `meta` | schema version, head build, config fingerprint |
 
 Original sources are never written to. Derived Markdown goes to a separate
@@ -103,6 +106,10 @@ output directory.
    (temp file + `os.replace`), delete removed ones and record the projected
    build. A projection interrupted after commit is detected and repaired on
    the next run, because it is a pure function of the store.
+6. **Publish**: each configured publisher receives the difference between
+   the current state and its ledger, in batches recorded after each
+   succeeds. A failing target leaves the rest pending for the next run, and
+   does not undo the build.
 
 ## Concurrency
 
@@ -129,6 +136,7 @@ Behaviour of other processes:
 
 ## What is deliberately not here
 
-No message queue, no distributed workers, no vector database, no web
-frontend in the MVP. The FastAPI service and React-Flow-shaped graph export
-are the hooks a frontend would use.
+No message queue, no distributed workers and no vector database. The web UI
+(`dakc serve`, ADR-26) is static HTML, CSS and JavaScript over the read-only
+REST API, with no framework or build step. Compiling stays in the CLI, the
+Python API and MCP.

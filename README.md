@@ -35,11 +35,12 @@ call. Everything else keeps its exact bytes. `dakc compile --dry-run` tells
 you all of this before anything is spent.
 
 **On real docs:** across the last 50 commits to FastAPI's documentation, DAKC
-made 259 LLM calls where re-processing each changed file made 267,896, and
-its result equalled a full rebuild at every commit. Most of that gap comes
-from a large release-notes file edited in almost every commit; see
+used about 148,000 input tokens (317 LLM calls) where re-processing each
+changed file used about 35 million (284,354 calls), and its result equalled a
+full rebuild at every commit. Most of that gap comes from a large
+release-notes file edited in almost every commit; see
 [examples/fastapi-docs](examples/fastapi-docs/README.md) for the breakdown,
-the token counts and the limitations.
+the per-commit costs and the limitations.
 
 > **Status:** research prototype / MVP, CLI-first, local-first. Python 3.12+,
 > SQLite, no GPU, no network required (deterministic providers are the
@@ -126,14 +127,14 @@ Affected Claims:            5   (new 1, retracted 1, changed 0, provenance-only 
 Affected Entities:          2
 Affected Knowledge Pages:   2   (regenerate 2, re-render citations only 0, delete 0, checked & unchanged 3)
 Unaffected Knowledge Pages: 20
-Summaries:                  regenerate 0, delete 0, checked & unchanged 1
+Summaries:                  regenerate 0, re-render 0, delete 0, checked & unchanged 1
 Index:                      unchanged
 
 Planned Operations:
 - Re-extract 1 passage(s)
 - Reconcile 2 entities
 - Regenerate 2 page(s), re-render 0
-- Update 0 summaries
+- Regenerate 0 summaries, re-render 0
 
 Estimated LLM Calls: 0 (exact)
 
@@ -147,8 +148,10 @@ Ledger pages are *checked and unchanged*. Only the JSONB and PostgreSQL pages
 are regenerated.
 
 With the default heuristic provider, LLM calls are 0 and the plan is exact.
-With an LLM provider, the plan counts the calls it *would* make, does not
-make them, and labels downstream numbers as an **upper bound**.
+With an LLM provider, the plan counts the extraction calls it *would* make,
+exactly, and does not make them. It estimates the facts in new text with the
+free heuristic extractor, so its page and summary counts are labelled an
+**estimate**.
 
 ## Commands
 
@@ -170,6 +173,8 @@ make them, and labels downstream numbers as an **upper bound**.
 | `dakc serve` | Local web UI and read-only REST API (`/status /check /plan /graph /artifacts /artifacts/{id}[/content\|/trace\|/downstream] /builds /diff /duplicates`) |
 | `dakc mcp [--read-only]` | MCP server for AI agents ([below](#mcp-server-for-ai-agents)) |
 | `dakc watch` | Recompile incrementally on file changes |
+| `dakc sources` | Configured sources: type, path prefix, location, documents at HEAD ([below](#sources-and-publishers)) |
+| `dakc publish [NAME] [--dry-run] [--reset]` | Bring publishers up to date with HEAD; retries what a failed publish left pending |
 
 IDs can be given in friendly form: `page:database-architecture`,
 `entity_postgresql`, `source:databases/redis.md`, a source path, or a page
@@ -305,6 +310,62 @@ commits that changed FastAPI's documentation. At every commit it measures
 what keeping a knowledge base current costs under each strategy, and checks
 that DAKC's result equals a full rebuild.
 
+## Sources and publishers
+
+DAKC does not care where content comes from, or where compiled knowledge
+goes. A **source connector** lists versioned items and reads them. A
+**publisher** receives what changed. The compiler between them is the same
+either way. The design is in
+[docs/rfcs/0001-sources-and-publishers.md](docs/rfcs/0001-sources-and-publishers.md).
+
+```toml
+[[sources]]                 # without [[sources]], [dakc] source_dir is the only source
+name = "docs"
+type = "filesystem"
+path = "knowledge"
+prefix = ""                 # these files keep their paths
+
+[[sources]]
+name = "policies"
+type = "filesystem"         # or an installed connector, or "custom" with factory = "module:attr"
+path = "/srv/policies"      # its documents appear under policies/
+
+[[publishers]]
+name = "feed"
+type = "jsonl"              # a change feed: one line per upsert or delete
+path = "feed/changes.jsonl"
+kinds = ["claim", "page", "summary"]
+```
+
+**One knowledge base, several systems.**
+- A fact stated in two sources is supported by both, and survives the
+  deletion of either.
+- Connectors with stable native ids (a Drive file id, a CRM record id) keep a
+  document's identity when it is moved *and* edited.
+- An unchanged revision is never read.
+- A source that cannot be listed fails the build before anything is
+  committed, rather than looking like a mass deletion.
+- `verify --against-full` checks a mixed-source workspace exactly like a
+  single directory.
+
+**Publishers converge.** DAKC records which version of every artifact each
+publisher has acknowledged, and sends only the difference:
+- A target that is down leaves its changes pending. The build still
+  commits, and the next `compile` or `dakc publish` resumes.
+- Rollbacks and new publishers need nothing special.
+- Every record carries its text, kind, build and the source documents it
+  derives from. A vector-database integration can therefore re-embed only
+  changed facts, delete retracted ones, and keep citations.
+
+**Plugins.** Connectors and publishers register Python entry points
+(`dakc.sources`, `dakc.publishers`). Alternatively, a local module can be
+loaded with `type = "custom"`, `factory = "module:attr"` and
+`plugin_path = "plugins"`.
+
+Only the filesystem connector and the `jsonl` publisher ship today. Remote
+connectors (Drive, SharePoint, GitHub), change feeds and permissions are
+phases 2 and 3 of the RFC.
+
 ## Guarantees, and how each is checked
 
 | Concern | What DAKC does | Checked by |
@@ -334,6 +395,7 @@ including deletion semantics and dry-run precision, is in
 | Source renamed | Same source id, **zero** LLM calls; citations re-rendered. |
 | Duplicate document added | Extraction-cache hit, **zero** extraction calls. |
 | Entity aliases changed (`[aliases]` in `dakc.toml`) | Entity resolution re-runs deterministically; only pages whose membership changed are rebuilt. |
+| A fact about a hub entity, or a page in a large topic, changes | The hub page (more than 64 claims) and large topic summaries (more than 64 pages) are built in content-defined sections. Only the sections whose inputs changed are rewritten, then their parent. No prompt reads a whole hub or a whole large topic. |
 | Prompt or model changed | The provider fingerprint changes. Writer and summarizer changes invalidate exactly the pages and summaries they built. An extractor change re-extracts every passage, because each passage records which extractor produced its claims. Pages are regenerated only where the re-extracted claims differ. |
 | Build fails (provider error, crash, injected fault) | Nothing is committed. HEAD and the wiki are unchanged; paid extraction results are cached for the retry. |
 
@@ -369,22 +431,22 @@ Two kinds of numbers appear here, and they are never mixed:
 
 Seeded synthetic corpus, **5,000 documents** (48,933 claims, 2,501 pages, 279,406 dependency edges). Deterministic mock provider: LLM calls are counted exactly, tokens are estimated. All three strategies run in the same engine. *File-level* emulates the strategy of existing LLM-wiki tools.
 
-| Scenario | LLM calls: full / file-level / DAKC | Pages regenerated: full / file-level / DAKC | Stale artifacts (DAKC) | Equal to full rebuild (DAKC) |
+| Scenario | Input tokens (est.): full / file-level / DAKC | LLM calls: full / file-level / DAKC | Pages regenerated: full / file-level / DAKC | Equal to full rebuild (DAKC) |
 |---|---|---|---|---|
-| S0 no change | 33,118 / 0 / **0** | 2,501 / 0 / **0** | 0 | yes |
-| S1 one source modified | 33,118 / 60 / **11** | 2,501 / 43 / **5** | 0 | yes |
-| S2 five sources modified | 33,118 / 146 / **32** | 2,501 / 90 / **15** | 0 | yes |
-| S3 one source deleted | 33,111 / 43 / **24** | 2,501 / 22 / **11** | 0 | yes |
-| S4 one source renamed | 33,118 / 80 / **0** | 2,501 / 39 / **0** | 0 | yes |
-| S5 one claim modified | 33,118 / 50 / **3** | 2,501 / 39 / **1** | 0 | yes |
-| S6 new source → popular entity | 33,121 / 13 / **7** | 2,501 / 5 / **2** | 0 | yes |
-| S7 contradicting source | 33,119 / 3 / **3** | 2,501 / 1 / **1** | 0 | yes |
-| S8 edit touching 7 entities | 33,118 / 73 / **22** | 2,501 / 50 / **11** | 0 | yes |
-| S9 contradiction, then original deleted | 33,117 / 13 / **8** | 2,501 / 6 / **4** | 0 | yes |
+| S0 no change | 3,663,730 / 0 / **0** | 34,767 / 0 / **0** | 2,501 / 0 / **0** | yes |
+| S1 one source modified | 3,663,729 / 289,027 / **6,036** | 34,767 / 766 / **13** | 2,501 / 43 / **5** | yes |
+| S2 five sources modified | 3,663,706 / 439,248 / **16,893** | 34,767 / 1,195 / **38** | 2,501 / 90 / **15** | yes |
+| S3 one source deleted | 3,662,976 / 212,492 / **14,692** | 34,759 / 542 / **27** | 2,501 / 22 / **11** | yes |
+| S4 one source renamed | 3,663,730 / 283,334 / **0** | 34,767 / 746 / **0** | 2,501 / 39 / **0** | yes |
+| S5 one claim modified | 3,663,740 / 263,682 / **726** | 34,767 / 702 / **3** | 2,501 / 39 / **1** | yes |
+| S6 new source → popular entity | 3,664,029 / 115,932 / **3,838** | 34,770 / 300 / **8** | 2,501 / 5 / **2** | yes |
+| S7 contradicting source | 3,663,815 / 79,867 / **854** | 34,768 / 196 / **3** | 2,501 / 1 / **1** | yes |
+| S8 edit touching 7 entities | 3,663,892 / 310,954 / **11,102** | 34,767 / 824 / **22** | 2,501 / 50 / **11** | yes |
+| S9 contradiction, then original deleted | 3,663,617 / 86,242 / **4,410** | 34,766 / 217 / **9** | 2,501 / 6 / **4** | yes |
 
-Across all sizes (100, 1,000, 5,000 documents) and scenarios, every strategy's result was identical to an independent full rebuild, and DAKC never regenerated an artifact whose inputs were unchanged. The smallest LLM-call savings versus file-level at 5,000 documents: S7 contradicting source: 0% (a brand-new fact must be extracted and written under any strategy); S9 contradiction, then original deleted: 38%. Full tables, method and caveats are in [docs/benchmark.md](docs/benchmark.md). Raw data: [benchmarks/results/latest.json](benchmarks/results/latest.json).
+Across all sizes (100, 1,000, 5,000 documents) and scenarios, every strategy's result was identical to an independent full rebuild, and DAKC never regenerated an artifact whose inputs were unchanged. The smallest input-token savings versus file-level at 5,000 documents: S3 one source deleted: 93% (retracted facts genuinely require regenerating the pages that stated them); S9 contradiction, then original deleted: 95%. Compare tokens rather than calls: every strategy writes hub pages and large topics in sections, so rebuilding one of them file-level is many small calls. Full tables, method and caveats are in [docs/benchmark.md](docs/benchmark.md). Raw data: [benchmarks/results/latest.json](benchmarks/results/latest.json).
 
-**At 20,000 documents** (realistic length and topic distributions; 329,123 claims, 10,002 pages, 1,906,814 dependency edges), LLM calls full / file-level / DAKC: S0 no change 177,546 / 0 / **0**; S1 one source modified 177,546 / 45 / **5**; S3 one source deleted 177,522 / 78 / **39**; S4 one source renamed 177,546 / 44 / **0**; S5 one claim modified 177,546 / 42 / **2**; S9 contradiction, then original deleted 177,546 / 14 / **11**. Every strategy was identical to a full rebuild with 0 stale artifacts. Raw data: [benchmarks/results/scale-realistic.json](benchmarks/results/scale-realistic.json).
+**At 20,000 documents** (realistic length and topic distributions; 329,123 claims, 10,002 pages, 1,906,814 dependency edges), LLM calls full / file-level / DAKC: S0 no change 190,964 / 0 / **0**; S1 one source modified 190,964 / 4,273 / **6**; S3 one source deleted 190,940 / 5,394 / **81**; S4 one source renamed 190,964 / 4,230 / **0**; S5 one claim modified 190,964 / 4,226 / **2**; S9 contradiction, then original deleted 190,964 / 1,939 / **15**. Every strategy was identical to a full rebuild with 0 stale artifacts. Raw data: [benchmarks/results/scale-realistic.json](benchmarks/results/scale-realistic.json).
 
 ### Real-model measurements
 
@@ -426,16 +488,26 @@ Unchanged facts kept with identical claim ids after a one-sentence edit, whole-p
 - **Heuristic extraction is crude** (see above).
 - **Contradictions are kept, not resolved.** Both claims appear on the page
   with their own sources.
-- **Large, flat folders make expensive topic summaries.**
-  - A topic summary's prompt lists every page in its folder.
-  - On FastAPI's docs, the root folder's summary covers about 1,660 pages,
-    a prompt of about 55,000 tokens, and it is regenerated whenever a page in
-    that folder changes.
-  - With an LLM provider, this dominates DAKC's incremental token cost
-    ([measured](examples/fastapi-docs/results/replay.md)).
-  - A much larger folder could exceed a model's context window.
-- **No frontend.** `dakc graph --format reactflow` and `GET /graph` provide
-  React Flow data for one.
+- **Hub pages and large topics are built in sections.** This bounds the cost
+  of an edit and every prompt's size, but it has costs of its own:
+  - a full build makes 3–5% more LLM calls;
+  - a hub page's lead is deterministic rather than LLM-written;
+  - an edited fact can rewrite two sections, because its claim moves.
+
+  See *Bounded fan-in* in [docs/dependency-model.md](docs/dependency-model.md).
+- **The free extractor creates noise hubs.** For example, it turns the "PR"
+  in every FastAPI release-notes line into an entity with 3,491 claims.
+  Sectioning keeps such a hub cheap to maintain, but the page is still
+  noise.
+- **The web UI is read-only and local.** Compiling, rollback and
+  configuration stay in the CLI, the Python API and MCP. There is no
+  authentication yet, so `dakc serve` only listens on this machine.
+- **Only local sources ship.** The connector interface supports remote
+  systems with native ids and opaque revisions, and is tested with an
+  in-memory one. But no Drive, SharePoint or GitHub connector exists yet,
+  and access control does not propagate through derived artifacts (RFC 0001,
+  phase 3). Until it does, don't mix documents with different audiences in
+  one knowledge base.
 
 ## Reproduce everything
 
@@ -457,6 +529,7 @@ indicative.
 
 ```text
 src/dakc/      kb (the Python API) · errors · cli · api (REST) · mcp_server
+               sources (connectors) · publishers (ledger, jsonl feed)
                hashing · parsing · ingestion · claims · artifacts · graph · invalidation
                compiler (+ projection) · transactions · provenance (explain, trace, compare, verify)
                providers (heuristic, mock, openai-compatible, anthropic, custom) · storage

@@ -70,8 +70,11 @@ The server sends instructions on connect. They tell the agent how to:
   what would be re-extracted and regenerated, and how many LLM calls it would
   make. Nothing is written or spent.
 - **Cost guard.** With an LLM provider, `compile(apply=true)` plans first and
-  refuses a build planned to exceed `--max-llm-calls` (default 100). The plan
-  is an upper bound, so the guard is conservative. `verify(against_full=true)`,
+  refuses a build planned to exceed `--max-llm-calls` (default 100). The
+  plan's extraction calls are exact. Its page and summary counts are an
+  estimate (new facts are estimated with the heuristic extractor), so the
+  guard catches unexpectedly large builds but is not a hard ceiling.
+  `verify(against_full=true)`,
   which re-pays every call, is refused over MCP with a paid provider.
 - **Explicit destruction.** `rollback` requires a build id and is annotated
   `destructiveHint`, so clients that confirm destructive tools will ask the

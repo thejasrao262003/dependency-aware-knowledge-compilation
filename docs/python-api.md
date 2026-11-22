@@ -23,10 +23,10 @@ Instances are cheap to open.
 
 | Method | Returns | Notes |
 |---|---|---|
-| `status()` | `Status` | `head`, `counts`, `up_to_date`, `source_changes`, `stale` (artifacts per kind downstream of changed sources) |
+| `status()` | `Status` | `head`, `counts`, `up_to_date`, `source_changes`, `stale` (artifacts per kind downstream of changed sources), and `outdated`: reasons a compile has work besides source changes (DAKC's logic, the configuration or the provider changed since HEAD). `up_to_date` is true only when there are neither. |
 | `check(root=None)` | `SourceChanges` | new / modified / deleted / renamed / unchanged, by content hash |
-| `plan(full=False)` | `BuildReport` | Dry run. Nothing is written or spent. `has_work()` and `llm_calls()` tell you whether a compile is needed and what it costs. Exact for free providers; an upper bound for LLM providers (`report.exact`). |
-| `compile(full=False, wait=0.0)` | `BuildReport` | Takes the build lock, commits atomically, updates the wiki files. Raises `BuildLocked` or `CompileFailed`. |
+| `plan(full=False)` | `BuildReport` | Dry run. Nothing is written or spent. `has_work()` and `llm_calls()` tell you whether a compile is needed and what it costs. Exact for free providers. For LLM providers, extraction calls are exact and page and summary counts are an estimate (`report.exact` is false). |
+| `compile(full=False, wait=0.0)` | `BuildReport` | Takes the build lock, commits atomically, updates the wiki files, then runs the configured publishers. `report.publications` has one result per publisher; a failing publisher does not fail the build. Raises `BuildLocked` or `CompileFailed`. |
 | `artifacts(kind=None, query=None, limit=100)` | `list[ArtifactSummary]` | Ordered by layer, then id. `query` is a case-insensitive substring of the title, or of the full text for claims and passages |
 | `read(artifact)` | `ArtifactContent` | Rendered Markdown for pages, summaries and the index. Text for claims and passages. For a source document, its current text on disk, with `metadata['changed_since_build']`. |
 | `explain(artifact)` | `Explanation` | Dependencies, dependents, upstream sources, signatures, history, `VALID` / `STALE` / `DELETED` with reasons. `STALE` means a source upstream changed. That is an upper bound: `plan()` shows whether the artifact actually changes. |
@@ -38,7 +38,9 @@ Instances are cheap to open.
 | `diff(a, b=None)` | `BuildDiff` | Artifacts created / updated / deleted between two builds (`b` defaults to HEAD) |
 | `duplicates(limit=None)` | `list[DuplicatePair]` | Advisory. Claims are never merged. |
 | `verify(against_full=False, allow_cost=False)` | `VerifyReport` | Invariants. `against_full` also compares with a full rebuild; with an LLM provider it needs `allow_cost=True` (`CostNotAllowed` otherwise). |
-| `rollback(to=None, wait=0.0)` | `RollbackResult` | Takes the build lock. Destructive: later artifact versions are discarded, though their build records remain. |
+| `rollback(to=None, wait=0.0)` | `RollbackResult` | Takes the build lock. Destructive: later artifact versions are discarded, though their build records remain. Publishers are brought back too (`.publications`). |
+| `sources()` | `list[SourceInfo]` | The configured sources: name, type, path prefix, location, capabilities, documents at HEAD |
+| `publish(name=None, dry_run=False, reset=False, wait=0.0)` | `list[PublishResult]` | Sends each publisher what its ledger has not acknowledged. `dry_run` only counts; `reset` sends everything again. A failure is returned (`.error`, `.pending`), not raised. |
 
 `artifact` may be:
 
@@ -67,6 +69,8 @@ matching built-in, so existing `except` clauses keep working.
 | `CompileFailed` | `RuntimeError` | a build failed. Nothing was committed. `.preserved` is True when HEAD still points at the previous build, and `.head` is that build. |
 | `CostNotAllowed` | `PermissionError` | a full-rebuild comparison with a paid provider without `allow_cost=True` |
 | `RollbackError` | `ValueError` | the target is not a committed build, or is already HEAD |
+| `SourceError` | `RuntimeError` | a source is misconfigured, could not be listed or read, or its plugin could not be loaded. During a compile it surfaces as `CompileFailed` and nothing is committed. |
+| `PublishError` | `RuntimeError` | a publisher is misconfigured or its plugin could not be loaded. It is raised before a compile starts. |
 
 ## Concurrency
 
@@ -77,3 +81,57 @@ serialized.
 Read methods never take the lock. SQLite's WAL mode gives them a consistent
 snapshot while a build runs. This is what lets an agent or the REST API keep
 answering during a compile.
+
+## Extending: connectors and publishers
+
+The contracts are in
+[RFC 0001](rfcs/0001-sources-and-publishers.md). A connector lists items and
+reads them:
+
+```python
+from dakc import Item
+
+class NotesConnector:
+    kind = "notes"
+    capabilities = frozenset({"native_ids"})   # items carry a stable key
+
+    def __init__(self, client):
+        self.client = client
+
+    def list(self):                              # a complete listing, every time
+        for n in self.client.all_notes():
+            yield Item(path=f"{n.folder}/{n.slug}.md", source_type="markdown",
+                       revision=n.version, size=n.size, key=n.id)
+
+    def read(self, item):                        # the bytes of exactly that revision
+        return self.client.export(item.key, version=item.revision)
+
+def make(name, options, root):                   # the factory DAKC calls
+    return NotesConnector(connect(options["url"]))
+```
+
+A publisher receives batches of `Record`s (`id`, `kind`, `state_hash`,
+`title`, `text`, `sources`, `build`, `metadata`) and deletions. It must be
+idempotent:
+
+```python
+class VectorPublisher:
+    kind = "vectors"
+    kinds = frozenset({"claim"})
+
+    def __init__(self, index):
+        self.index = index
+
+    def publish(self, batch):
+        if batch.deletes:
+            self.index.delete(ids=batch.deletes)
+        if batch.upserts:
+            self.index.upsert([(r.id, embed(r.text), {"sources": r.sources, "build": r.build})
+                               for r in batch.upserts])
+```
+
+Register either one with an entry point in the `dakc.sources` or
+`dakc.publishers` group, or load a local module with `type = "custom"`,
+`factory = "module:attr"` and `plugin_path = "plugins"`. Every other key in
+its `[[sources]]` or `[[publishers]]` table is passed to the factory as
+`options`.

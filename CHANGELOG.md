@@ -1,5 +1,121 @@
 # Changelog
 
+## Unreleased
+
+### Upgrading from 0.4
+
+- **The first build after upgrading migrates large artifacts.** New
+  versions `page/2` and `summary/2` are recorded. Hub pages (more than 64
+  claims) and topic summaries of more than 64 pages are rebuilt once, in
+  sections. Smaller pages and topics keep their signatures and are not
+  regenerated.
+- **Every source is re-parsed once (`parse/3`).** Passage text is
+  unchanged, so nothing is re-extracted and no provider is called. The
+  re-parse repairs passage headings left stale by earlier versions (see
+  *Fixed*).
+- **The store's schema moves to version 2.** Two nullable columns
+  (`sources.key`, `sources.revision`) and a `published` table are added on
+  first open. The change is additive, so 0.4.0 can still open and compile
+  the store (tested). Whatever it writes is migrated by the next compile
+  with this version.
+  Workspaces without `[[sources]]` behave exactly as before: same source ids,
+  same paths.
+- **With an LLM provider, preview the migration first.** Run
+  `dakc compile --dry-run` to see its cost before running it.
+- **Heuristic and mock summaries are regenerated (free).** The template
+  summarizer now writes a short overview (`template-summarizer/2`).
+
+### Added
+
+- **Sources and publishers** ([RFC 0001](docs/rfcs/0001-sources-and-publishers.md)).
+  The compiler no longer knows where content comes from or where it goes.
+  - **Source connectors** list versioned items and read them. The filesystem
+    is now the first connector. A connector may declare `native_ids` (a
+    moved and edited document keeps its identity) and `content_hash` (an
+    unchanged revision is never read).
+  - **Several sources per workspace**, configured as `[[sources]]` tables,
+    each under its own path prefix. A fact stated in two sources survives
+    the deletion of either. Renames are detected only within one source.
+  - **Fail closed.** A source that cannot be listed fails the build before
+    anything is committed. So does a source directory that went missing
+    while the store still holds its documents.
+  - **Publishers**, configured as `[[publishers]]` tables, receive only what
+    changed, tracked by a ledger of what each one has acknowledged. A
+    publisher that fails leaves its changes pending without failing the
+    build, and the next run resumes. Rollbacks converge.
+  - **A built-in `jsonl` publisher**: a change feed for anything without a
+    plugin.
+  - **Plugins** via the `dakc.sources` and `dakc.publishers` entry-point
+    groups, or local modules (`type = "custom"`, `factory`, `plugin_path`).
+  - **Interfaces.**
+    - CLI: `dakc sources`, and `dakc publish [NAME] [--dry-run] [--reset]`.
+    - Python: `kb.sources()`, `kb.publish()`, `report.publications`, and
+      `dakc.Item`, `SourceConnector`, `Publisher`, `Record`,
+      `SourceError`, `PublishError`.
+    - `dakc watch` watches every filesystem source, and refuses to start
+      when there is none.
+
+### Changed
+
+- **Bounded fan-in.** Hub pages and large topic summaries are built in
+  content-defined sections, each cached by a signature over its inputs. An
+  edit rewrites the sections it touched, then their parent, and no prompt
+  reads a whole hub or a whole large topic.
+  - On a FastAPI release-notes commit: 4,699 input tokens instead of 58,689,
+    in 6 calls instead of 4.
+  - Over FastAPI's last 50 documentation commits: 148,030 input tokens
+    instead of 2,460,770, in 317 calls instead of 259. The result still
+    equals a full rebuild at every commit.
+  - On the synthetic benchmark, DAKC's input tokens across all ten scenarios
+    fall by 26% at 100 documents, 69% at 1,000 and 89% at 5,000. It
+    regenerates the same pages as before in every scenario.
+  - A full build makes 3–5% more calls.
+  - See *Bounded fan-in* in `docs/dependency-model.md` and ADR-27.
+- **The template summarizer's output is bounded.** It writes a short overview
+  instead of repeating every page, which the rendered summary already lists.
+
+### Fixed
+
+- **`status` said "up to date" when a compile still had work.** It compared
+  only the sources. After an upgrade that changes DAKC's logic, or a change
+  to aliases, the provenance mode or the provider's model, it reported up to
+  date. An agent that trusted it would skip the compile. `Status` now has
+  `outdated`, the reasons other than source changes, and `up_to_date`
+  accounts for them. This shows in the CLI, REST, MCP and the web UI. After a
+  rollback, it reads the fingerprints of the build that was restored.
+- **Passages kept the heading they were first seen under.** A passage's id
+  covers its text, not its heading. So when a heading was inserted or renamed
+  above unchanged paragraphs, the passages were rightly reused, but kept their
+  old heading. `dakc trace` and the web UI then named the wrong section, and
+  `verify --against-full` missed it because it compared passage text only.
+  Present since v0.1. Re-parsing now updates the heading in place
+  (`passage_heading_changed`), without re-extracting, and the full-rebuild
+  comparison includes headings. Found by replaying FastAPI's history with an
+  early version of sectioned hub pages that grouped facts by heading.
+- **A summary could be reported twice.** When its text was reused but its
+  rendered listing changed, it was reported as both *checked and unchanged*
+  and *re-rendered*, so the web UI counted it twice and showed too few
+  untouched summaries. Each summary now gets exactly one outcome, as pages
+  already did. The CLI plan lists re-rendered summaries
+  (`Summaries: regenerate N, re-render N, …` and
+  `- Regenerate N summaries, re-render N`).
+- **Dry runs with an LLM provider undercounted.** For edits that add facts,
+  they planned the extraction call but none of the pages and summaries the
+  new facts would touch. The plan now estimates new facts with the heuristic
+  extractor. The docs had called these counts an "upper bound"; they are now
+  labelled an estimate, and the MCP and MkDocs cost guards are described
+  accordingly.
+
+### Corrected
+
+- **The cost of a FastAPI release-notes commit was misattributed.** The
+  v0.4.0 docs said nearly all of it went to a ~55,000-token prompt for the
+  root topic summary. Measured stage by stage, that summary is about 30,000
+  tokens. The other ~28,600 regenerate one hub page with 3,491 claims ("PR",
+  created by the heuristic extractor). The README, the replay report and the
+  example README now give the measured split.
+- **The README no longer says there is no frontend.**
+
 ## v0.4.0: web UI, MkDocs plugin, and FastAPI's real history
 
 ### Upgrading from 0.3

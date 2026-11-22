@@ -6,7 +6,8 @@ other directories. Design rules:
 * **Inspection tools are read-only** and never take the build lock.
 * **``compile`` previews by default.** It only builds with ``apply=true``. With an
   LLM provider it first plans, and refuses a build planned to exceed
-  ``max_llm_calls`` (an upper bound, so the guard is conservative).
+  ``max_llm_calls`` (an estimate: extraction calls are exact, and new facts are
+  estimated with the heuristic extractor).
 * **``rollback`` needs an explicit build id** and is marked destructive.
 * ``--read-only`` omits ``compile`` and ``rollback`` entirely.
 * **Outputs are bounded** (``limit`` / ``max_chars`` arguments) so a hub page or
@@ -100,9 +101,10 @@ def create_server(workspace: str | Path = ".", *, read_only: bool = False, max_l
     # ------------------------------------------------------------ inspection
     @server.tool(annotations=READ_ONLY)
     def status() -> dict[str, Any]:
-        """Current build (HEAD), artifact counts, and whether sources changed since it.
-        If not up to date, `stale` counts the artifacts downstream of changed documents:
-        an upper bound, not a prediction (compile previews the exact rebuild)."""
+        """Current build (HEAD), artifact counts, and whether a compile has work: sources
+        changed since HEAD, or `outdated` lists other reasons (DAKC's logic, the
+        configuration or the provider changed). `stale` counts the artifacts downstream of
+        changed documents: an upper bound, not a prediction (compile previews the exact rebuild)."""
         with session() as kb:
             d = kb.status().to_dict()
         if not d["up_to_date"]:

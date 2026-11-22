@@ -37,6 +37,16 @@ class RollbackError(DakcError, ValueError):
     """The requested rollback target is not a committed build, or is already HEAD."""
 
 
+class SourceError(DakcError, RuntimeError):
+    """A source is misconfigured, could not be listed or read, or its plugin could not be loaded.
+    A build that hits it fails before anything is committed."""
+
+
+class PublishError(DakcError, RuntimeError):
+    """A publisher is misconfigured or its plugin could not be loaded. (A publisher that
+    fails while publishing does not raise: its work stays pending and is reported.)"""
+
+
 class CostNotAllowed(DakcError, PermissionError):
     """The operation would re-pay LLM calls and cost was not explicitly allowed."""
 

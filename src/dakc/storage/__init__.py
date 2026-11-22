@@ -19,7 +19,7 @@ from typing import Any
 from dakc.artifacts import Artifact, from_payload
 from dakc.ingestion import SourceRecord
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2  # 2: sources.key and sources.revision (RFC 0001); the published ledger
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS meta(key TEXT PRIMARY KEY, value TEXT NOT NULL);
@@ -63,7 +63,13 @@ CREATE INDEX IF NOT EXISTS edges_to ON edges(to_build);
 CREATE TABLE IF NOT EXISTS extraction_cache(
     key TEXT PRIMARY KEY, fingerprint TEXT NOT NULL, result TEXT NOT NULL, created_at TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS published(
+    publisher TEXT NOT NULL, id TEXT NOT NULL, kind TEXT NOT NULL, state_hash TEXT NOT NULL,
+    build INTEGER NOT NULL, published_at TEXT NOT NULL, PRIMARY KEY(publisher, id)
+);
 """
+
+SOURCE_COLS = "id,path,raw_hash,text_hash,size,type,key,revision"
 
 
 def now_iso() -> str:
@@ -109,7 +115,11 @@ class Store:
         self.conn.execute("PRAGMA synchronous=NORMAL")
         self.conn.execute("PRAGMA foreign_keys=OFF")
         self.conn.executescript(SCHEMA)
-        if self.get_meta("schema_version") is None:
+        cols = {r[1] for r in self.conn.execute("PRAGMA table_info(sources)")}
+        for col in ("key", "revision"):  # schema 2: additive, so older DAKC versions can still read the store
+            if col not in cols:
+                self.conn.execute(f"ALTER TABLE sources ADD COLUMN {col} TEXT")
+        if int(self.get_meta("schema_version") or 0) < SCHEMA_VERSION:
             self.set_meta("schema_version", str(SCHEMA_VERSION))
 
     def close(self) -> None:
@@ -181,7 +191,7 @@ class Store:
             config_fingerprint=self.get_meta("config_fingerprint") or "",
             compiler_versions=json.loads(self.get_meta("compiler_versions") or "{}"),
         )
-        for r in self.conn.execute("SELECT id,path,raw_hash,text_hash,size,type FROM sources WHERE to_build IS NULL"):
+        for r in self.conn.execute(f"SELECT {SOURCE_COLS} FROM sources WHERE to_build IS NULL"):
             state.sources[r[0]] = SourceRecord(*r)
         for id_, kind, version, payload in self.conn.execute(
             "SELECT id,kind,version,payload FROM artifacts WHERE to_build IS NULL"
@@ -193,7 +203,7 @@ class Store:
     def load_sources(self) -> dict[str, SourceRecord]:
         return {
             r[0]: SourceRecord(*r)
-            for r in self.conn.execute("SELECT id,path,raw_hash,text_hash,size,type FROM sources WHERE to_build IS NULL")
+            for r in self.conn.execute(f"SELECT {SOURCE_COLS} FROM sources WHERE to_build IS NULL")
         }
 
     def all_source_ids(self) -> set[str]:
@@ -240,7 +250,7 @@ class Store:
 
     def current_source(self, source_id: str) -> SourceRecord | None:
         r = self.conn.execute(
-            "SELECT id,path,raw_hash,text_hash,size,type FROM sources WHERE id=? AND to_build IS NULL", (source_id,)
+            f"SELECT {SOURCE_COLS} FROM sources WHERE id=? AND to_build IS NULL", (source_id,)
         ).fetchone()
         return SourceRecord(*r) if r else None
 

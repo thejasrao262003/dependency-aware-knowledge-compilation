@@ -25,7 +25,7 @@ from collections.abc import Callable, Iterable
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field, replace
 from pathlib import Path
-from typing import Any, TypeVar
+from typing import Any, NamedTuple, TypeVar
 
 from dakc.artifacts import (
     INDEX_ID,
@@ -38,12 +38,15 @@ from dakc.artifacts import (
     SummaryArt,
     Usage,
 )
+from dakc.errors import SourceError
 from dakc.claims import ExtractedClaim, match_revisions, plan_reuse, segment, sentence_key, split_sentences
 from dakc.hashing import claim_id, entity_key, h, h_obj, normalize_claim, normalize_text, slugify
-from dakc.ingestion import FileInfo, ScanResult, SourceRecord, new_source_id, scan
+from dakc.ingestion import FileInfo, ScanResult, SourceRecord, new_source_id
 from dakc.parsing import ParseError, parse_bytes
 from dakc.providers import ClaimView, PageLead, ProviderBundle
+from dakc.providers.deterministic import HeuristicExtractor
 from dakc.provenance.trace import ground_body
+from dakc.sources import SourceSet
 from dakc.storage import KBState, Store
 from dakc.transactions import ChangeSet, FaultInjector, commit
 from dakc.transactions.lock import workspace_lock
@@ -57,6 +60,65 @@ R = TypeVar("R")
 
 class SourceChangedDuringBuild(RuntimeError):
     pass
+
+
+# Hierarchical topic summaries (versions.SUMMARY). A topic with more than SECTION_FLAT
+# pages is summarized in sections of about SECTION_FANIN pages, then from the section
+# overviews (recursively, so no prompt grows without bound).
+SECTION_FANIN = 32
+SECTION_MAX = 4 * SECTION_FANIN
+SECTION_FLAT = 2 * SECTION_FANIN
+PAGE_FLAT = 2 * SECTION_FANIN  # entity pages with more claims are written in sections (versions.PAGE)
+_CITE = re.compile(r"\[\^C(\d+)\]")
+
+
+class SumItem(NamedTuple):
+    key: str  # stable sort/boundary key: a page id, or the first page id of a section
+    title: str
+    lead: str
+    count: int  # pages it stands for
+
+
+def content_sections(items: list[T], key: Callable[[T], str], fanin: int = SECTION_FANIN) -> list[list[T]]:
+    """Split ``items`` (sorted by ``key``) into sections whose boundaries depend only on
+    the keys: a section ends after an item whose key hashes to 0 modulo ``fanin`` (or
+    at 4 x ``fanin`` items). The split is a pure function of the set of keys, so an
+    incremental build and a full rebuild agree, and adding or removing an item changes
+    only the section that contains it (content-defined chunking, as in rsync or
+    prolly trees)."""
+    out: list[list[T]] = []
+    cur: list[T] = []
+    for it in items:
+        cur.append(it)
+        if int(h(key(it))[:8], 16) % fanin == 0 or len(cur) >= 4 * fanin:
+            out.append(cur)
+            cur = []
+    if cur:
+        out.append(cur)
+    return out
+
+
+def _section_label(first: int, last: int, citations: list[list[str]]) -> str:
+    """A hub-page section's heading: its page-wide fact numbers and the documents it draws on.
+    Built from the citations alone, so it changes with them and only causes a re-render."""
+    counts = Counter(p for paths in citations for p in paths)
+    top = [p for p, _ in sorted(counts.items(), key=lambda kv: (-kv[1], kv[0]))]
+    srcs = ", ".join(top[:2]) + (f" and {len(top) - 2} more" if len(top) > 2 else "")
+    return f"Facts {first}–{last}" + (f", from {srcs}" if srcs else "")
+
+
+def _renumber(text: str, offset: int, n: int) -> str:
+    """Section-local citations [^C1..Cn] -> page-wide numbers; section headings one level down."""
+    text = _CITE.sub(lambda m: f"[^C{offset + int(m.group(1))}]" if 1 <= int(m.group(1)) <= n else m.group(0), text)
+    return re.sub(r"(?m)^(#{2,5}) ", lambda m: "#" + m.group(1) + " ", text)
+
+
+def _hub_lead(name: str, mentions: list[tuple[str, ...]]) -> str:
+    """A hub page's lead, written without an LLM (the same sentence the template writer uses)."""
+    co = Counter(m for ms in mentions for m in ms if m.casefold() != name.casefold())
+    about = f", most often alongside {sorted(co.items(), key=lambda kv: (-kv[1], kv[0]))[0][0]}" if co else ""
+    n = len(mentions)
+    return f"{name} has {n} documented fact{'s' if n != 1 else ''}{about}. They are listed below in sections."
 
 
 def topic_of(path: str) -> str:
@@ -100,6 +162,7 @@ class BuildReport:
     notes: list[str] = field(default_factory=list)
     duration_s: float = 0.0
     projection: dict[str, int] = field(default_factory=dict)
+    publications: list[dict[str, Any]] = field(default_factory=list)  # one PublishResult.to_dict() per publisher
 
     def op(self, category: str, ident: str) -> None:
         self.ops[category].append(ident)
@@ -134,6 +197,7 @@ class BuildReport:
             "notes": self.notes,
             "duration_s": round(self.duration_s, 4),
             "projection": self.projection,
+            "publications": self.publications,
         }
 
 
@@ -142,7 +206,7 @@ class Compiler:
         self,
         store: Store,
         provider: ProviderBundle,
-        source_root: Path,
+        source_root: Path | SourceSet,
         *,
         aliases: dict[str, str] | None = None,
         config_fingerprint: str = "",
@@ -160,7 +224,8 @@ class Compiler:
             raise ValueError(f"strategy must be one of {STRATEGIES}")
         self.store = store
         self.provider = provider
-        self.source_root = source_root
+        # A directory (the single-source case) or every configured source (RFC 0001).
+        self.sources = source_root if isinstance(source_root, SourceSet) else SourceSet.from_root(source_root, exclude)
         self.alias_map = aliases or {}
         if provenance not in ("report", "strict"):
             raise ValueError("provenance must be 'report' or 'strict'")
@@ -194,7 +259,7 @@ class Compiler:
             self.store.recover_aborted_builds()  # safe: we hold the build lock
         head_at_load = self.store.head
         old = self.store.load_state()
-        result = scan(self.source_root, old.sources, detect_renames=self.strategy != "file", exclude=self.exclude)
+        result = self.sources.scan(old.sources, detect_renames=self.strategy != "file")
         report.scan = {
             **result.summary(),
             "new_paths": result.new,
@@ -246,9 +311,13 @@ class Compiler:
         parser_changed = has_history and not full and stored_v.get("parser") != versions.PARSER
         identity_changed = has_history and not full and stored_v.get("claim_identity") != versions.CLAIM_IDENTITY
         render_changed = has_history and not full and stored_v.get("render") != versions.RENDER
-        for layer, changed in (("parser", parser_changed), ("claim identity", identity_changed), ("rendering", render_changed)):
+        summary_changed = has_history and not full and stored_v.get("summary") != versions.SUMMARY
+        page_changed = has_history and not full and stored_v.get("page") != versions.PAGE
+        for layer, key, changed in (("parser", "parser", parser_changed), ("claim identity", "claim_identity", identity_changed),
+                                    ("rendering", "render", render_changed), ("summary structure", "summary", summary_changed),
+                                    ("page structure", "page", page_changed)):
             if changed:
-                report.notes.append(f"{layer} logic changed since HEAD ({stored_v.get(layer.replace(' ', '_').replace('rendering', 'render'))} -> current): affected layer recomputed")
+                report.notes.append(f"{layer} logic changed since HEAD ({stored_v.get(key)} -> current): affected layer recomputed")
         P = self.provider
         base_passages: dict[str, PassageArt] = {} if full else dict(old.of("passage"))  # type: ignore[arg-type]
         base_claims: dict[str, ClaimArt] = {} if full else dict(old.of("claim"))  # type: ignore[arg-type]
@@ -284,6 +353,10 @@ class Compiler:
             report.op("source_renamed", sid)
             if full:
                 to_parse.append((sid, sr.files[new_path]))
+        for sid, path in sr.revised:  # a new revision with the same bytes: only the registry learns it
+            if sid in sources:
+                sources[sid] = replace(sources[sid], revision=sr.files[path].revision)
+                report.op("source_revised", sid)
         for sid, path in sr.modified:
             to_parse.append((sid, sr.files[path]))
             report.op("source_modified", sid)
@@ -294,11 +367,18 @@ class Compiler:
         if full or parser_changed:
             for sid in sr.unchanged:
                 to_parse.append((sid, sr.files[old.sources[sid].path]))
+        to_parse = list(dict(to_parse).items())  # a source that was moved and edited is parsed once
 
         added: dict[str, PassageArt] = {}
+        reheaded: set[str] = set()  # kept passages whose heading changed
         gone_by_source: dict[str, set[str]] = defaultdict(set)  # replaced passage versions, for sentence reuse
         for sid, info in sorted(to_parse, key=lambda t: t[1].path):
-            raw = info.abspath.read_bytes()
+            try:
+                raw = info.read()
+            except SourceError:
+                raise
+            except Exception as exc:
+                raise SourceError(f"{info.path} (source {info.origin!r}) could not be read: {type(exc).__name__}: {exc}") from exc
             if h(raw) != info.raw_hash:
                 raise SourceChangedDuringBuild(f"{info.path} changed while compiling; run again")
             try:
@@ -309,7 +389,7 @@ class Compiler:
                 report.notes.append(f"parse error in {info.path}: {exc}")
                 new_passages, text_hash = [], h(f"parse-error:{exc}")
             report.op("source_processed", sid)
-            sources[sid] = SourceRecord(sid, info.path, info.raw_hash, text_hash, info.size, info.source_type)
+            sources[sid] = SourceRecord(sid, info.path, info.raw_hash, text_hash, info.size, info.source_type, info.key, info.revision)
             old_pids = passages_by_source.get(sid, set())
             new_by_id = {p.id: p for p in new_passages}
             if self.strategy == "file":
@@ -321,6 +401,13 @@ class Compiler:
             for pid in fresh:
                 p = new_by_id[pid]
                 added[pid] = PassageArt(pid, sid, p.text, p.text_hash, p.heading, p.occurrence, P.extractor.fingerprint)
+            # A passage's id covers its text, not its heading: a heading inserted or renamed
+            # above it keeps the passage (and its claims) but moves it to another section.
+            for pid in sorted(old_pids & new_by_id.keys()):
+                if passages[pid].heading != new_by_id[pid].heading:
+                    passages[pid] = replace(passages[pid], heading=new_by_id[pid].heading)
+                    reheaded.add(pid)
+                    report.op("passage_heading_changed", pid)
         report.counts["sources_processed"] = len(to_parse)
 
         # Passages whose claims came from a different extractor (model, prompt or
@@ -394,10 +481,19 @@ class Compiler:
         report.counts["sentences_extracted"] = n_sentences_extracted
 
         if self.dry_run and not ex.free:
+            # The facts in new or edited text are unknown until it is extracted. Estimate
+            # them with the free heuristic extractor, so the plan also counts the pages and
+            # summaries that new facts would touch (an estimate, not a bound).
             report.exact = False
             report.planned_llm_calls["extract"] = len(to_call)
-            for p, _t, reused in to_call:
-                results[p.id] = None if not reused else reused
+            if to_call:
+                report.notes.append("LLM provider: extraction calls are exact; the facts in new text are estimated with "
+                                    "the heuristic extractor, so page and summary counts are an estimate")
+            estimator = HeuristicExtractor()
+            for p, targets, reused in to_call:
+                seen = {claim_id(c.text) for c in reused}
+                guess = [c for c in estimator.extract(p.text, targets).claims if claim_id(c.text) not in seen]
+                results[p.id] = list(reused) + guess
         else:
             # Cache rows are content-addressed facts about provider output, not
             # knowledge: they are flushed even if the build later fails, so a
@@ -545,7 +641,7 @@ class Compiler:
                 for cid in claims_by_passage.get(pid, ()):
                     if cid in claims:
                         candidates |= self._entity_ids(claims[cid])
-        if full or render_changed:
+        if full or render_changed or page_changed:
             candidates |= set(entities)
         # Pages written by a different writer (model, prompt) are stale even if no source changed.
         drifted = {p.entity_id for p in pages.values() if p.generator != P.writer.fingerprint}
@@ -554,8 +650,15 @@ class Compiler:
             candidates |= drifted
 
         W = P.writer
-        page_plans: list[tuple[str, EntityArt, list[str], str]] = []  # (page id, entity, claim order, gen_sig)
-        regen: list[tuple[str, str, tuple[ClaimView, ...]]] = []
+        # Pages with up to PAGE_FLAT claims are written in one call (unchanged since v0.1).
+        # A hub page is written in sections: its claims, in the same order as a small page's
+        # (claim text, then id), are split with content_sections; each section is written with
+        # its own citation numbers and cached by a signature over its claims. Membership
+        # depends on the claims alone, so moved citations or headings never rewrite a section.
+        # Page-wide numbers and section labels are assigned when the page is assembled, so an
+        # insertion renumbers citations without rewriting any text.
+        page_plans: list[tuple[str, EntityArt, list[str], str, list[tuple[str, list[str]]] | None]] = []
+        regen: list[tuple[Any, str, tuple[ClaimView, ...]]] = []
         for eid in sorted(candidates):
             pid = page_id_for(eid)
             ent = entities.get(eid)
@@ -564,60 +667,93 @@ class Compiler:
                     del pages[pid]
                     report.op("delete_page", pid)
                 continue
-            order = sorted(ent.claim_ids, key=lambda c: (normalize_claim(claims[c].text), c))
-            gen_sig = h_obj([W.fingerprint, ent.name, [(c, claims[c].content_hash) for c in order]])
             prev = pages.get(pid)
-            page_plans.append((pid, ent, order, gen_sig))
-            if self.forced or prev is None or prev.gen_sig != gen_sig:
-                views = tuple(ClaimView(f"C{i + 1}", claims[c].text, claims[c].mentions) for i, c in enumerate(order))
-                regen.append((pid, ent.name, views))
+            order = sorted(ent.claim_ids, key=lambda c: (normalize_claim(claims[c].text), c))
+            if len(ent.claim_ids) <= PAGE_FLAT:
+                gen_sig = h_obj([W.fingerprint, ent.name, [(c, claims[c].content_hash) for c in order]])
+                page_plans.append((pid, ent, order, gen_sig, None))
+                if self.forced or prev is None or prev.gen_sig != gen_sig:
+                    views = tuple(ClaimView(f"C{i + 1}", claims[c].text, claims[c].mentions) for i, c in enumerate(order))
+                    regen.append((pid, ent.name, views))
+                    report.op("regenerate_page", pid)
+                continue
+            cached = {sec[0] for sec in prev.sections} if prev is not None else set()
+            secs: list[tuple[str, list[str]]] = []
+            rewritten = False
+            for chunk in content_sections(order, key=lambda c: c):
+                sig_s = h_obj([W.fingerprint, versions.PAGE, ent.name, [(c, claims[c].content_hash) for c in chunk]])
+                secs.append((sig_s, chunk))
+                if self.forced or sig_s not in cached:
+                    views = tuple(ClaimView(f"C{j + 1}", claims[c].text, claims[c].mentions) for j, c in enumerate(chunk))
+                    regen.append(((pid, len(secs) - 1), ent.name, views))
+                    report.op("regenerate_section", f"{pid}#{len(secs)}")
+                    rewritten = True
+                else:
+                    report.op("cutoff_section", f"{pid}#{len(secs)}")
+            gen_sig = h_obj([W.fingerprint, versions.PAGE, ent.name, [sec[0] for sec in secs]])
+            page_plans.append((pid, ent, order, gen_sig, secs))
+            if rewritten:
+                report.op("regenerate_page", pid)
 
-        bodies: dict[str, tuple[str, str]] = {}
-        for pid, _, _ in regen:
-            report.op("regenerate_page", pid)
+        bodies: dict[Any, tuple[str, str]] = {}
         if self.dry_run and not W.free:
             report.exact = False
             report.planned_llm_calls["page"] = len(regen)
-            for pid, _, _ in regen:
-                bodies[pid] = ("(pending regeneration)", f"(pending {pid})")
+            for key, _, _ in regen:
+                bodies[key] = ("(pending regeneration)", f"(pending {key})")
         else:
             for item, res in self._map(lambda it: W.write(it[1], it[2]), regen, W.is_llm, "page"):
                 report.usage.add("page", llm=W.is_llm, input_tokens=res.input_tokens, output_tokens=res.output_tokens)
                 bodies[item[0]] = (res.text, first_paragraph(res.text))
 
         changed_pages: set[str] = set(report.ops.get("delete_page", []))
-        for pid, ent, order, gen_sig in page_plans:
+        for pid, ent, order, gen_sig, secs in page_plans:
             prev = pages.get(pid)
-            body = bodies[pid][0] if pid in bodies else prev.body  # type: ignore[union-attr]
+            citations = [sorted({sources[passages[p].source_id].path for p in claims[c].passage_ids}) for c in order]
+            stored: tuple[tuple[str, str, str, tuple[str, ...]], ...] = ()
+            if secs is None:
+                body = bodies[pid][0] if pid in bodies else prev.body  # type: ignore[union-attr]
+                written = pid in bodies
+            else:
+                old_text = {sec[0]: sec[2] for sec in prev.sections} if prev is not None else {}
+                parts, offset, kept = [], 0, []
+                for i, (sig_s, chunk) in enumerate(secs):
+                    local = bodies[(pid, i)][0] if (pid, i) in bodies else old_text[sig_s]
+                    label = _section_label(offset + 1, offset + len(chunk), citations[offset:offset + len(chunk)])
+                    kept.append((sig_s, label, local, tuple(chunk)))
+                    parts.append(f"## {label}\n\n" + _renumber(local, offset, len(chunk)))
+                    offset += len(chunk)
+                stored = tuple(kept)
+                body = _hub_lead(ent.name, [claims[c].mentions for c in order]) + "\n\n" + "\n\n".join(parts)
+                written = any((pid, i) in bodies for i in range(len(secs)))
             dropped: list[str] = []
             display = body
             if self.provenance == "strict":
                 display, dropped = ground_body(body, len(order))
             lead = first_paragraph(display)
             related = self._related(ent.id, rels_by_entity, rels, entities)
-            citations = []
-            topic_votes: Counter[str] = Counter()
-            for c in order:
-                paths = sorted({sources[passages[p].source_id].path for p in claims[c].passage_ids})
-                citations.append(paths)
-                topic_votes.update(topic_of(p) for p in paths)
+            topic_votes: Counter[str] = Counter(topic_of(p) for paths in citations for p in paths)
             topic = sorted(topic_votes.items(), key=lambda kv: (-kv[1], kv[0]))[0][0]
             render_sig = h_obj([gen_sig, versions.RENDER, self.provenance, related, citations])
             rendered = self._render_page(ent.name, display, related, citations)
             page = PageArt(
                 pid, ent.id, ent.name, body, lead, rendered, tuple(order),
                 tuple(sorted(set(rels_by_entity.get(ent.id, ())) & rels.keys())), topic, gen_sig, render_sig, W.fingerprint,
-                tuple(dropped),
+                tuple(dropped), stored,
             )
             if prev is None or prev.state_hash != page.state_hash:
                 changed_pages.add(pid)
-                if pid not in bodies:
+                if not written:
                     report.op("rerender_page", pid)
-            elif pid not in bodies:
+            elif not written:
                 report.op("cutoff_page", pid)
             pages[pid] = page
 
         # ---------------------------------------------------------- summaries
+        # Up to SECTION_FLAT pages: one call over the page leads (unchanged since v0.1).
+        # Larger topics: content-defined sections, each summarized from its leads and
+        # cached by a signature over them; the topic is summarized from the section
+        # overviews. An edit regenerates the sections it touched and the levels above.
         S = P.summarizer
         old_pages = old.of("page")
         topics: set[str] = set()
@@ -626,7 +762,7 @@ class Compiler:
                 topics.add(old_pages[pid].topic)  # type: ignore[attr-defined]
             if pid in pages:
                 topics.add(pages[pid].topic)
-        if full or render_changed:
+        if full or render_changed or summary_changed:
             topics |= {p.topic for p in pages.values()}
         topics |= {sm.topic for sm in summaries.values() if sm.generator != S.fingerprint}  # summarizer drift
         pages_by_topic: dict[str, list[PageArt]] = defaultdict(list)
@@ -634,8 +770,26 @@ class Compiler:
             for p in pages.values():
                 if p.topic in topics:
                     pages_by_topic[p.topic].append(p)
-        sum_plans: list[tuple[str, str, list[PageArt], str]] = []
-        sum_regen: list[tuple[str, str, tuple[PageLead, ...]]] = []
+        pending = self.dry_run and not S.free  # plan LLM calls without making them
+        section_cache: dict[str, str] = {}
+        for sm in summaries.values():
+            for sig_s, _title, body_s in sm.sections:  # type: ignore[attr-defined]
+                section_cache[sig_s] = body_s
+
+        def summarize_all(items: list[tuple[Any, str, tuple[PageLead, ...]]]) -> dict[Any, str]:
+            if pending:
+                if items:
+                    report.exact = False
+                    report.planned_llm_calls["summary"] = report.planned_llm_calls.get("summary", 0) + len(items)
+                return {it[0]: "(pending regeneration)" for it in items}
+            out: dict[Any, str] = {}
+            for item, res in self._map(lambda it: S.summarize(it[1], it[2]), items, S.is_llm, "summary"):
+                report.usage.add("summary", llm=S.is_llm, input_tokens=res.input_tokens, output_tokens=res.output_tokens)
+                out[item[0]] = res.text
+            return out
+
+        plans: dict[str, dict[str, Any]] = {}
+        tree: dict[str, list[SumItem]] = {}  # hierarchical topics: the items of the level being built
         for topic in sorted(topics):
             sid = summary_id_for(topic)
             members_ = sorted(pages_by_topic.get(topic, []), key=lambda p: (p.title.casefold(), p.id))
@@ -643,38 +797,85 @@ class Compiler:
                 if summaries.pop(sid, None) is not None:
                     report.op("delete_summary", sid)
                 continue
-            sig = h_obj([S.fingerprint, topic, [(p.id, p.title, h(p.lead)) for p in members_]])
-            prev_s = summaries.get(sid)
-            sum_plans.append((sid, topic, members_, sig))
-            if self.forced or prev_s is None or prev_s.sig != sig or not prev_s.body:
+            plans[sid] = {"topic": topic, "members": members_, "sections": []}
+            if len(members_) > SECTION_FLAT:
+                tree[sid] = [SumItem(p.id, p.title, p.lead, 1) for p in sorted(members_, key=lambda p: p.id)]
+
+        level = 1
+        while any(len(items) > SECTION_FLAT for items in tree.values()):
+            todo: list[tuple[Any, str, tuple[PageLead, ...]]] = []
+            built: dict[str, list[tuple[list[SumItem], str, int, str]]] = {}
+            for sid, items in tree.items():
+                if len(items) <= SECTION_FLAT:
+                    continue
+                topic = plans[sid]["topic"]
+                entries = built.setdefault(sid, [])
+                for chunk in content_sections(items, key=lambda it: it.key):
+                    title = chunk[0].title if len(chunk) == 1 else f"{chunk[0].title} – {chunk[-1].title}"
+                    count = sum(it.count for it in chunk)
+                    sig_s = h_obj([S.fingerprint, versions.SUMMARY, topic, level,
+                                   [(it.key, it.title, h(it.lead), it.count) for it in chunk]])
+                    entries.append((chunk, title, count, sig_s))
+                    op = f"{sid}#{level}:{chunk[0].key}"
+                    if self.forced or sig_s not in section_cache:
+                        leads = tuple(PageLead(it.title, it.key.split(":", 1)[-1] if level == 1 else "", it.lead, it.count) for it in chunk)
+                        todo.append(((sid, len(entries) - 1), f"{topic} ({title})", leads))
+                        report.op("regenerate_section", op)
+                    else:
+                        report.op("cutoff_section", op)
+            bodies = summarize_all(todo)
+            for sid, entries in built.items():
+                next_items = []
+                for i, (chunk, title, count, sig_s) in enumerate(entries):
+                    body_s = bodies[(sid, i)] if (sid, i) in bodies else section_cache[sig_s]
+                    label = f"{title} ({count} page{'s' if count != 1 else ''})"
+                    plans[sid]["sections"].append((sig_s, label, body_s, level, [it.key for it in chunk]))
+                    next_items.append(SumItem(chunk[0].key, label, body_s, count))
+                tree[sid] = next_items
+            level += 1
+
+        sum_regen: list[tuple[Any, str, tuple[PageLead, ...]]] = []
+        for sid, plan in plans.items():
+            topic, members_ = plan["topic"], plan["members"]
+            if sid in tree:
+                items = tree[sid]
+                sig = h_obj([S.fingerprint, versions.SUMMARY, topic, "top", [(it.key, it.title, h(it.lead), it.count) for it in items]])
+                leads = tuple(PageLead(it.title, "", it.lead, it.count) for it in items)
+            else:
+                sig = h_obj([S.fingerprint, topic, [(p.id, p.title, h(p.lead)) for p in members_]])
                 leads = tuple(PageLead(p.title, p.id.split(":", 1)[1], p.lead) for p in members_)
+            plan["sig"] = sig
+            prev_s = summaries.get(sid)
+            if self.forced or prev_s is None or prev_s.sig != sig or not prev_s.body:
                 sum_regen.append((sid, topic, leads))
                 report.op("regenerate_summary", sid)
-            else:
-                report.op("cutoff_summary", sid)
-        sum_bodies: dict[str, str] = {}
-        if self.dry_run and not S.free:
-            report.exact = False
-            report.planned_llm_calls["summary"] = len(sum_regen)
-            sum_bodies = {sid: "(pending regeneration)" for sid, _, _ in sum_regen}
-        else:
-            for item, res in self._map(lambda it: S.summarize(it[1], it[2]), sum_regen, S.is_llm, "summary"):
-                report.usage.add("summary", llm=S.is_llm, input_tokens=res.input_tokens, output_tokens=res.output_tokens)
-                sum_bodies[item[0]] = res.text
-        for sid, topic, members_, sig in sum_plans:
+        # Like pages, every summary gets exactly one of regenerate / re-render / cutoff.
+        sum_bodies = summarize_all(sum_regen)
+        for sid, plan in plans.items():
+            topic, members_, sig, secs = plan["topic"], plan["members"], plan["sig"], plan["sections"]
             prev_s = summaries.get(sid)
             body = sum_bodies.get(sid)
             if body is None:
                 body = prev_s.body  # generation signature unchanged: reuse the generated text
-            links = "\n".join(f"- [{p.title}](../pages/{p.id.split(':', 1)[1]}.md)" for p in members_)
-            render_sig = h_obj([sig, versions.RENDER, links])
+            if secs:
+                by_id = {p.id: p for p in members_}
+                blocks = [f"### {label}\n\n{body_s}\n\n" + "\n".join(
+                    f"- [{by_id[k].title}](../pages/{k.split(':', 1)[1]}.md)" for k in keys)
+                    for _sig, label, body_s, lvl, keys in secs if lvl == 1]
+                listing = "## Sections\n\n" + "\n\n".join(blocks)
+                render_sig = h_obj([sig, versions.RENDER, listing, [x[0] for x in secs]])
+            else:
+                links = "\n".join(f"- [{p.title}](../pages/{p.id.split(':', 1)[1]}.md)" for p in members_)
+                listing = f"## Pages\n\n{links}"
+                render_sig = h_obj([sig, versions.RENDER, links])
             if sid not in sum_bodies and prev_s is not None and prev_s.render_sig == render_sig:
+                report.op("cutoff_summary", sid)
                 continue  # nothing to do: keep the previous version
-            rendered = f"# Topic: {topic}\n\n{body}\n\n## Pages\n\n{links}\n"
+            rendered = f"# Topic: {topic}\n\n{body}\n\n{listing}\n"
             if sid not in sum_bodies:
                 report.op("rerender_summary", sid)
             summaries[sid] = SummaryArt(sid, topic, f"Topic: {topic}", rendered, tuple(p.id for p in members_), sig,
-                                        S.fingerprint, body, render_sig)
+                                        S.fingerprint, body, render_sig, tuple((x[0], x[1], x[2]) for x in secs))
 
         # -------------------------------------------------------------- index
         page_entries = sorted(((p.title, p.id) for p in pages.values()), key=lambda t: (t[0].casefold(), t[1]))
@@ -717,7 +918,7 @@ class Compiler:
                         cs.edges[aid] = after.deps()
 
         all_or = (lambda kind, new, ids: set(old.of(kind)) | set(new)) if full else (lambda kind, new, ids: ids)
-        diff("passage", passages, all_or("passage", passages, removed_pids | set(added)))
+        diff("passage", passages, all_or("passage", passages, removed_pids | set(added) | reheaded))
         diff("claim", claims, all_or("claim", claims, touched_claims))
         diff("entity", entities, all_or("entity", entities, touched_entities))
         diff("relationship", rels, all_or("relationship", rels, touched_rels))
@@ -732,7 +933,7 @@ class Compiler:
             "entities_touched": len(touched_entities),
             "relationships_touched": len(touched_rels),
             "pages_considered": len(page_plans),
-            "summaries_considered": len(sum_plans),
+            "summaries_considered": len(plans),
             "sources_total": len(sources),
             "pages_total": len(pages),
             "claims_total": len(claims),

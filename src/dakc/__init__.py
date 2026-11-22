@@ -21,7 +21,9 @@ from dakc.errors import (  # noqa: E402
     CostNotAllowed,
     DakcError,
     InvalidArgument,
+    PublishError,
     RollbackError,
+    SourceError,
     WorkspaceNotFound,
 )
 from dakc.kb import (  # noqa: E402
@@ -33,6 +35,7 @@ from dakc.kb import (  # noqa: E402
     KnowledgeBase,
     RollbackResult,
     SourceChanges,
+    SourceInfo,
     Status,
     VerifyReport,
     ingest,
@@ -41,6 +44,8 @@ from dakc.kb import (  # noqa: E402
 from dakc.kb import open_kb as open  # noqa: E402,A001  (dakc.open, like tarfile.open)
 from dakc.provenance import Explanation  # noqa: E402
 from dakc.provenance.trace import ClaimTrace, PageTrace  # noqa: E402
+from dakc.publishers import Publisher, PublishResult, Record  # noqa: E402
+from dakc.sources import Item, SourceConnector  # noqa: E402
 from dakc.storage import BuildRecord  # noqa: E402
 
 __all__ = [
@@ -62,8 +67,15 @@ __all__ = [
     "PageTrace",
     "RollbackResult",
     "SourceChanges",
+    "SourceInfo",
     "Status",
     "VerifyReport",
+    # extending (RFC 0001)
+    "Item",
+    "SourceConnector",
+    "Publisher",
+    "PublishResult",
+    "Record",
     # errors
     "DakcError",
     "ArtifactNotFound",
@@ -72,6 +84,8 @@ __all__ = [
     "ConcurrentBuildError",
     "CostNotAllowed",
     "InvalidArgument",
+    "PublishError",
     "RollbackError",
+    "SourceError",
     "WorkspaceNotFound",
 ]

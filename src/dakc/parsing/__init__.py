@@ -2,7 +2,10 @@
 
 Supported: Markdown, plain text, HTML, JSON and PDF (PyMuPDF, optional extra).
 Each parser returns blocks in document order. Headings are kept as context but
-are not passages; code blocks are dropped (they are not prose claims).
+are not passages; code blocks are dropped (they are not prose claims). Markdown
+table rows become one block each, with every cell labelled by its column header
+("Row — Header: value; Header: value."), so a fact taken from a table still says
+which column it belongs to.
 """
 
 from __future__ import annotations
@@ -83,13 +86,32 @@ def _strip_front_matter(text: str) -> str:
 def _parse_markdown(raw: bytes) -> list[Block]:
     from markdown_it import MarkdownIt
 
-    tokens = MarkdownIt("commonmark").parse(_strip_front_matter(_decode(raw)))
+    tokens = MarkdownIt("commonmark").enable("table").parse(_strip_front_matter(_decode(raw)))
     blocks: list[Block] = []
     headings: dict[int, str] = {}
     in_list = 0
     pending_heading: int | None = None
+    header: list[str] = []  # current table's column headers
+    row: list[str] | None = None  # cells of the table row being read
+    in_thead = False
     for i, tok in enumerate(tokens):
-        if tok.type in ("bullet_list_open", "ordered_list_open"):
+        if tok.type == "thead_open":
+            in_thead, header = True, []
+        elif tok.type == "thead_close":
+            in_thead = False
+        elif tok.type == "tr_open":
+            row = []
+        elif tok.type == "tr_close":
+            if in_thead:
+                header = row or []
+            else:
+                text = _table_row_text(header, row or [])
+                if text:
+                    blocks.append(Block(text, "table_row", _heading_path(headings, 99)))
+            row = None
+        elif tok.type == "inline" and row is not None:
+            row.append(_inline_text(tok).strip())
+        elif tok.type in ("bullet_list_open", "ordered_list_open"):
             in_list += 1
         elif tok.type in ("bullet_list_close", "ordered_list_close"):
             in_list -= 1
@@ -109,6 +131,23 @@ def _parse_markdown(raw: bytes) -> list[Block]:
         elif tok.type == "heading_close":
             pending_heading = None
     return blocks
+
+
+def _table_row_text(header: list[str], cells: list[str]) -> str:
+    """One table row as a self-describing statement. An unlabelled first column is
+    the row's label: ``| | A | B |`` / ``| x | 1 | 2 |`` gives ``"x — A: 1; B: 2."``."""
+    label, parts = "", []
+    for i, cell in enumerate(cells):
+        if not cell:
+            continue
+        head = header[i] if i < len(header) else ""
+        if i == 0 and not head:
+            label = cell
+        else:
+            parts.append(f"{head}: {cell}" if head else cell)
+    body = "; ".join(parts)
+    text = f"{label} — {body}" if label and body else (label or body)
+    return text if not text or text.endswith((".", "!", "?")) else text + "."
 
 
 def _inline_text(tok) -> str:  # markdown_it Token

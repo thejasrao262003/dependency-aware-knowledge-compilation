@@ -43,12 +43,15 @@ entity pages, topic summaries and an index. It records which source sentences ev
 and rebuilds only what a source change invalidates.
 
 To answer a question from the knowledge base: list_artifacts(kind="page", query=...) then read_artifact. \
-Use trace on a page to see which source sentences support each statement, and cite those sources.
+Pages are named after entities; for a concept or phrase, search kind="claim" or kind="passage" (full text). \
+Use trace on a page or claim to see which source sentences support each statement, and cite those sources. \
+read_artifact on a source path returns the document as it is on disk now.
 To see what an edit to a document would affect, before making it: downstream(<source path>).
 After documents change: status, then compile (a preview by default), then compile(apply=true) to build.
 explain tells you why an artifact is stale and what it depends on."""
 
 READ_ONLY = ToolAnnotations(readOnlyHint=True, openWorldHint=False)
+STALE_NOTE = ("an upper bound: everything downstream of a changed document. Many of these may not change at all (an edit that touches no extracted fact changes nothing); compile() without apply previews exactly what would be rebuilt")
 
 
 def _cap(items: list, limit: int) -> list:
@@ -98,9 +101,13 @@ def create_server(workspace: str | Path = ".", *, read_only: bool = False, max_l
     @server.tool(annotations=READ_ONLY)
     def status() -> dict[str, Any]:
         """Current build (HEAD), artifact counts, and whether sources changed since it.
-        If not up to date, `stale` counts the artifacts downstream of changed sources."""
+        If not up to date, `stale` counts the artifacts downstream of changed documents:
+        an upper bound, not a prediction (compile previews the exact rebuild)."""
         with session() as kb:
-            return kb.status().to_dict()
+            d = kb.status().to_dict()
+        if not d["up_to_date"]:
+            d["stale_note"] = STALE_NOTE
+        return d
 
     @server.tool(annotations=READ_ONLY)
     def check_sources(limit: Limit = 50) -> dict[str, Any]:
@@ -120,8 +127,10 @@ def create_server(workspace: str | Path = ".", *, read_only: bool = False, max_l
         query: Annotated[str | None, Field(description="Case-insensitive substring of the title (page name, claim text, source path).")] = None,
         limit: Limit = 50,
     ) -> dict[str, Any]:
-        """Find artifacts by kind and title. Pages are the readable articles; claims are
-        single facts; sources are the original documents."""
+        """Find artifacts by kind and text. Pages (the readable articles, one per entity),
+        summaries and entities match on their title; claims (single facts) and passages
+        (source paragraphs) match on their full text; sources (the original documents)
+        on their path."""
         with session() as kb:
             items = kb.artifacts(kind, query=query, limit=limit + 1)
         return {"artifacts": [a.to_dict() for a in items[:limit]], "more_available": len(items) > limit}
@@ -133,7 +142,9 @@ def create_server(workspace: str | Path = ".", *, read_only: bool = False, max_l
     ) -> dict[str, Any]:
         """The current content of an artifact: rendered Markdown for pages, summaries and the
         index (statements carry [^Cn] citation markers; use trace to resolve them), the
-        text of claims and passages."""
+        text of claims and passages, or, for a source document (by path), its text as it is
+        on disk now, with metadata.changed_since_build telling whether the knowledge base
+        has caught up with it."""
         with session() as kb:
             c = kb.read(artifact)
         d = c.to_dict()
@@ -148,9 +159,16 @@ def create_server(workspace: str | Path = ".", *, read_only: bool = False, max_l
     @server.tool(annotations=READ_ONLY)
     def explain(artifact: ArtifactRef, limit: Limit = 30) -> dict[str, Any]:
         """What an artifact depends on, what depends on it, the sources upstream of it, and
-        whether it is VALID or STALE against the documents on disk (with the reason)."""
+        whether it is VALID or STALE against the documents on disk (with the reason). STALE
+        means an upstream document changed; whether this artifact actually changes is shown
+        by a compile preview."""
         with session() as kb:
             d = kb.explain(artifact).to_dict()
+        if d["status"] == "STALE":
+            d["stale_note"] = ("STALE means a document upstream changed since the last build. This artifact may or "
+                               "may not change (an edit that touches no extracted fact changes nothing); compile() "
+                               "without apply previews exactly what would be rebuilt, and read_artifact on the "
+                               "document shows its current text")
         for k in ("depends_on", "dependents", "upstream_sources", "history"):
             d[f"{k}_total"] = len(d[k])
             d[k] = _cap(d[k], limit)

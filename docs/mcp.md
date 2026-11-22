@@ -67,6 +67,33 @@ The server sends instructions on connect. They tell the agent how to:
   running build (from the CLI, `dakc watch` or another agent), then fails with
   a clear message. Read tools never block on a build.
 
+## Tested with real agents
+
+The server was exercised by headless Claude Code agents (Sonnet) that could see only the DAKC tools. They worked against
+a knowledge base built from this repository's `research/` folder. Each task was phrased as a user would phrase it:
+
+- a concept question with no page of its own;
+- a question about one audited project, with citations;
+- the impact of editing a file, named by its repository path;
+- whether a fact is still accurate after its document was edited;
+- "rebuild after edits".
+
+Every task succeeded. The traces exposed five problems, all fixed:
+
+| Problem | Fix |
+|---|---|
+| A path such as `research/TECHNICAL_GAP.md` did not resolve: the source is `TECHNICAL_GAP.md` | Unambiguous suffix paths resolve; errors suggest the closest paths and titles |
+| `read_artifact` on a source returned no text, so an agent could not check an edited document and repeated an outdated fact | Sources return their current text on disk, with `changed_since_build` |
+| Passages matched a query only in their first 80 characters | Claims and passages match on their full text |
+| `status` said about 160 pages were stale; the rebuild changed none (the edit touched no extracted fact) | `stale_note`: the count is an upper bound, and a compile preview gives the exact rebuild |
+| Markdown tables were parsed as one paragraph, so a claim taken from a table row lost its column headers, and an agent attributed a value to the wrong project | Tables are parsed into one block per row, each value labelled with its column header (parser version `parse/2`) |
+
+After the fixes:
+
+- the impact task took 2 turns instead of 4;
+- the "still accurate?" task found the exact outdated value (2 s in the knowledge base, 5 s in the edited document) where before it could only guess;
+- the project question gave the correct table value with its source.
+
 ## Errors
 
 Anticipated failures reach the agent as tool errors with their message, for

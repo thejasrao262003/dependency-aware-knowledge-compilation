@@ -235,6 +235,22 @@ reproducible benchmark command and a clean CI run.
     pyflakes, including a stale comment in the real-LLM experiment that
     contradicted the code below it. Behaviour is unchanged, and the benchmark
     still reproduces exactly.
+43. **MCP tested with real agents.**
+    - Headless Claude Code agents (`claude -p`, Sonnet) had built-in tools
+      turned off and only the DAKC server configured. They ran six
+      user-phrased tasks against a knowledge base built from `research/`.
+    - All the tasks succeeded, but the tool traces showed five problems, all
+      fixed and covered by tests (see docs/mcp.md, *Tested with real agents*):
+      - path suffixes did not resolve, and there were no suggestions;
+      - sources could not be read;
+      - passage search covered only the first 80 characters;
+      - the stale counts read as predictions;
+      - Markdown tables lost their headers. This one produced a wrong answer:
+        an agent attributed a table value to the wrong project.
+    - The table fix changes the parser (`parse/2`). An existing knowledge base
+      re-parses on the next build. On `research/` that re-extracted only the
+      193 table passages, and the result still equals a full rebuild. The
+      benchmark corpora have no tables, and the benchmark reproduces exactly.
 
 ## Not done (deliberately or for lack of resources)
 

@@ -210,3 +210,33 @@ def test_context_manager_closes_the_connection(tmp_path):
     assert kb._store is None
     with pytest.raises(Exception):
         conn.execute("SELECT 1")
+
+
+def test_references_resolve_forgivingly_and_errors_suggest(kb):
+    # a path given relative to another directory resolves when exactly one source matches
+    assert kb.resolve("knowledge/databases/postgres.md") == kb.resolve("databases/postgres.md")
+    assert kb.resolve("./databases/postgres.md") == kb.resolve("databases/postgres.md")
+    with pytest.raises(dakc.ArtifactNotFound, match="did you mean 'databases/postgres.md'"):
+        kb.read("databases/postgre.md")
+    with pytest.raises(dakc.ArtifactNotFound, match="did you mean 'JSONB'"):
+        kb.explain("JSONBB")
+    with pytest.raises(dakc.ArtifactNotFound, match="content-addressed"):
+        kb.read("psg:0123456789abcdef")
+
+
+def test_passages_match_on_full_text(kb):
+    write_files(kb.source_root, {"notes/long.md": "Kafka " + "padding words " * 10 + "mentions a rare phrase quietly.\n"})
+    kb.compile()
+    assert [a.title[:5] for a in kb.artifacts("passage", query="rare phrase")] == ["Kafka"]
+    assert kb.artifacts("page", query="rare phrase") == []  # pages match on their title only
+
+
+def test_read_source_returns_the_current_document(kb):
+    src = kb.read("databases/postgres.md")
+    assert src.text.startswith("# PostgreSQL") and src.metadata["changed_since_build"] is False
+    write_files(kb.source_root, {"databases/postgres.md": "PostgreSQL supports Partitioning.\n"})
+    src = kb.read("databases/postgres.md")
+    assert src.text == "PostgreSQL supports Partitioning.\n" and src.metadata["changed_since_build"] is True
+    (kb.source_root / "databases" / "postgres.md").unlink()
+    src = kb.read("databases/postgres.md")
+    assert src.text == "" and src.metadata["on_disk"].startswith("missing")

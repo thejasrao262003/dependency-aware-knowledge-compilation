@@ -85,3 +85,24 @@ def test_source_types(tmp_path):
     assert source_type_for(tmp_path / "a.MD") == "markdown"
     assert source_type_for(tmp_path / "a.htm") == "html"
     assert source_type_for(tmp_path / "a.png") is None
+
+
+def test_markdown_table_rows_keep_their_column_headers():
+    from dakc.parsing import parse_bytes
+
+    md = (
+        "# Grid\n\nIntro.\n\n"
+        "| | llm_wiki | OpenKB |\n|---|---|---|\n"
+        "| Update path | full re-ingest | **additive** |\n"
+        "| Cutoff | none | |\n\n"
+        "| Capability | Status |\n|---|---|\n| Hashing | file-level |\n"
+    )
+    blocks = parse_bytes(md.encode(), "markdown").blocks
+    rows = [b for b in blocks if b.kind == "table_row"]
+    assert [b.text for b in rows] == [
+        "Update path - llm_wiki: full re-ingest; OpenKB: additive.",  # unlabelled first column = row label
+        "Cutoff - llm_wiki: none.",  # empty cells are skipped
+        "Capability: Hashing; Status: file-level.",
+    ]
+    assert all(b.heading == "Grid" for b in rows)
+    assert not any("|" in b.text for b in blocks)

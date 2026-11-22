@@ -23,7 +23,9 @@ use one instance per thread.
 
 from __future__ import annotations
 
+import difflib
 import json
+import re
 from collections.abc import Iterator
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
@@ -41,6 +43,8 @@ from dakc.errors import (
     WorkspaceNotFound,
 )
 from dakc.graph import build_graph, downstream, export, resolve_id, stats, titles
+from dakc.hashing import hash_file
+from dakc.parsing import ParseError, parse_bytes
 from dakc.provenance import Explanation, changed_sources, explain, stale_artifacts
 from dakc.provenance.trace import ClaimTrace, PageTrace, trace_claim, trace_page
 from dakc.providers import ProviderBundle
@@ -308,11 +312,39 @@ class KnowledgeBase:
     # ----------------------------------------------------------------- helpers
     def resolve(self, ident: str) -> str:
         """Canonical id for an artifact id, a friendly form (``page:PostgreSQL``,
-        ``entity_postgresql``), a source path or a page title."""
-        aid = resolve_id(self.store, ident)
+        ``entity_postgresql``), a source path or a page title. A path given
+        relative to another directory (``research/notes.md`` for the source
+        ``notes.md``) resolves when exactly one source matches it."""
+        aid = self._lookup(ident)
         if aid is None:
-            raise ArtifactNotFound(f"no source or artifact matches {ident!r}")
+            raise ArtifactNotFound(self._not_found(ident))
         return aid
+
+    def _source_paths(self) -> dict[str, str]:
+        return {path: sid for sid, path in self.store.conn.execute("SELECT id, path FROM sources WHERE to_build IS NULL")}
+
+    def _lookup(self, ident: str) -> str | None:
+        aid = resolve_id(self.store, ident)
+        if aid is not None:
+            return aid
+        norm = ident.strip().removeprefix("./")
+        hits = [sid for path, sid in self._source_paths().items()
+                if norm == path or norm.endswith("/" + path) or path.endswith("/" + norm)]
+        return hits[0] if len(hits) == 1 else None
+
+    def _not_found(self, ident: str) -> str:
+        msg = f"no source or artifact matches {ident!r}"
+        if re.fullmatch(r"(psg|clm):[0-9a-f]+", ident.strip()):
+            return (msg + " in the current build. Passage and claim ids are content-addressed: an id shown by a "
+                    "compile preview exists only once that build is applied, and an id from an earlier build may "
+                    "have been replaced (explain shows its history)")
+        norm = ident.strip().removeprefix("./")
+        paths = list(self._source_paths())
+        suffix = [p for p in paths if norm.endswith("/" + p) or p.endswith("/" + norm)]
+        pages = [t for (t,) in self.store.conn.execute(
+            "SELECT json_extract(payload, '$.title') FROM artifacts WHERE kind='page' AND to_build IS NULL")]
+        close = suffix or difflib.get_close_matches(norm, paths + pages, n=3, cutoff=0.6)
+        return msg + (f"; did you mean {', '.join(repr(c) for c in close[:3])}?" if close else "")
 
     def _changed(self) -> dict[str, str]:
         return changed_sources(self.store, self.source_root, self.workspace.excluded)[1]
@@ -372,30 +404,30 @@ class KnowledgeBase:
         return report
 
     def artifacts(self, kind: str | None = None, *, query: str | None = None, limit: int | None = 100) -> list[ArtifactSummary]:
-        """Current artifacts (and sources), optionally of one kind and/or whose title
-        contains ``query`` (case-insensitive). Ordered by layer, then id."""
+        """Current artifacts (and sources), optionally of one kind and/or matching
+        ``query`` (a case-insensitive substring of the title; of the full text for
+        claims and passages). Ordered by layer, then id."""
         if kind is not None and kind not in KINDS:
             raise InvalidArgument(f"kind must be one of {', '.join(KINDS)}")
         q = query.casefold() if query else None
         out: list[ArtifactSummary] = []
-        for summary in self._iter_artifacts(kind, query):
-            if q is None or q in summary.title.casefold():
+        for summary, haystack in self._iter_artifacts(kind, query):
+            if q is None or q in haystack.casefold():
                 out.append(summary)
                 if limit is not None and len(out) >= limit:
                     break
         return out
 
-    def _iter_artifacts(self, kind: str | None, query: str | None) -> Iterator[ArtifactSummary]:
+    def _iter_artifacts(self, kind: str | None, query: str | None) -> Iterator[tuple[ArtifactSummary, str]]:
         kinds = [kind] if kind else sorted(KINDS, key=lambda k: LAYER[k])
-        # SQLite LIKE folds case only for ASCII, and payloads may store escaped
-        # non-ASCII, so a non-ASCII query skips the pre-filter.
+        # SQLite LIKE folds case only for ASCII, so a non-ASCII query skips the pre-filter.
         like = f"%{query}%" if query and query.isascii() else "%"
         for k in kinds:
             if k == "source":
                 rows = self.store.conn.execute(
                     "SELECT id, path FROM sources WHERE to_build IS NULL AND path LIKE ? ORDER BY id", (like,))
                 for sid, path in rows:
-                    yield ArtifactSummary(sid, "source", path)
+                    yield ArtifactSummary(sid, "source", path), path
                 continue
             # LIKE on the stored JSON is a cheap pre-filter; the title check above is exact.
             rows = self.store.conn.execute(
@@ -409,23 +441,26 @@ class KnowledgeBase:
                     batch = []
             yield from self._summaries(batch, k)
 
-    def _summaries(self, ids: list[str], kind: str) -> Iterator[ArtifactSummary]:
+    def _summaries(self, ids: list[str], kind: str) -> Iterator[tuple[ArtifactSummary, str]]:
+        """(summary, text to match a query against): the title, or the full text of a passage."""
         if not ids:
             return
         names = titles(self.store, ids)
+        full: dict[str, str] = {}
+        if kind == "passage":
+            q = f"SELECT id, json_extract(payload, '$.text') FROM artifacts WHERE to_build IS NULL AND id IN ({','.join('?' * len(ids))})"
+            full = dict(self.store.conn.execute(q, ids).fetchall())
         for aid in ids:
-            yield ArtifactSummary(aid, kind, names.get(aid, aid))
+            title = names.get(aid, aid)
+            yield ArtifactSummary(aid, kind, title), full.get(aid, title)
 
     def read(self, artifact: str) -> ArtifactContent:
         """The current version of an artifact. Pages, summaries and the index return
-        their rendered Markdown; claims and passages their text."""
+        their rendered Markdown; claims and passages their text; a source document
+        its current text on disk."""
         aid = self.resolve(artifact)
         if kind_of(aid) == "source":
-            src = self.store.current_source(aid)
-            assert src is not None
-            row = self.store.conn.execute("SELECT from_build FROM sources WHERE id=? AND to_build IS NULL", (aid,)).fetchone()
-            return ArtifactContent(aid, "source", src.path, None, row[0] if row else None, "",
-                                   {"path": src.path, "raw_hash": src.raw_hash, "size": src.size, "type": src.type})
+            return self._read_source(aid)
         cur = self.store.current_artifact(aid)
         if cur is None:  # pragma: no cover - resolve() only returns current ids
             raise ArtifactNotFound(f"no current artifact {aid!r}")
@@ -441,12 +476,37 @@ class KnowledgeBase:
         title = titles(self.store, [aid]).get(aid, art.title)
         return ArtifactContent(aid, art.kind, title, version, from_build, text, meta)
 
+    def _read_source(self, aid: str) -> ArtifactContent:
+        """A source document as it is on disk now (it may differ from the last build;
+        ``metadata['changed_since_build']`` says so). Markdown, text and JSON are
+        returned as written; HTML and PDF as the text DAKC extracts from them."""
+        src = self.store.current_source(aid)
+        assert src is not None
+        row = self.store.conn.execute("SELECT from_build FROM sources WHERE id=? AND to_build IS NULL", (aid,)).fetchone()
+        meta: dict[str, Any] = {"path": src.path, "type": src.type, "recorded_raw_hash": src.raw_hash}
+        path = self.source_root / src.path
+        text = ""
+        if not path.is_file():
+            meta["on_disk"] = "missing (deleted or moved since the last build)"
+        else:
+            meta["on_disk"] = "present"
+            meta["changed_since_build"] = hash_file(path) != src.raw_hash
+            raw = path.read_bytes()
+            if src.type in ("markdown", "text", "json"):
+                text = raw.decode("utf-8", errors="replace")
+            else:
+                try:
+                    text = "\n\n".join(b.text for b in parse_bytes(raw, src.type).blocks)
+                except ParseError as exc:
+                    meta["parse_error"] = str(exc)
+        return ArtifactContent(aid, "source", src.path, None, row[0] if row else None, text, meta)
+
     def explain(self, artifact: str) -> Explanation:
         """Dependencies, dependents, upstream sources and live staleness of one artifact."""
-        aid = resolve_id(self.store, artifact) or artifact.strip()
+        aid = self._lookup(artifact) or artifact.strip()
         exp = explain(self.store, aid, self._changed())
         if exp.status == "UNKNOWN":
-            raise ArtifactNotFound(f"no source or artifact matches {artifact!r}")
+            raise ArtifactNotFound(self._not_found(artifact))
         return exp
 
     def trace(self, artifact: str) -> PageTrace | ClaimTrace:

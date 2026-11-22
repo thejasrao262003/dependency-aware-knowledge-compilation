@@ -1,5 +1,34 @@
 # Changelog
 
+## Unreleased
+
+Found by testing the MCP server with real agents (see `docs/mcp.md`).
+
+### Fixed
+
+- **Markdown tables** were parsed as a single paragraph, so facts taken
+  from a table row lost their column headers. Each row is now one block,
+  with every value labelled by its column ("Row - Header: value;
+  Header: value."). The parser version moves to `parse/2`, so existing
+  knowledge bases re-parse on their next build. Only passages whose text
+  changed are re-extracted.
+
+### Added
+
+- **`read` / `read_artifact` on a source document** return its current text
+  on disk, with `changed_since_build` (and `on_disk: missing` when it is
+  gone).
+- **Forgiving references.** A path relative to another directory
+  (`research/notes.md` for `notes.md`) resolves when exactly one source
+  matches. `ArtifactNotFound` suggests the closest paths and page titles,
+  and explains content-addressed ids taken from a compile preview.
+- **Full-text search.** `artifacts(query=...)` matches claims and passages
+  on their full text.
+- **MCP stale notes.** `status` and `explain` include a `stale_note` saying
+  that "stale" is an upper bound and that a compile preview gives the exact
+  rebuild. The tool descriptions and server instructions now say how to
+  search concepts and read source documents.
+
 ## v0.2.1: first PyPI release
 
 There are no code changes from v0.2.0. This release is packaging only:

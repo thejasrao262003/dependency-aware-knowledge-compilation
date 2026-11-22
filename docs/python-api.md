@@ -27,9 +27,9 @@ Instances are cheap to open.
 | `check(root=None)` | `SourceChanges` | new / modified / deleted / renamed / unchanged, by content hash |
 | `plan(full=False)` | `BuildReport` | Dry run. Nothing is written or spent. `has_work()` and `llm_calls()` tell you whether a compile is needed and what it costs. Exact for free providers; an upper bound for LLM providers (`report.exact`). |
 | `compile(full=False, wait=0.0)` | `BuildReport` | Takes the build lock, commits atomically, updates the wiki files. Raises `BuildLocked` or `CompileFailed`. |
-| `artifacts(kind=None, query=None, limit=100)` | `list[ArtifactSummary]` | Ordered by layer, then id. `query` is a case-insensitive title substring. |
-| `read(artifact)` | `ArtifactContent` | Rendered Markdown for pages, summaries and the index; text for claims and passages; metadata for sources |
-| `explain(artifact)` | `Explanation` | Dependencies, dependents, upstream sources, signatures, history, `VALID` / `STALE` / `DELETED` with reasons |
+| `artifacts(kind=None, query=None, limit=100)` | `list[ArtifactSummary]` | Ordered by layer, then id. `query` is a case-insensitive substring of the title, or of the full text for claims and passages |
+| `read(artifact)` | `ArtifactContent` | Rendered Markdown for pages, summaries and the index. Text for claims and passages. For a source document, its current text on disk, with `metadata['changed_since_build']`. |
+| `explain(artifact)` | `Explanation` | Dependencies, dependents, upstream sources, signatures, history, `VALID` / `STALE` / `DELETED` with reasons. `STALE` means a source upstream changed. That is an upper bound: `plan()` shows whether the artifact actually changes. |
 | `trace(artifact)` | `PageTrace` or `ClaimTrace` | Each page sentence, the claims it cites, and each claim's passage, source version and evidence sentences |
 | `downstream(artifact)` | `Downstream` | Everything an edit to this source or artifact would invalidate, by kind |
 | `graph_stats()` | `dict` | Artifact and edge counts |
@@ -46,6 +46,8 @@ Instances are cheap to open.
 - a friendly form (`page:PostgreSQL`, `entity_postgresql`);
 - a source path (`databases/postgres.md`);
 - a page title (`PostgreSQL`).
+
+A path written relative to another directory (`research/notes.md` for the source `notes.md`) resolves when exactly one source matches it. When nothing matches, `ArtifactNotFound` suggests the closest source paths and page titles.
 
 Every result has `to_dict()`, which returns JSON-safe data. That is what
 `--json`, the REST API and the MCP tools emit. `Downstream.to_dict` and

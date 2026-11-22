@@ -164,3 +164,17 @@ def test_stdio_transport_end_to_end(ws):
     assert info.name == "dakc" and info.version == dakc.__version__
     assert names == READ_TOOLS
     assert not r.is_error and r.structured_content["head"] == 1
+
+
+def test_stale_is_explained_as_an_upper_bound(ws):
+    write_files(ws / "knowledge", {"databases/redis.md": "Redis supports Clustering.\n"})
+    st, ex, src = session(
+        create_server(ws),
+        ("status", {}),
+        ("explain", {"artifact": "page:redis"}),
+        ("read_artifact", {"artifact": "knowledge/databases/redis.md"}),
+    )
+    assert "upper bound" in st.structured_content["stale_note"]
+    assert ex.structured_content["status"] == "STALE" and "may or may not change" in ex.structured_content["stale_note"]
+    assert src.structured_content["text"] == "Redis supports Clustering.\n"
+    assert src.structured_content["metadata"]["changed_since_build"] is True

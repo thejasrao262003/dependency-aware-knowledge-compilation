@@ -14,7 +14,7 @@ A store whose builds predate this mechanism has no recorded versions and is
 treated as outdated in every layer.
 """
 
-PARSER = "parse/1"
+PARSER = "parse/2"  # 2: Markdown tables parsed, one labelled block per row
 CLAIM_IDENTITY = "claim-id/2"
 ENTITY_RESOLUTION = "entity/1"
 RENDER = "render/1"

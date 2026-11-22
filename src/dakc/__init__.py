@@ -10,7 +10,7 @@
 See :mod:`dakc.kb` for the full API.
 """
 
-__version__ = "0.3.0"
+__version__ = "0.4.0"
 
 from dakc.compiler import BuildReport  # noqa: E402
 from dakc.errors import (  # noqa: E402

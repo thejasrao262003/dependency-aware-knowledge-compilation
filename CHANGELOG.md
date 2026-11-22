@@ -1,6 +1,16 @@
 # Changelog
 
-## Unreleased
+## v0.4.0: web UI, MkDocs plugin, and FastAPI's real history
+
+### Upgrading from 0.3
+
+- **Nothing to rebuild.** The parser, claim-identity and rendering versions
+  are unchanged, so existing knowledge bases are reused as they are.
+- **`dakc serve` now also serves the web UI.** `/` redirects to `/ui/`, every
+  existing REST endpoint is unchanged, and new ones were added (below). It
+  stays local-only.
+- **New optional extra: `mkdocs`.** Install it with
+  `pip install 'dakc[mkdocs]'`.
 
 ### Added
 

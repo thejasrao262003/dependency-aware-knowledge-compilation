@@ -1,0 +1,45 @@
+name: Bug report
+description: DAKC did something wrong, crashed, or produced a result you can show is incorrect.
+labels: ["bug"]
+body:
+  - type: input
+    id: version
+    attributes:
+      label: DAKC version
+      description: Output of `dakc --version`
+      placeholder: dakc 0.3.0
+    validations:
+      required: true
+  - type: dropdown
+    id: surface
+    attributes:
+      label: How were you using DAKC?
+      multiple: true
+      options: [CLI, Python API, MCP server, REST API, dakc watch]
+    validations:
+      required: true
+  - type: input
+    id: provider
+    attributes:
+      label: Provider
+      description: The `provider` in your dakc.toml (heuristic, mock, openai, anthropic, custom), and the model if any
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened, and what did you expect?
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      description: The smallest set of documents and commands that shows the problem. Please remove anything private.
+      render: shell
+    validations:
+      required: true
+  - type: textarea
+    id: verify
+    attributes:
+      label: Output of `dakc verify` (and `dakc verify --against-full` if your provider is free)
+      description: If the incremental result differs from a full rebuild, that is a correctness bug, and this output is the most useful thing you can attach.
+      render: text

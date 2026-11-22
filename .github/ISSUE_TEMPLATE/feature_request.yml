@@ -1,0 +1,30 @@
+name: Something DAKC can't do yet
+description: Describe a problem you hit. Concrete use cases decide what gets built next.
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        DAKC grows from what people actually need. Please describe the **job you were trying to do**, not only the feature you have in mind.
+  - type: textarea
+    id: job
+    attributes:
+      label: What were you trying to do?
+      placeholder: e.g. keep architecture pages in sync with our docs repository on every merge to main
+    validations:
+      required: true
+  - type: textarea
+    id: blocker
+    attributes:
+      label: Where did DAKC fall short?
+      description: What you tried, and what was missing, slow, confusing or wrong.
+    validations:
+      required: true
+  - type: textarea
+    id: today
+    attributes:
+      label: How do you handle this today?
+  - type: textarea
+    id: idea
+    attributes:
+      label: Proposed solution (optional)

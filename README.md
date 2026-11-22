@@ -213,6 +213,7 @@ It needs the `mcp` extra: `pip install 'dakc[mcp]'`.
 
 ```bash
 claude mcp add dakc -- dakc mcp --workspace /absolute/path/to/demo   # Claude Code
+claude mcp add dakc -- uvx --from 'dakc[mcp]' dakc mcp --workspace /absolute/path/to/demo   # nothing preinstalled
 ```
 
 Other clients take the usual JSON configuration:
@@ -237,8 +238,11 @@ Safety rules:
 - **Bounded outputs.** Every list is capped by a `limit` argument, and totals
   are always reported.
 
-The default transport is stdio. `--transport streamable-http` serves HTTP on
-`127.0.0.1:8766`. See [docs/mcp.md](docs/mcp.md).
+The server needs a workspace built first (`dakc ingest DIR`). The default
+transport is stdio. `--transport streamable-http` serves HTTP on
+`127.0.0.1:8766`. There is no authentication yet, so both HTTP servers
+refuse to listen beyond this machine. [docs/mcp.md](docs/mcp.md) covers
+setup, the tools, the safety rules and the known limitations.
 
 ## Guarantees, and how each is checked
 

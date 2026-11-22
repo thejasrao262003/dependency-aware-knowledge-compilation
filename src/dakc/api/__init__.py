@@ -5,6 +5,10 @@ run), artifacts, explain, trace, downstream, graph (React Flow format for a
 frontend), builds and diff. Nothing here mutates the knowledge base; compiling
 stays an explicit CLI, Python or MCP action. Each request opens its own
 connection and closes it when the response is sent.
+
+There is no authentication yet, so the API is local-only: ``dakc serve``
+binds only to a loopback address, and requests whose ``Host`` header is not
+local are rejected (this blocks DNS-rebinding attacks from web pages).
 """
 
 # No `from __future__ import annotations`: FastAPI must evaluate the local
@@ -16,6 +20,7 @@ from typing import Annotated
 
 from fastapi import Depends, FastAPI, HTTPException, Query, Request
 from fastapi.responses import JSONResponse, PlainTextResponse
+from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from dakc import __version__
 from dakc.errors import ArtifactNotFound, InvalidArgument, WorkspaceNotFound
@@ -23,6 +28,7 @@ from dakc.kb import KnowledgeBase
 from dakc.workspace import Workspace
 
 GRAPH_EXPORT_LIMIT = 20_000  # edges; larger graphs are only exported around one node
+LOCAL_HOSTS = ["127.0.0.1", "localhost", "::1", "[::1]"]
 
 
 def create_app(root: Path) -> FastAPI:
@@ -31,6 +37,7 @@ def create_app(root: Path) -> FastAPI:
     except FileNotFoundError as exc:
         raise WorkspaceNotFound(str(exc)) from exc
     app = FastAPI(title="DAKC", version=__version__, description="Dependency-Aware Knowledge Compiler (read-only API)")
+    app.add_middleware(TrustedHostMiddleware, allowed_hosts=LOCAL_HOSTS)
 
     def open_kb() -> Iterator[KnowledgeBase]:
         kb = KnowledgeBase(ws)

@@ -251,6 +251,17 @@ reproducible benchmark command and a clean CI run.
       re-parses on the next build. On `research/` that re-extracted only the
       193 table passages, and the result still equals a full rebuild. The
       benchmark corpora have no tables, and the benchmark reproduces exactly.
+44. **v0.3.0 release hardening.**
+    - Both HTTP servers are local-only until authentication exists. They
+      refuse non-loopback `--host` values and reject requests with a
+      non-local `Host` header, which blocks DNS rebinding.
+    - For MCP, the SDK's own host check is kept on by binding only to
+      loopback (it is enabled automatically for loopback hosts), and a test
+      pins it (HTTP 421).
+    - The REST API gained the same check through Starlette's
+      `TrustedHostMiddleware`.
+    - Also added: MCP setup and known-limitations docs, migration notes, and
+      GitHub issue templates.
 
 ## Not done (deliberately or for lack of resources)
 

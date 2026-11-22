@@ -35,6 +35,16 @@ err = Console(stderr=True, highlight=False, soft_wrap=True, width=_WIDTH)
 WS = Annotated[Path, typer.Option("--workspace", "-w", help="Workspace directory (holds dakc.toml).", envvar="DAKC_WORKSPACE")]
 JSON = Annotated[bool, typer.Option("--json", help="Machine-readable output.")]
 WAIT = Annotated[float, typer.Option("--wait", help="Seconds to wait for another running build on this workspace.")]
+LOOPBACK = ("127.0.0.1", "localhost", "::1")
+
+
+def _require_loopback(host: str) -> None:
+    """The HTTP servers have no authentication yet, so they listen only on this machine."""
+    if host not in LOOPBACK:
+        err.print(f"[red]error:[/red] refusing to listen on {host!r}: DAKC's HTTP servers have no authentication yet, "
+                  "so they only bind to this machine (127.0.0.1, localhost or ::1). A read-only API still exposes "
+                  "everything in the knowledge base.")
+        raise typer.Exit(2)
 
 
 @contextmanager
@@ -448,7 +458,8 @@ def serve(
     host: Annotated[str, typer.Option()] = "127.0.0.1",
     port: Annotated[int, typer.Option()] = 8765,
 ) -> None:
-    """Serve the read-only REST API (requires the 'api' extra)."""
+    """Serve the read-only REST API on this machine (requires the 'api' extra)."""
+    _require_loopback(host)
     try:
         import uvicorn
     except ImportError as exc:
@@ -465,7 +476,7 @@ def serve(
 def mcp_cmd(
     workspace: WS = Path("."),
     transport: Annotated[str, typer.Option(help="stdio (local agents) | streamable-http")] = "stdio",
-    host: Annotated[str, typer.Option(help="Bind address for streamable-http.")] = "127.0.0.1",
+    host: Annotated[str, typer.Option(help="Bind address for streamable-http (loopback only).")] = "127.0.0.1",
     port: Annotated[int, typer.Option(help="Port for streamable-http.")] = 8766,
     read_only: Annotated[bool, typer.Option("--read-only", help="Expose inspection tools only (no compile or rollback).")] = False,
     max_llm_calls: Annotated[int, typer.Option(help="Refuse an LLM-provider compile planned to exceed this many calls.")] = 100,
@@ -477,6 +488,8 @@ def mcp_cmd(
     if transport not in ("stdio", "streamable-http"):
         err.print("[red]error:[/red] transport must be stdio or streamable-http")
         raise typer.Exit(2)
+    if transport == "streamable-http":
+        _require_loopback(host)  # the SDK then also rejects requests whose Host header is not local
     from dakc.mcp_server import create_server
 
     with _errors():

@@ -1,0 +1,43 @@
+name: I tried DAKC on my project
+description: Short field report. It is the most valuable feedback at this stage, positive or negative.
+labels: ["feedback"]
+body:
+  - type: textarea
+    id: project
+    attributes:
+      label: What did you point DAKC at?
+      description: Kind of documents (docs site, notes vault, papers, generated docs, agent memory...), rough number of files, and how often they change.
+    validations:
+      required: true
+  - type: dropdown
+    id: surface
+    attributes:
+      label: How did you use it?
+      multiple: true
+      options: [CLI, Python API, MCP server with an agent, REST API, In CI]
+  - type: input
+    id: first_build
+    attributes:
+      label: Time from install to first successful compile
+      placeholder: e.g. 5 minutes
+  - type: dropdown
+    id: problem_fit
+    attributes:
+      label: Does incremental compilation solve a problem you actually have?
+      options: ["Yes, clearly", "Somewhat", "Not really", "Too early to tell"]
+    validations:
+      required: true
+  - type: textarea
+    id: understood
+    attributes:
+      label: Was it clear what DAKC rebuilt and why?
+      description: e.g. did `compile --dry-run`, `explain`, `trace` and the dependency graph make sense?
+  - type: textarea
+    id: missing
+    attributes:
+      label: What did you try to do that DAKC could not do?
+  - type: dropdown
+    id: keep
+    attributes:
+      label: Would you keep it in your stack?
+      options: ["Yes", "Maybe, if something changed (please say what above)", "No"]

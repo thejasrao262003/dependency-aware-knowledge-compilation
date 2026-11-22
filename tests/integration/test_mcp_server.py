@@ -178,3 +178,18 @@ def test_stale_is_explained_as_an_upper_bound(ws):
     assert ex.structured_content["status"] == "STALE" and "may or may not change" in ex.structured_content["stale_note"]
     assert src.structured_content["text"] == "Redis supports Clustering.\n"
     assert src.structured_content["metadata"]["changed_since_build"] is True
+
+
+def test_http_transport_rejects_foreign_host_headers(ws):
+    """Bound to loopback, the HTTP transport refuses requests for other hosts (DNS rebinding)."""
+    from starlette.testclient import TestClient
+
+    init = {"jsonrpc": "2.0", "id": 1, "method": "initialize",
+            "params": {"protocolVersion": "2025-06-18", "capabilities": {}, "clientInfo": {"name": "t", "version": "0"}}}
+    headers = {"Accept": "application/json, text/event-stream", "Content-Type": "application/json"}
+    codes = {}
+    for base in ("http://evil.example", "http://127.0.0.1:8766"):
+        app = create_server(ws, read_only=True).streamable_http_app(host="127.0.0.1")  # what `dakc mcp` runs
+        with TestClient(app, base_url=base) as client:
+            codes[base] = client.post("/mcp", json=init, headers=headers).status_code
+    assert codes == {"http://evil.example": 421, "http://127.0.0.1:8766": 200}

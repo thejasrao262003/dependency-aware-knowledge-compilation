@@ -1,8 +1,32 @@
 # Changelog
 
-## Unreleased
+## v0.3.0: fixes from real-agent testing, local-only HTTP
 
-Found by testing the MCP server with real agents (see `docs/mcp.md`).
+Most changes were found by testing the MCP server with real agents (see
+`docs/mcp.md`).
+
+### Upgrading from 0.2
+
+- **The parser version changes (`parse/2`).** The first `dakc compile`
+  after upgrading re-parses every source. Only passages whose text changed
+  are re-extracted: in practice, paragraphs containing Markdown tables.
+  With the free default provider this costs nothing. **With an LLM
+  provider, run `dakc compile --dry-run` first**: it shows how many
+  passages and LLM calls the upgrade needs. On this repository's
+  `research/` folder, the 19 tables became 193 row passages, and every
+  other passage was reused.
+- **`dakc serve` and `dakc mcp --transport streamable-http` refuse
+  non-loopback `--host` values.** Requests with a non-local `Host` header
+  are rejected. If you exposed the REST API on a network, that now fails on
+  purpose. There is no authentication yet.
+- **No API, CLI or JSON fields were removed.**
+
+### Security
+
+- **Local-only HTTP.** Both HTTP servers bind only to 127.0.0.1, localhost
+  or ::1, and reject requests for other hosts. This blocks DNS rebinding
+  from web pages. The MCP HTTP transport uses the SDK's host check, and the
+  REST API adds the same check.
 
 ### Fixed
 
@@ -28,6 +52,9 @@ Found by testing the MCP server with real agents (see `docs/mcp.md`).
   that "stale" is an upper bound and that a compile preview gives the exact
   rebuild. The tool descriptions and server instructions now say how to
   search concepts and read source documents.
+- **Docs.** MCP setup, including registration with `uvx` and no install,
+  plus a *Known limitations* table (`docs/mcp.md`). GitHub issue templates
+  for bugs, feature requests and integration reports.
 
 ## v0.2.1: first PyPI release
 

@@ -5,20 +5,36 @@
 official MCP Python SDK (2.x) and is a thin layer over the
 [Python API](python-api.md).
 
+## Setup
+
+The server needs an existing workspace. Agents cannot create one yet. Build
+it once from your documents:
+
 ```bash
 pip install 'dakc[mcp]'
-dakc mcp --workspace /absolute/path/to/workspace            # stdio (local agents)
-dakc mcp --workspace ... --transport streamable-http        # HTTP on 127.0.0.1:8766/mcp
-dakc mcp --workspace ... --read-only                        # inspection tools only
-dakc mcp --workspace ... --max-llm-calls 500                # raise the cost guard
+cd /path/to/workspace && dakc ingest ./docs   # creates dakc.toml and compiles ./docs
 ```
 
-Claude Code: `claude mcp add dakc -- dakc mcp --workspace /absolute/path/to/workspace`.
+Then register it. In Claude Code:
 
-Other clients:
+```bash
+claude mcp add dakc -- dakc mcp --workspace /absolute/path/to/workspace
+# or, without installing anything first (uv fetches DAKC on demand):
+claude mcp add dakc -- uvx --from 'dakc[mcp]' dakc mcp --workspace /absolute/path/to/workspace
+```
+
+Other clients take the usual JSON configuration:
 
 ```json
 { "mcpServers": { "dakc": { "command": "dakc", "args": ["mcp", "--workspace", "/absolute/path/to/workspace"] } } }
+```
+
+Options:
+
+```bash
+dakc mcp --workspace ... --read-only                        # inspection tools only
+dakc mcp --workspace ... --max-llm-calls 500                # raise the cost guard (default 100)
+dakc mcp --workspace ... --transport streamable-http        # HTTP on 127.0.0.1:8766/mcp (this machine only)
 ```
 
 ## Tools
@@ -63,6 +79,12 @@ The server sends instructions on connect. They tell the agent how to:
 - **Bounded outputs.** Lists are capped by `limit` (and text by `max_chars`),
   and totals are always reported (`*_total`, `more_available`). A hub page or
   a large build cannot flood the agent's context.
+- **Local-only HTTP.** There is no authentication yet, so `--transport
+  streamable-http` refuses to bind to anything but 127.0.0.1, localhost or
+  ::1. Requests whose `Host` header is not local are rejected (HTTP 421),
+  which blocks DNS-rebinding attacks from web pages. A read-only server
+  still exposes everything in the knowledge base. The stdio transport has
+  no network surface at all.
 - **Same locking as everywhere else.** A compile waits up to 5 s for a
   running build (from the CLI, `dakc watch` or another agent), then fails with
   a clear message. Read tools never block on a build.
@@ -93,6 +115,19 @@ After the fixes:
 - the impact task took 2 turns instead of 4;
 - the "still accurate?" task found the exact outdated value (2 s in the knowledge base, 5 s in the edited document) where before it could only guess;
 - the project question gave the correct table value with its source.
+
+## Known limitations
+
+| Limitation | Effect | Workaround |
+|---|---|---|
+| No workspace creation | An agent cannot start a knowledge base from a folder | Run `dakc ingest DIR` once, then register the server |
+| No progress reporting | A long `compile(apply=true)` with an LLM provider is a single call that can take minutes; some clients time out | Preview first. Run large first builds with `dakc compile` in a terminal, and leave incremental builds to the agent. |
+| Search is substring, not semantic | Pages match on their title; claims and passages on their full text. Synonyms and paraphrases are not found. | Agents should try several phrasings, and search claims and passages for concepts |
+| "Stale" is an upper bound | `status` and `explain` count everything downstream of a changed document | `compile` without `apply` gives the exact rebuild |
+| No authentication on HTTP | HTTP is local-only (see *Safety rules*) | Use stdio, which is what local agents use anyway |
+| Compile results are not yet a structured change list | The report lists operations and ids; an agent has to interpret them to explain "what changed" | Use `diff_builds` after a build |
+| No MCP resources or prompts | Clients cannot browse pages as resources | Use `list_artifacts` and `read_artifact` |
+| Quality depends on the extractor | The default heuristic extractor makes noisy entity pages (many single-fact pages, some junk names). It quotes source sentences verbatim, so its claims stay grounded. | Configure an LLM provider for cleaner pages |
 
 ## Errors
 

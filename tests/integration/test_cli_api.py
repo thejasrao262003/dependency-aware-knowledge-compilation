@@ -82,7 +82,7 @@ def test_rest_api(ws):
     from dakc.api import create_app
 
     run("ingest", ws / "knowledge", "-w", ws)
-    client = TestClient(create_app(ws))
+    client = TestClient(create_app(ws), base_url="http://localhost")
     assert client.get("/status").json()["head"] == 1
     assert client.get("/check").json()["unchanged"] == 3
     exp = client.get("/artifacts/page:jsonb").json()
@@ -104,3 +104,18 @@ def test_missing_extra_hint_keeps_brackets(ws, monkeypatch):
     monkeypatch.setattr(importlib.util, "find_spec", lambda name, *a: None)
     r = run("mcp", "-w", ws, ok=False)
     assert r.exit_code == 2 and "pip install 'dakc[mcp]'" in r.output
+
+
+def test_http_servers_are_local_only(ws):
+    from fastapi.testclient import TestClient
+
+    from dakc.api import create_app
+
+    run("ingest", ws / "knowledge", "-w", ws)
+    for host in ("localhost", "127.0.0.1"):
+        assert TestClient(create_app(ws), base_url=f"http://{host}:8765").get("/health").status_code == 200
+    # a page served from another domain that resolves to 127.0.0.1 (DNS rebinding) is refused
+    assert TestClient(create_app(ws), base_url="http://evil.example").get("/status").status_code == 400
+    for cmd in (["serve"], ["mcp", "--transport", "streamable-http"]):
+        r = run(*cmd, "-w", ws, "--host", "0.0.0.0", ok=False)
+        assert r.exit_code == 2 and "no authentication" in r.output

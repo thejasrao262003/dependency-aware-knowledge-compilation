@@ -363,8 +363,8 @@ digests.
   worker threads.
 
 **Not done.** There are no MCP resources or prompts yet; the tools cover the
-use cases. There is no authentication for the HTTP transport, which binds to
-127.0.0.1 by default.
+use cases. There is no authentication for HTTP, so (since v0.3.0) both HTTP
+servers refuse non-loopback binds and reject non-local `Host` headers.
 
 ## Libraries reused rather than reimplemented
 

@@ -240,3 +240,26 @@ def test_read_source_returns_the_current_document(kb):
     (kb.source_root / "databases" / "postgres.md").unlink()
     src = kb.read("databases/postgres.md")
     assert src.text == "" and src.metadata["on_disk"].startswith("missing")
+
+
+def test_neighborhood_is_connected_and_capped(kb):
+    nb = kb.neighborhood("page:postgresql", up=6, down=6, per_kind=2)
+    by_kind = {}
+    for n in nb.nodes:
+        by_kind.setdefault(n["kind"], []).append(n)
+    assert all(len(v) <= 2 for k, v in by_kind.items() if k != "page")
+    assert nb.hidden.get("claim", 0) >= 1  # postgresql has more than two claims
+    ids = {n["id"] for n in nb.nodes}
+    assert all(e["dependency"] in ids and e["dependent"] in ids for e in nb.edges)
+    # every shown node is connected to the root through shown nodes
+    adj = {}
+    for e in nb.edges:
+        adj.setdefault(e["dependency"], set()).add(e["dependent"])
+        adj.setdefault(e["dependent"], set()).add(e["dependency"])
+    seen, todo = {"page:postgresql"}, ["page:postgresql"]
+    while todo:
+        for o in adj.get(todo.pop(), ()):
+            if o not in seen:
+                seen.add(o)
+                todo.append(o)
+    assert seen == ids

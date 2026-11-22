@@ -65,6 +65,10 @@ content-type = "text/markdown"
 [[tool.hatch.metadata.hooks.fancy-pypi-readme.fragments]]
 path = "README.md"
 
+[[tool.hatch.metadata.hooks.fancy-pypi-readme.substitutions]]  # images: raw files, so PyPI can display them
+pattern = '!\[([^\]]*)\]\((?!https?://)([^)\s]+)\)'
+replacement = '![\1](https://raw.githubusercontent.com/thejasrao262003/dependency-aware-knowledge-compilation/main/\2)'
+
 [[tool.hatch.metadata.hooks.fancy-pypi-readme.substitutions]]
 pattern = '\]\((?!https?://|#|mailto:)([^)\s]+)\)'
 replacement = '](https://github.com/thejasrao262003/dependency-aware-knowledge-compilation/blob/main/\1)'

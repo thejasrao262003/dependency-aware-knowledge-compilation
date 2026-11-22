@@ -294,6 +294,22 @@ reproducible benchmark command and a clean CI run.
       `status`, previewed the compile, applied it, and answered with the new
       facts and their sources.
 
+47. **Web UI (ADR-26).**
+    - `dakc serve` now serves a dependency-free, read-only UI: an overview
+      with a layered cross-section, changes, explore, artifact pages with
+      citation provenance, dependencies, impact, a graph, and history.
+    - It was built and checked against the FastAPI demo: two builds plus one
+      pending real commit.
+    - Browser checks (Playwright: desktop, dark, 390 px) caught these, all
+      fixed:
+      - bars animating out of step with their change markers;
+      - a fully changed layer hiding its count;
+      - long absolute paths;
+      - the graph clipping the index column;
+      - raw ids and internal operation names in History;
+      - scroll position carried across views;
+      - the provenance panel out of view on mobile.
+
 ## Not done (deliberately or for lack of resources)
 
 - No React frontend. The API exposes React-Flow-shaped graph JSON for one.

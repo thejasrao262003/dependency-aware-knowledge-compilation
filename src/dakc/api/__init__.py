@@ -19,14 +19,17 @@ from pathlib import Path
 from typing import Annotated
 
 from fastapi import Depends, FastAPI, HTTPException, Query, Request
-from fastapi.responses import JSONResponse, PlainTextResponse
+from fastapi.responses import JSONResponse, PlainTextResponse, RedirectResponse
+from fastapi.staticfiles import StaticFiles
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from dakc import __version__
 from dakc.errors import ArtifactNotFound, InvalidArgument, WorkspaceNotFound
+from dakc.graph import titles as title_map
 from dakc.kb import KnowledgeBase
 from dakc.workspace import Workspace
 
+STATIC = Path(__file__).resolve().parent / "static"
 GRAPH_EXPORT_LIMIT = 20_000  # edges; larger graphs are only exported around one node
 LOCAL_HOSTS = ["127.0.0.1", "localhost", "::1", "[::1]"]
 
@@ -84,6 +87,15 @@ def create_app(root: Path) -> FastAPI:
     def artifact_content(artifact_id: str, kb: KB):
         return kb.read(artifact_id).text
 
+    @app.get("/artifacts/{artifact_id:path}/read")
+    def artifact_read(artifact_id: str, kb: KB):
+        return kb.read(artifact_id).to_dict()
+
+    @app.get("/artifacts/{artifact_id:path}/neighborhood")
+    def artifact_neighborhood(artifact_id: str, kb: KB, up: int = Query(2, ge=0, le=6),
+                              down: int = Query(2, ge=0, le=6), per_kind: int = Query(8, ge=1, le=50)):
+        return kb.neighborhood(artifact_id, up=up, down=down, per_kind=per_kind).to_dict()
+
     @app.get("/artifacts/{artifact_id:path}/trace")
     def artifact_trace(artifact_id: str, kb: KB):
         return kb.trace(artifact_id).to_dict()
@@ -96,13 +108,22 @@ def create_app(root: Path) -> FastAPI:
     def artifact(artifact_id: str, kb: KB):
         return kb.explain(artifact_id).to_dict()
 
+    @app.get("/titles")
+    def titles(kb: KB, id: Annotated[list[str] | None, Query()] = None):  # noqa: A002 - repeated ?id=
+        """Display titles for up to 500 artifact ids (the UI labels plan entries with them)."""
+        return title_map(kb.store, (id or [])[:500])
+
     @app.get("/builds")
     def builds(kb: KB, limit: int = 50):
         return [b.to_dict() for b in kb.builds(limit)]
 
     @app.get("/diff/{a}/{b}")
-    def diff(a: int, b: int, kb: KB):
-        return kb.diff(a, b).changes
+    def diff(a: int, b: int, kb: KB, titles: bool = False):
+        d = kb.diff(a, b)
+        if not titles:
+            return d.changes
+        names = title_map(kb.store, [i for items in d.changes.values() for i, c in items if c != "deleted"])
+        return {k: [{"id": i, "change": c, "title": names.get(i, i)} for i, c in items] for k, items in d.changes.items()}
 
     @app.get("/duplicates")
     def duplicates(kb: KB, limit: int = Query(100, ge=1)):
@@ -111,6 +132,12 @@ def create_app(root: Path) -> FastAPI:
     @app.get("/health")
     def health():
         return {"ok": True, "version": __version__}
+
+    @app.get("/", include_in_schema=False)
+    def root():
+        return RedirectResponse("/ui/")
+
+    app.mount("/ui", StaticFiles(directory=STATIC, html=True), name="ui")
 
     _ = HTTPException  # re-exported for callers that extend the app
     return app

@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>DAKC</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect x='1' y='1' width='14' height='2' fill='%23d8cdb6'/%3E%3Crect x='1' y='4.5' width='12' height='2' fill='%23b2a683'/%3E%3Crect x='1' y='8' width='10' height='2' fill='%23768a79'/%3E%3Crect x='1' y='11.5' width='14' height='3' fill='%233d4743'/%3E%3Crect x='5' y='8' width='1.6' height='2' fill='%232747f5'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="app.css">
+  <script>
+    try { const t = localStorage.getItem("dakc-theme"); if (t) document.documentElement.dataset.theme = t; } catch (e) {}
+  </script>
+</head>
+<body>
+  <header class="top">
+    <a class="brand" href="#/" aria-label="DAKC overview">
+      <svg class="brand-mark" width="26" height="22" viewBox="0 0 26 22" aria-hidden="true">
+        <rect x="0" y="0" width="26" height="3" rx="1" fill="var(--l-index)"/>
+        <rect x="0" y="4.5" width="21" height="3" rx="1" fill="var(--l-page)"/>
+        <rect x="0" y="9" width="17" height="3" rx="1" fill="var(--l-claim)"/>
+        <rect x="0" y="13.5" width="23" height="3" rx="1" fill="var(--l-passage)"/>
+        <rect x="0" y="18" width="26" height="4" rx="1" fill="var(--l-source)"/>
+        <rect x="9" y="9" width="2.5" height="3" fill="var(--accent)"/>
+      </svg>
+      <span class="brand-name">DAKC</span>
+    </a>
+    <span class="ws" id="ws"></span>
+    <form class="search" id="top-search" role="search">
+      <input type="search" name="q" placeholder="Search pages, claims, passages, sources" aria-label="Search the knowledge base">
+    </form>
+    <button class="icon-btn" id="theme" type="button" aria-label="Switch between light and dark theme" title="Theme">
+      <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.5" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8 1.5a6.5 6.5 0 0 1 0 13z" fill="currentColor"/></svg>
+    </button>
+  </header>
+  <div class="shell">
+    <nav class="rail" aria-label="Sections">
+      <a href="#/" data-nav="overview">Overview</a>
+      <a href="#/explore" data-nav="explore">Explore</a>
+      <a href="#/changes" data-nav="changes">Changes <span class="badge" id="changes-badge" hidden></span></a>
+      <a href="#/builds" data-nav="builds">History</a>
+    </nav>
+    <main id="view" tabindex="-1"><p class="loading">Loading…</p></main>
+  </div>
+  <script type="module" src="app.js"></script>
+</body>
+</html>

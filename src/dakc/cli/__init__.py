@@ -458,7 +458,7 @@ def serve(
     host: Annotated[str, typer.Option()] = "127.0.0.1",
     port: Annotated[int, typer.Option()] = 8765,
 ) -> None:
-    """Serve the read-only REST API on this machine (requires the 'api' extra)."""
+    """Serve the web UI and the read-only REST API on this machine (requires the 'api' extra)."""
     _require_loopback(host)
     try:
         import uvicorn
@@ -469,7 +469,9 @@ def serve(
 
     with _errors():
         app_ = create_app(workspace.resolve())
-    uvicorn.run(app_, host=host, port=port)
+    shown = f"[{host}]" if ":" in host else host
+    console.print(f"DAKC UI: http://{shown}:{port}/   (read-only; Ctrl-C to stop)")
+    uvicorn.run(app_, host=host, port=port, log_level="warning")
 
 
 @app.command(name="mcp")

@@ -4,6 +4,24 @@
 
 ### Added
 
+- **Web UI: `dakc serve`.** A local, read-only UI. It has these views:
+  - an overview drawing the knowledge base as layers, with what the next or
+    last compile changes;
+  - the pending compile plan;
+  - search across pages, claims, passages and sources;
+  - pages whose citations open the claim, the source version and the exact
+    sentence;
+  - dependencies, impact and a layered dependency graph per artifact;
+  - build history with titled diffs.
+
+  It is plain HTML, CSS and JavaScript inside the package, with no build step
+  or CDN. It has light and dark themes and works on mobile. New REST
+  endpoints: `/artifacts/{id}/read`, `/artifacts/{id}/neighborhood`,
+  `/titles`, and `?titles=true` on `/diff`. New library method:
+  `KnowledgeBase.neighborhood()`.
+- **`examples/fastapi-docs/ui_demo.py`.** The UI on FastAPI's docs, with
+  history and one pending real commit.
+
 - **MkDocs plugin** (`pip install 'dakc[mkdocs]'`, then add `- dakc` under
   `plugins`).
   - Every `mkdocs build` and every `mkdocs serve` reload compiles the docs

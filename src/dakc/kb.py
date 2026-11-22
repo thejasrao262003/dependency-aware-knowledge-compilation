@@ -26,6 +26,7 @@ from __future__ import annotations
 import difflib
 import json
 import re
+from collections import Counter
 from collections.abc import Iterator
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
@@ -42,7 +43,7 @@ from dakc.errors import (
     RollbackError,
     WorkspaceNotFound,
 )
-from dakc.graph import build_graph, downstream, export, resolve_id, stats, titles
+from dakc.graph import build_graph, downstream, export, resolve_id, stats, titles, upstream
 from dakc.hashing import hash_file
 from dakc.parsing import ParseError, parse_bytes
 from dakc.provenance import Explanation, changed_sources, explain, stale_artifacts
@@ -145,6 +146,20 @@ class Downstream:
             "counts": {k: len(v) for k, v in self.by_kind.items()},
             "by_kind": {k: [a.to_dict() for a in v[:limit]] for k, v in self.by_kind.items()},
         }
+
+
+@dataclass
+class Neighborhood:
+    """The artifacts around one artifact, for drawing: what it is built from (``up``)
+    and what is built from it (``down``), capped per kind, with the number hidden."""
+
+    root: str
+    nodes: list[dict[str, Any]] = field(default_factory=list)  # id, kind, title, layer, side, distance
+    edges: list[dict[str, str]] = field(default_factory=list)  # dependency -> dependent, kind
+    hidden: dict[str, int] = field(default_factory=dict)  # kind -> nodes not shown
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
 
 
 @dataclass
@@ -535,6 +550,47 @@ class KnowledgeBase:
             by_kind.setdefault(kind_of(i), []).append(ArtifactSummary(i, kind_of(i), names.get(i, i)))
         ordered = dict(sorted(by_kind.items(), key=lambda kv: LAYER.get(kv[0], 9)))
         return Downstream(root, names.get(root, root), ordered)
+
+    def neighborhood(self, artifact: str, *, up: int = 2, down: int = 2, per_kind: int = 8) -> Neighborhood:
+        """The dependency graph around ``artifact``, up to ``up`` steps towards the sources
+        and ``down`` steps towards the index, with at most ``per_kind`` nodes of each kind.
+        Nodes are chosen outwards from the artifact, so every shown node is connected to it."""
+        root = self.resolve(artifact)
+        side: dict[str, tuple[str, int]] = {root: ("root", 0)}
+        for i, d in upstream(self.store, root, up).items():
+            side.setdefault(i, ("up", d))
+        for i, d in downstream(self.store, root, down).items():
+            side.setdefault(i, ("down", d))
+        edges = [(a, b, k) for a, b, k in self.store.dependencies_many(list(side)) if a in side and b in side]
+        towards = {"up": {}, "down": {}}  # direction -> node -> neighbours further out
+        for dependent, dependency, _ in edges:
+            towards["up"].setdefault(dependent, []).append(dependency)
+            towards["down"].setdefault(dependency, []).append(dependent)
+        kept, shown = {root}, Counter()
+        for direction in ("up", "down"):
+            frontier = [root]
+            while frontier:
+                nxt = []
+                for node in sorted(frontier):
+                    for other in sorted(towards[direction].get(node, ())):
+                        if other in kept or side[other][0] != direction:
+                            continue
+                        kind = kind_of(other)
+                        if shown[kind] < per_kind:
+                            kept.add(other)
+                            shown[kind] += 1
+                            nxt.append(other)
+                frontier = nxt
+        total = Counter(kind_of(i) for i in side if i != root)
+        names = titles(self.store, sorted(kept))
+        nodes = [{"id": i, "kind": kind_of(i), "title": names.get(i, i), "layer": LAYER.get(kind_of(i), 9),
+                  "side": side[i][0], "distance": side[i][1]} for i in sorted(kept, key=lambda i: (LAYER.get(kind_of(i), 9), i))]
+        return Neighborhood(
+            root,
+            nodes,
+            [{"dependency": b, "dependent": a, "kind": k} for a, b, k in edges if a in kept and b in kept],
+            {k: n - shown[k] for k, n in total.items() if n > shown[k]},
+        )
 
     def export_graph(self, fmt: str = "json", *, around: str | None = None) -> str:
         """The dependency graph (or the part downstream of ``around``) as JSON

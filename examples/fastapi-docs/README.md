@@ -105,6 +105,20 @@ the extra pages. FastAPI's own `mkdocs.yml` adds their custom hooks, which this
 minimal config leaves out, so some code-include directives show as plain
 text. The knowledge pages are unaffected.
 
+## In the browser
+
+```bash
+python examples/fastapi-docs/ui_demo.py               # two builds of history plus one pending real commit
+dakc serve -w examples/fastapi-docs/.work/ui-demo-kb  # then open http://127.0.0.1:8765/
+```
+
+- **Overview** shows the pending change against the whole knowledge base.
+- **Changes** shows the 20-call plan.
+- **History** shows what build 2 changed.
+- **Any page** lets you select a citation to see the exact source sentence.
+
+![Changes view: one modified document, 20 LLM calls to catch up](../../docs/images/ui-changes.png)
+
 ## Reproduce
 
 ```bash

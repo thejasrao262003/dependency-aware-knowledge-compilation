@@ -167,7 +167,7 @@ make them, and labels downstream numbers as an **upper bound**.
 | `dakc builds` / `dakc diff A [B]` | Audit log; artifact-level diff between builds |
 | `dakc rollback [--to N]` | Restore an earlier committed build (later builds' artifact versions are discarded; their records stay in `builds`) |
 | `dakc verify [--against-full]` | Invariant and provenance checks, citation coverage, equality with a full rebuild |
-| `dakc serve` | Read-only REST API (`/status /check /plan /graph /artifacts /artifacts/{id}[/content\|/trace\|/downstream] /builds /diff /duplicates`) |
+| `dakc serve` | Local web UI and read-only REST API (`/status /check /plan /graph /artifacts /artifacts/{id}[/content\|/trace\|/downstream] /builds /diff /duplicates`) |
 | `dakc mcp [--read-only]` | MCP server for AI agents ([below](#mcp-server-for-ai-agents)) |
 | `dakc watch` | Recompile incrementally on file changes |
 
@@ -250,6 +250,35 @@ transport is stdio. `--transport streamable-http` serves HTTP on
 `127.0.0.1:8766`. There is no authentication yet, so both HTTP servers
 refuse to listen beyond this machine. [docs/mcp.md](docs/mcp.md) covers
 setup, the tools, the safety rules and the known limitations.
+
+## Web UI
+
+`dakc serve` opens a local, read-only UI for a workspace. It needs the `api`
+extra: `pip install 'dakc[api]'`.
+
+![The DAKC UI on FastAPI's docs: one changed document, and how little a compile would redo](docs/images/ui-overview.png)
+
+- **Overview.** The knowledge base shown as layers, from the source documents
+  at the bottom to the index at the top, with what the next compile would
+  change (or what the last one changed).
+- **Changes.** The exact plan for pending edits, before anything runs: which
+  documents changed, how many LLM calls the compile needs, and which pages and
+  summaries it would regenerate.
+- **Explore and read.** Search pages, claims, passages and sources. On a page,
+  select a citation to see its claim, the source document and version, and the
+  exact sentence it came from.
+- **Dependencies, impact and graph.** What an artifact is built from,
+  everything an edit to it would invalidate, and the dependency graph around
+  it.
+- **History.** Every build, and what it changed.
+
+![Selecting a citation shows the exact sentence it came from](docs/images/ui-provenance.png)
+
+The UI is plain HTML, CSS and JavaScript that ships inside the package. There
+is no build step and no CDN, and it works offline. Like the REST API, it only
+listens on this machine. To see it on FastAPI's docs, run
+`python examples/fastapi-docs/ui_demo.py`, then
+`dakc serve -w examples/fastapi-docs/.work/ui-demo-kb`.
 
 ## Integrations
 

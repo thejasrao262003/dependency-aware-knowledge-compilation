@@ -395,6 +395,32 @@ generator or a hosted service.
   every build. On FastAPI's docs, publishing all 2,336 entity pages made
   builds 6 times slower, and most of those pages held one fact.
 
+## ADR-26: A read-only web UI with no build step
+
+**Decision.** `dakc serve` serves a single-page UI as static files from the
+package (`dakc/api/static`): plain HTML, CSS and ES-module JavaScript, with no
+framework, bundler or CDN.
+
+- **Read-only.** It reads the existing REST API, plus a few endpoints added
+  for it (`read`, `neighborhood`, `titles`, titled diffs). Compiling stays in
+  the CLI, the Python API and MCP.
+- **Local-only.** The same loopback and `Host` checks as the API.
+- **The overview** draws the knowledge base as layers, sources at the bottom
+  and the index at the top. Each layer is sized by its artifact count, and
+  the next (or last) compile's changes are marked in a single accent colour.
+  The point is to make "how little was rebuilt" visible at a glance.
+
+**Why.** The review advised against a heavy React frontend until users ask
+for one, and the user asked for a UI.
+
+- *No build step* means nothing to install, nothing to keep patched, and the
+  UI works offline in the wheel.
+- *Read-only* means the UI cannot spend money or rewrite the knowledge base.
+
+The UI was checked in a real browser with Playwright: every view on desktop,
+in dark mode and at 390 px wide, with no console errors and no horizontal
+overflow.
+
 ## Libraries reused rather than reimplemented
 
 | Need | Library |

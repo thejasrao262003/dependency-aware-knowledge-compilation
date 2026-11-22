@@ -119,3 +119,30 @@ def test_http_servers_are_local_only(ws):
     for cmd in (["serve"], ["mcp", "--transport", "streamable-http"]):
         r = run(*cmd, "-w", ws, "--host", "0.0.0.0", ok=False)
         assert r.exit_code == 2 and "no authentication" in r.output
+
+
+def test_web_ui_and_its_endpoints(ws):
+    from fastapi.testclient import TestClient
+
+    from dakc.api import create_app
+
+    run("ingest", ws / "knowledge", "-w", ws)
+    write_files(ws / "knowledge", {"databases/redis.md": "Redis supports Clustering.\n"})
+    run("compile", "-w", ws)
+    client = TestClient(create_app(ws), base_url="http://localhost", follow_redirects=False)
+    assert client.get("/").headers["location"] == "/ui/"
+    index = client.get("/ui/")
+    assert index.status_code == 200 and '<script type="module" src="app.js">' in index.text
+    for asset in ("app.js", "app.css"):
+        assert client.get(f"/ui/{asset}").status_code == 200
+    page = client.get("/artifacts/page:jsonb/read").json()
+    assert page["kind"] == "page" and page["text"].startswith("# JSONB")
+    nb = client.get("/artifacts/page:jsonb/neighborhood", params={"up": 6, "down": 6}).json()
+    kinds = {n["kind"] for n in nb["nodes"]}
+    assert nb["root"] == "page:jsonb" and {"source", "passage", "claim", "page", "index"} <= kinds
+    ids = {n["id"] for n in nb["nodes"]}
+    assert all(e["dependency"] in ids and e["dependent"] in ids for e in nb["edges"])
+    assert client.get("/titles", params=[("id", "page:jsonb"), ("id", "page:nope")]).json() == {"page:jsonb": "JSONB"}
+    titled = client.get("/diff/1/2", params={"titles": "true"}).json()
+    assert any(x["title"] == "Redis" and x["change"] == "updated" for x in titled["page"])
+    assert client.get("/diff/1/2").json() == {k: [[x["id"], x["change"]] for x in v] for k, v in titled.items()}

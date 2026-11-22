@@ -34,6 +34,13 @@ claims are unchanged but whose citations moved are re-rendered without an LLM
 call. Everything else keeps its exact bytes. `dakc compile --dry-run` tells
 you all of this before anything is spent.
 
+**On real docs:** across the last 50 commits to FastAPI's documentation, DAKC
+made 259 LLM calls where re-processing each changed file made 267,896, and
+its result equalled a full rebuild at every commit. Most of that gap comes
+from a large release-notes file edited in almost every commit; see
+[examples/fastapi-docs](examples/fastapi-docs/README.md) for the breakdown,
+the token counts and the limitations.
+
 > **Status:** research prototype / MVP, CLI-first, local-first. Python 3.12+,
 > SQLite, no GPU, no network required (deterministic providers are the
 > default). See [what is not done](#limitations).
@@ -244,6 +251,31 @@ transport is stdio. `--transport streamable-http` serves HTTP on
 refuse to listen beyond this machine. [docs/mcp.md](docs/mcp.md) covers
 setup, the tools, the safety rules and the known limitations.
 
+## Integrations
+
+**MkDocs.** Add one line to an existing `mkdocs.yml`:
+
+```yaml
+plugins:
+  - search
+  - dakc            # pip install 'dakc[mkdocs]'
+```
+
+- Every `mkdocs build`, and every live reload of `mkdocs serve`, compiles
+  the docs incrementally.
+- The knowledge base is published under `/knowledge/`, and every cited fact
+  links back to the docs page it came from.
+- In CI, cache the workspace directory and every build is incremental.
+
+See [docs/integrations/mkdocs.md](docs/integrations/mkdocs.md) and the
+runnable [examples/mkdocs-site](examples/mkdocs-site/mkdocs.yml).
+
+**Real documentation history.**
+[examples/fastapi-docs](examples/fastapi-docs/README.md) replays the last 50
+commits that changed FastAPI's documentation. At every commit it measures
+what keeping a knowledge base current costs under each strategy, and checks
+that DAKC's result equals a full rebuild.
+
 ## Guarantees, and how each is checked
 
 | Concern | What DAKC does | Checked by |
@@ -365,6 +397,14 @@ Unchanged facts kept with identical claim ids after a one-sentence edit, whole-p
 - **Heuristic extraction is crude** (see above).
 - **Contradictions are kept, not resolved.** Both claims appear on the page
   with their own sources.
+- **Large, flat folders make expensive topic summaries.**
+  - A topic summary's prompt lists every page in its folder.
+  - On FastAPI's docs, the root folder's summary covers about 1,660 pages,
+    a prompt of about 55,000 tokens, and it is regenerated whenever a page in
+    that folder changes.
+  - With an LLM provider, this dominates DAKC's incremental token cost
+    ([measured](examples/fastapi-docs/results/replay.md)).
+  - A much larger folder could exceed a model's context window.
 - **No frontend.** `dakc graph --format reactflow` and `GET /graph` provide
   React Flow data for one.
 

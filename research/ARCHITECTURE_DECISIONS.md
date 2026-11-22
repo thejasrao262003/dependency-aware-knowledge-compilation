@@ -366,6 +366,35 @@ digests.
 use cases. There is no authentication for HTTP, so (since v0.3.0) both HTTP
 servers refuse non-loopback binds and reject non-local `Host` headers.
 
+## ADR-25: Integrate with existing docs tools as a plugin
+
+**Decision.** The first integration is a MkDocs plugin, not a new site
+generator or a hosted service.
+
+- **One line in `mkdocs.yml`.** DAKC compiles the `docs_dir` incrementally in
+  `on_pre_build`, so this runs for every build and every `mkdocs serve`
+  reload.
+- **Virtual files.** The generated pages are added as virtual files
+  (`File.generated`) under a prefix. Nothing is written into `docs_dir`.
+- **Separate state.** The workspace lives outside `docs_dir`, which makes it
+  easy to cache in CI.
+- **Links back.** Citations link to the source docs pages.
+- **Page filter.** Pages backed by fewer than `min_claims` facts are not
+  published. References to them are dropped or unlinked, so strict builds
+  pass.
+
+**Why.**
+
+- *Adoption.* The question to answer was whether a developer can add DAKC to
+  an existing docs workflow without replacing their tools. A plugin changes
+  one line.
+- *Language.* MkDocs is Python, so the plugin calls the library directly.
+- *Correctness.* Virtual files avoid a feedback loop, where DAKC would ingest
+  its own output, and avoid polluting the docs repository.
+- *Build time.* `min_claims` exists because MkDocs renders every page on
+  every build. On FastAPI's docs, publishing all 2,336 entity pages made
+  builds 6 times slower, and most of those pages held one fact.
+
 ## Libraries reused rather than reimplemented
 
 | Need | Library |
@@ -381,4 +410,5 @@ servers refuse non-loopback binds and reject non-local `Host` headers.
 | File watching | `watchdog` (optional extra) |
 | HTTP API / clients | `fastapi`, `httpx` |
 | MCP server | `mcp` (official Python SDK, v2; optional extra) |
+| MkDocs integration | `mkdocs` plugin API (optional extra) |
 | Tests | `pytest` |

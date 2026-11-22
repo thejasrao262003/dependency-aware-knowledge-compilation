@@ -39,10 +39,14 @@ watch = ["watchdog>=4"]
 api = ["fastapi>=0.110", "uvicorn>=0.29"]
 anthropic = ["anthropic>=1.0"]
 mcp = ["mcp>=2.3,<3"]
-dev = ["pytest>=8", "pymupdf>=1.24", "watchdog>=4", "fastapi>=0.110", "uvicorn>=0.29", "mcp>=2.3,<3"]
+mkdocs = ["mkdocs>=1.6"]
+dev = ["pytest>=8", "pymupdf>=1.24", "watchdog>=4", "fastapi>=0.110", "uvicorn>=0.29", "mcp>=2.3,<3", "mkdocs>=1.6"]
 
 [project.scripts]
 dakc = "dakc.cli:main"
+
+[project.entry-points."mkdocs.plugins"]
+dakc = "dakc.integrations.mkdocs_plugin:DakcPlugin"
 
 [project.urls]
 Homepage = "https://github.com/thejasrao262003/dependency-aware-knowledge-compilation"

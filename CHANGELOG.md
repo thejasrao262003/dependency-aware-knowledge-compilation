@@ -1,5 +1,37 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- **MkDocs plugin** (`pip install 'dakc[mkdocs]'`, then add `- dakc` under
+  `plugins`).
+  - Every `mkdocs build` and every `mkdocs serve` reload compiles the docs
+    incrementally.
+  - The knowledge base is published under `/knowledge/`, with every citation
+    linking back to its docs page.
+  - Options: `workspace`, `provider`, `publish`, `prefix`, `min_claims`
+    (publish only pages backed by at least N facts; default 2),
+    `max_llm_calls` (fails the build instead of overspending), `verify` and
+    `enabled`.
+  - Works with `mkdocs build --strict`.
+  - See `docs/integrations/mkdocs.md`, which includes a GitHub Actions
+    workflow that caches DAKC's state between runs.
+- **`examples/mkdocs-site`**: an ordinary MkDocs site with the plugin added.
+  CI builds it in strict mode and checks that the second build is a no-op.
+- **`examples/fastapi-docs`**: FastAPI's real documentation and history.
+  - `replay.py` replays the last 50 commits that changed the docs, measuring
+    full, file-level and DAKC rebuild costs at every commit. It also checks
+    that DAKC's result equals a full rebuild each time.
+  - `walkthrough.py` captures the edit, dry-run, compile, trace and verify
+    flow on one real commit.
+  - `agent_session.py` records a real agent session over MCP, before and
+    after that commit.
+  - `RECORDING.md` is a tested script for a demo of under 3 minutes.
+  - Findings, now documented as limitations: large flat folders make
+    expensive topic summaries, and the heuristic extractor misses sentences
+    with no capitalized term.
+
 ## v0.3.0: fixes from real-agent testing, local-only HTTP
 
 Most changes were found by testing the MCP server with real agents (see

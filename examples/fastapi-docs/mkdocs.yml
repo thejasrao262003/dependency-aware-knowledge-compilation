@@ -1,0 +1,26 @@
+# FastAPI's real English docs, built with MkDocs and the DAKC plugin.
+# The only DAKC-specific line is `- dakc` under plugins.
+#
+#   python examples/fastapi-docs/replay.py --commits 1     # clones FastAPI's docs into .work/
+#   mkdocs build -f examples/fastapi-docs/mkdocs.yml        # or `mkdocs serve -f ...`
+#
+# FastAPI's own mkdocs.yml adds their custom hooks and plugins (code includes,
+# translations); this minimal config leaves those out, so some include
+# directives show as plain text. The knowledge pages are unaffected.
+site_name: FastAPI docs + DAKC knowledge (demo)
+docs_dir: .work/fastapi/docs/en/docs
+site_dir: .work/site
+theme:
+  name: material
+markdown_extensions:
+  - admonition
+  - toc:
+      permalink: true
+  - pymdownx.superfences
+  - pymdownx.blocks.admonition
+  - pymdownx.blocks.tab:
+      alternate_style: true
+plugins:
+  - search
+  - dakc:
+      workspace: .work/site-kb

@@ -28,6 +28,12 @@ jobs:
         run: uv run python -m benchmarks.run --sizes 100 --reps 1 --verify-against benchmarks/results/latest.json --work /tmp/bench-work
       - name: Claim-equivalence evaluation (deterministic matchers)
         run: uv run python -m benchmarks.equivalence --out /tmp/equivalence.json
+      - name: MkDocs integration example (strict build; the second build must be a no-op)
+        run: |
+          cd examples/mkdocs-site
+          uv run --project "$GITHUB_WORKSPACE" mkdocs build --strict
+          uv run --project "$GITHUB_WORKSPACE" mkdocs build --strict 2>&1 | tee /tmp/second-build.log
+          grep -q "knowledge base up to date" /tmp/second-build.log
       - name: Example corpus end to end
         run: |
           mkdir -p /tmp/demo && cp -r examples/sample-knowledge-base /tmp/demo/knowledge

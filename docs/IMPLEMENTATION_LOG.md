@@ -262,6 +262,37 @@ reproducible benchmark command and a clean CI run.
       `TrustedHostMiddleware`.
     - Also added: MCP setup and known-limitations docs, migration notes, and
       GitHub issue templates.
+45. **MkDocs integration (ADR-25).**
+    - `dakc[mkdocs]` provides a plugin that compiles `docs_dir` incrementally
+      on every build and every serve reload. It publishes the knowledge base
+      under `/knowledge/`, with citations linking to the docs pages.
+    - It has an LLM cost cap, and the workspace lives outside `docs_dir`.
+    - Tests run MkDocs' own build in strict mode. `examples/mkdocs-site` is
+      built in CI, and the second build must be a no-op.
+    - **Measured build cost.** On FastAPI's docs, publishing every page made
+      builds 6 times slower (3.4 s to 20.2 s), while DAKC's own up-to-date
+      check took 0.27 s. Hence `min_claims` (default 2). It drops pages with a
+      single fact, mostly heuristic noise, and keeps links valid.
+46. **Real documentation history (`examples/fastapi-docs`).**
+    - The last 50 commits to FastAPI's docs were replayed with a full rebuild
+      as the reference at every commit. DAKC's state was identical at all 50.
+    - LLM calls: DAKC 259, file-level 267,896, full 688,168.
+    - Two findings, both recorded as limitations:
+      - **Topic summaries are a hot spot.** A summary's prompt lists every
+        page in its folder. The root folder of FastAPI's docs has about 1,660
+        pages, so each regeneration is a prompt of about 55,000 tokens. That
+        dominates DAKC's token cost, which is 14 times below file-level
+        instead of 1,000 times, and it would not scale to much larger flat
+        folders.
+      - **The heuristic extractor misses facts.** It skips sentences without
+        a capitalized term, such as the `max_files` bullet, and it promotes
+        sentence-initial words to entities (`page:exceeding`). Agents still
+        found the `max_files` bullet through full-text passage search.
+    - A real agent session over MCP is recorded in
+      `results/agent-session.md`. Before the commit, the agent said the
+      knowledge base did not cover the question. After it, the agent ran
+      `status`, previewed the compile, applied it, and answered with the new
+      facts and their sources.
 
 ## Not done (deliberately or for lack of resources)
 

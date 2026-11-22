@@ -10,3 +10,8 @@ dist/
 .env
 .env.*
 .private/
+
+# example working directories (cloned third-party repos, DAKC state)
+examples/*/.work/
+examples/*/.dakc-kb/
+examples/*/site/

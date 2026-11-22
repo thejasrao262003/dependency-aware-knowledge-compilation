@@ -77,7 +77,7 @@ rule is the *verifying trace* from build systems:
 | Artifact | Generation signature (LLM work) | Render signature (deterministic work) |
 |---|---|---|
 | passage | — (deterministic segmentation) | — |
-| claim (extraction) | H(extractor fp, passage text hash) | — |
+| claim (extraction) | H(extractor fp, passage text hash); each passage records the fp that produced its claims (`extracted_by`), and a passage whose fp differs from the current extractor is re-extracted even if its text is unchanged | — |
 | page | H(writer fp, entity display name, [(claim id, claim content hash)], related entity names) | H(gen sig, [(claim id, [source paths])]) |
 | summary | H(summarizer fp, topic, [(page id, title, lead hash)]) | — |
 | index | — | H([(id, title)] of pages and summaries) |
@@ -96,9 +96,12 @@ When an artifact is rebuilt and its output content hash equals the previous
 one, its dependents' signatures do not change, so propagation stops there.
 DAKC gets this at every layer:
 
-- **Claim layer.** A paragraph edit that leaves a sentence intact reproduces
-  the same claim id. Pages that depend only on unchanged claims are not
-  touched.
+- **Claim layer.** A paragraph edit that leaves a sentence intact keeps that
+  sentence's claims byte-for-byte: they are *reused* from the cache rather
+  than re-generated (see *Sentence-grounded extraction* below). Pages that
+  depend only on unchanged claims are not touched. This holds for LLM
+  extractors too, which would otherwise reword unchanged facts and give them
+  new ids.
 - **Page → summary.** Summaries depend on page *leads*, not full bodies. A
   changed fact deep inside a page does not regenerate the topic summary.
 - **Index.** It depends only on titles.
@@ -141,15 +144,40 @@ relationship with no claims is deleted, along with its page. A topic with no
 pages loses its summary. Claims still supported elsewhere survive, and their
 pages are only re-rendered (citations), not regenerated.
 
+## Sentence-grounded extraction
+
+Passages are split into sentences deterministically (`split_sentences`).
+Every extracted claim carries its *evidence*: the sentences needed to state
+it, including sentences that identify what a pronoun refers to. LLM
+extractors are shown numbered sentences and asked for them. The extraction
+cache stores evidence as sentence content hashes.
+
+When a passage version replaces another (same source):
+
+1. A sentence is **dirty** if its text is not in the replaced versions.
+2. A sentence that may depend on earlier context is also dirty when any
+   earlier sentence of the passage is dirty. That covers pronouns, "this" or
+   "the X" references, and continuation words such as "However".
+3. Claims whose evidence sentences are all clean are **reused verbatim**.
+4. Only dirty sentences are sent to the extractor, with the whole passage as
+   context. If no sentence is dirty (deletions, reordering), no call is made.
+
+Without this, an LLM re-extracting an edited paragraph rewords the
+unchanged facts, gives them new claim ids, and turns every page they feed
+into a "change" (measured in docs/benchmark.md). The context rule is
+conservative: it re-extracts more than strictly necessary rather than reuse
+a claim whose antecedent changed. The coreference experiment in the
+benchmark tests it.
+
 ## Dry-run precision
 
-Deterministic layers (scan, segmentation, cache lookup, entity resolution,
-signatures) are computed exactly in a dry run. Passages that would need a
-*paid* extraction call cannot be known without making it, so the dry run
-treats their new claims as unknown and reports downstream counts as an
-**upper bound derived from the current graph**. It labels them that way and
-does not present them as exact. With the free heuristic extractor the dry run
-is exact.
+Deterministic layers (scan, segmentation, sentence reuse planning, cache
+lookup, entity resolution, signatures) are computed exactly in a dry run, so
+the number of extraction calls is exact. The claims those calls would
+return cannot be known without making them, so with a *paid* extractor the
+dry run reports downstream counts as an **upper bound derived from the
+current graph**. It labels them that way and does not present them as exact.
+With the free heuristic extractor the whole dry run is exact.
 
 ## Invariants (checked by tests and benchmarks)
 

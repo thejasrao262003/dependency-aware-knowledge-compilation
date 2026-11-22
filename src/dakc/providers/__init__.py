@@ -32,11 +32,11 @@ __all__ = [
     "PROVIDERS",
 ]
 
-PROVIDERS = ("heuristic", "mock", "openai", "anthropic")
+PROVIDERS = ("heuristic", "mock", "openai", "anthropic", "custom")
 
 
 def make_provider(name: str, options: dict[str, Any] | None = None) -> ProviderBundle:
-    options = options or {}
+    options = dict(options or {})
     if name in ("heuristic", "mock"):
         as_llm = name == "mock"
         return ProviderBundle(name, HeuristicExtractor(as_llm), TemplatePageWriter(as_llm), TemplateSummarizer(as_llm))
@@ -48,4 +48,36 @@ def make_provider(name: str, options: dict[str, Any] | None = None) -> ProviderB
 
         client = AnthropicClient(**options)
         return ProviderBundle(name, LLMExtractor(client), LLMPageWriter(client), LLMSummarizer(client))
+    if name == "custom":
+        client = load_custom_client(options)
+        return ProviderBundle(name, LLMExtractor(client), LLMPageWriter(client), LLMSummarizer(client))
     raise ProviderError(f"unknown provider {name!r}; choose one of {', '.join(PROVIDERS)}")
+
+
+def load_custom_client(options: dict[str, Any]):
+    """Bring-your-own LLM client.
+
+    ``factory = "module.path:callable"`` must return an object with a
+    ``fingerprint`` attribute and ``complete(system, user, json_schema=None)``
+    returning :class:`dakc.providers.llm.Completion`. Optional ``path`` is a
+    directory prepended to ``sys.path`` (resolved by the workspace relative to
+    itself), and ``options`` is a table of keyword arguments for the factory.
+    """
+    import importlib
+    import sys
+
+    spec = options.get("factory")
+    if not spec or ":" not in spec:
+        raise ProviderError('custom provider needs factory = "module.path:callable" in [provider.custom]')
+    path = options.get("path")
+    if path and path not in sys.path:
+        sys.path.insert(0, path)
+    module_name, _, attr = spec.partition(":")
+    try:
+        factory = getattr(importlib.import_module(module_name), attr)
+    except (ImportError, AttributeError) as exc:
+        raise ProviderError(f"cannot load custom provider factory {spec!r}: {exc}") from exc
+    client = factory(**dict(options.get("options", {})))
+    if not hasattr(client, "complete") or not getattr(client, "fingerprint", ""):
+        raise ProviderError(f"{spec!r} must return an object with .fingerprint and .complete(system, user, json_schema=None)")
+    return client

@@ -110,11 +110,59 @@ unless noted.
     They verify DAKC's request and response handling only, not any real
     model.
 
+## Real-LLM phase (2026-11-22)
+
+22. Added a vendor-neutral `custom` provider (`factory = "module:callable"`)
+    so any LLM client can be plugged in without code changes in DAKC.
+23. A first live extraction call showed anchored re-extraction keeping a
+    stale fact (ADR-15). Anchoring was made configurable (`off` / `strict` /
+    `loose`), default `off`, and an experiment was designed to measure the
+    benefit (unchanged facts keep their claim ids) against the harm (edited
+    facts survive, new facts are missed).
+24. While designing that experiment, found that an extractor change did not
+    re-extract unchanged passages, contradicting the README. Fixed with
+    per-passage `extracted_by` (ADR-14).
+25. The first real-LLM run aborted on one invalid JSON response. Added one
+    bounded repair retry (ADR-16). The experiment now records per-item
+    failures instead of crashing.
+
+## Making the real-LLM path work (2026-11-22)
+
+26. **Diagnosis of the poor real-LLM numbers.**
+    - Claim identity was a hash of the LLM's wording.
+    - Re-extracting a whole edited paragraph regenerated, and reworded, its
+      unchanged facts.
+    - Anchoring asked the model to do a comparison inside generation.
+    - The measurement itself had two flaws: the code-dense test text was a
+      worst case for verbatim reproduction, and the stale metric counted
+      edits whose target appeared twice in a sentence.
+27. **Sentence-grounded extraction (ADR-17).**
+    - Every claim carries its evidence sentences.
+    - Changed passages reuse the claims of unchanged sentences verbatim, and
+      only changed or context-dependent sentences are sent to the model.
+    - Deletions and reorderings cost zero calls.
+    - Anchoring was removed.
+28. **A live trace exposed two more extraction issues (ADR-18).**
+    - Correct claims with no named entity were being discarded. The prompt now
+      also asks for technical concepts.
+    - Quote and backtick variation was minting new claim ids. Identity
+      normalization now ignores them.
+29. **Measurement fixes.**
+    - The private client now uses server-enforced JSON schemas. The second
+      experiment had zero provider failures, down from 5 of 36 paragraphs.
+    - Edits now only target entities that occur exactly once in a paragraph.
+30. **Three-way experiment: passage vs sentence vs evidence-only.** Evidence-only
+    is the most efficient, but left stale facts in pronoun cases, so the
+    conservative context rule remains the default.
+31. The deterministic benchmark was re-run on the final code, because
+    sentence reuse changes extraction call counts. A deleted sentence no
+    longer costs a call.
+
 ## Not done (deliberately or for lack of resources)
 
 - No React frontend. The API exposes React-Flow-shaped graph JSON for one.
-- No real-LLM benchmark. No local model or API key was available, so the
-  harness supports it but it was not run.
+- Real-LLM results cover one hosted model (`gpt-4o-mini`) on small corpora
+  (see docs/benchmark.md). Other models were not measured.
 - Semantic (embedding) claim matching was not added. Deterministic matching
   plus content addressing was sufficient for the benchmark scenarios, and the
   PRD asks for deterministic-first.

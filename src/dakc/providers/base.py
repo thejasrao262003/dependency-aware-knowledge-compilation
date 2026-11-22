@@ -29,6 +29,7 @@ class ExtractResult:
     claims: list[ExtractedClaim]
     input_tokens: int = 0
     output_tokens: int = 0
+    calls: int = 1  # provider calls made (a JSON repair retry makes it 2)
 
 
 @dataclass
@@ -45,7 +46,14 @@ class Component(Protocol):
 
 
 class Extractor(Component, Protocol):
-    def extract(self, passage_text: str, anchors: tuple[str, ...] = ()) -> ExtractResult: ...
+    def extract(self, passage_text: str, targets: tuple[int, ...] | None = None) -> ExtractResult:
+        """Extract claims from ``passage_text``.
+
+        ``targets``: indices into ``split_sentences(passage_text)``; when given,
+        return only claims stated (at least partly) by those sentences, using the
+        rest as context. Every claim must carry its ``evidence`` sentence indices.
+        """
+        ...
 
 
 class PageWriter(Component, Protocol):

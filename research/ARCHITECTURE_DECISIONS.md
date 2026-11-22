@@ -172,6 +172,95 @@ Invalidation is driven by content hashes alone.
 - Using similarity to skip work would trade correctness for cost, which the
   PRD forbids.
 
+## ADR-14: Each passage records the extractor that produced its claims
+
+**Decision.** A passage stores `extracted_by`, the extractor fingerprint
+(algorithm, model, prompt). A passage whose `extracted_by` differs from the
+current extractor is re-extracted even though its text is unchanged.
+
+**Why.** Without this, changing the extraction model or prompt left every
+unchanged passage with claims from the old extractor, while the README
+claimed that a model change invalidates what that model built. Found while
+designing the real-LLM experiment; fixed and covered by
+`test_extractor_change_reextracts_unchanged_passages`.
+
+## ADR-15: Anchored re-extraction (superseded by ADR-17, removed)
+
+**Decision (historical).** Showing the model the previous claims of an
+edited passage ("anchoring") was briefly available as `strict` or `loose`,
+off by default. It was removed in favour of deterministic sentence reuse
+(ADR-17).
+
+**Why.** A live call showed the risk. The passage changed "PostgreSQL supports
+JSONB" to "PostgreSQL stores JSONB in a binary format", and the anchored model
+returned the old claim, a stale fact. Anchoring trades correctness risk for
+fewer regenerated pages, so it must be justified by measurement, not assumed.
+The first real-LLM experiment measured both sides (raw results:
+`benchmarks/results/archive/llm-gpt-4o-mini-anchoring.json`).
+
+**Outcome (gpt-4o-mini).** `off` was best on synthetic text: unchanged facts
+reproduced verbatim, no stale claims, every new fact captured. On natural
+prose, `strict` raised unchanged-fact reproduction by about 5 points but
+captured the new fact in far fewer paragraphs. `loose` kept stale facts and,
+end to end, lost every new fact of a rewritten paragraph. Anchoring was
+therefore never enabled by default, and was later removed.
+
+## ADR-16: One JSON repair retry for LLM extraction
+
+**Decision.** If an extraction response is not valid JSON, the extractor asks
+once more for strictly valid JSON. If that also fails, the error propagates
+and the build fails without committing anything. Both calls are counted in
+usage.
+
+**Why.** Technical prose with quotes and code identifiers produced an invalid
+JSON response in the first real-LLM run, which aborted the run. A single
+bounded retry fixes the common case without hiding persistent failures.
+
+## ADR-17: Sentence-grounded extraction with verbatim reuse
+
+**Decision.** Claims carry sentence-level evidence. When a passage changes,
+claims whose evidence sentences are unchanged are reused verbatim, and only
+changed sentences are extracted, with the passage as context. A sentence that
+may depend on earlier context (pronoun, "the X", continuation word) is
+re-extracted whenever an earlier sentence changed. The anchoring feature
+(ADR-15) was removed.
+
+**Why.** The first real-LLM run showed that re-extracting a whole edited
+paragraph rewords its unchanged facts. Only about 40% of claims reproduced
+verbatim, even with no edit at all, so claim-level cutoff barely worked on
+real prose. Anchoring tried to fix this by asking the model to reuse
+wording, and was measured to keep stale facts and miss new ones (raw results:
+`benchmarks/results/archive/llm-gpt-4o-mini-anchoring.json`). Reuse decided
+deterministically, by sentence hashes, does not depend on the model repeating
+itself. The LLM is only asked about sentences that actually changed.
+
+**Measured (gpt-4o-mini, docs/benchmark.md).**
+- Unchanged facts kept with identical ids went from about 50% (whole-paragraph
+  re-extraction) to about 80–90% on technical and explanatory prose, with zero
+  stale claims and fewer output tokens.
+- A variant trusting only the model's declared dependencies (no pattern rule)
+  reached about 96–100%, but in the coreference set left 5 stale claims (10% of those that should have been retracted).
+  The pattern rule therefore stays.
+
+**Rejected.**
+- *Per-sentence extraction without context*: pronouns and abbreviations
+  could not be resolved.
+- *Semantic (embedding) matching of old and new claims*: it would have to
+  decide "same fact?" by similarity, which is the anchoring failure mode in
+  another form.
+
+## ADR-18: Claim identity ignores cosmetic wording; extraction asks for concepts too
+
+**Decision.**
+- Claim identity normalization drops quote, backtick and markdown emphasis
+  characters (`"MD5"`, `'MD5'` and `` `MD5` `` are one claim).
+- The LLM extraction prompt asks for at least one entity per claim, allowing
+  specific technical concepts ("file watcher") as well as named entities.
+
+**Why.** A live trace showed the model correctly extracting "The watcher
+checks size and mtime." with an empty entity list. DAKC then discarded it
+because it had no page to attach to. Quote style also varied between calls.
+
 ## Libraries reused rather than reimplemented
 
 | Need | Library |

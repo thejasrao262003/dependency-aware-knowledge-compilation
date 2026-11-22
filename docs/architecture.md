@@ -49,7 +49,7 @@ inputs. A Markdown "wiki" directory is a projection of that store.
 | `hashing` | BLAKE3 helpers, canonical JSON, text normalization, id derivation. |
 | `parsing` | Format detection and text-block extraction (Markdown via markdown-it-py, HTML via BeautifulSoup, PDF via PyMuPDF, JSON, TXT). |
 | `ingestion` | Source scan, raw hashing and change classification, including rename pairing. |
-| `claims` | Segmentation into passages, the extractor protocol, the heuristic extractor, claim normalization and deterministic claim matching. |
+| `claims` | Segmentation into passages and sentences, the heuristic extractor, sentence-grounded reuse planning (`plan_reuse`), claim normalization and deterministic claim matching. |
 | `artifacts` | Pydantic models for every artifact kind; content hashing; dependency derivation from content. |
 | `graph` | Dependency-edge queries, reverse/transitive traversal, cycle detection and export (JSON, DOT, React Flow) on NetworkX. |
 | `invalidation` | Builds the plan: the affected set, rebuild categories and LLM-call estimates. |

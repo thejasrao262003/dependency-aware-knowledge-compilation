@@ -65,13 +65,14 @@ class PassageArt(Artifact):
     text_hash: str = ""
     heading: str = ""
     occurrence: int = 0
+    extracted_by: str = ""  # fingerprint of the extractor whose claims this passage supports
     kind: ClassVar[str] = "passage"
 
     def content(self):
         return {"text": self.text}
 
     def payload(self):
-        return {"source_id": self.source_id, "text": self.text, "text_hash": self.text_hash, "heading": self.heading, "occurrence": self.occurrence}
+        return {"source_id": self.source_id, "text": self.text, "text_hash": self.text_hash, "heading": self.heading, "occurrence": self.occurrence, "extracted_by": self.extracted_by}
 
     def deps(self):
         return [(self.source_id, "from_source")]
@@ -240,7 +241,7 @@ class IndexArt(Artifact):
 
 def from_payload(kind: str, id_: str, p: dict[str, Any]) -> Artifact:
     if kind == "passage":
-        return PassageArt(id_, p["source_id"], p["text"], p["text_hash"], p.get("heading", ""), p.get("occurrence", 0))
+        return PassageArt(id_, p["source_id"], p["text"], p["text_hash"], p.get("heading", ""), p.get("occurrence", 0), p.get("extracted_by", ""))
     if kind == "claim":
         return ClaimArt(id_, tuple((s[0], s[1], tuple(s[2])) for s in p["supports"]))
     if kind == "entity":
@@ -284,13 +285,15 @@ class Usage:
     cache_hits: int = 0
     by_stage: dict[str, int] = field(default_factory=dict)
 
-    def add(self, stage: str, *, llm: bool, input_tokens: int = 0, output_tokens: int = 0) -> None:
-        self.calls += 1
+    def add(self, stage: str, *, llm: bool, input_tokens: int = 0, output_tokens: int = 0, calls: int = 1) -> None:
+        self.calls += calls
         if llm:
-            self.llm_calls += 1
+            self.llm_calls += calls
         self.input_tokens += input_tokens
         self.output_tokens += output_tokens
         self.by_stage[stage] = self.by_stage.get(stage, 0) + 1
+        if calls > 1:
+            self.by_stage[f"{stage}_retry"] = self.by_stage.get(f"{stage}_retry", 0) + calls - 1
 
     def as_dict(self) -> dict[str, Any]:
         return {

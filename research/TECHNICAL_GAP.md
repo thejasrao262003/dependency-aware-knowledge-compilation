@@ -78,20 +78,32 @@ The contribution is applying them correctly to LLM knowledge compilation, at
 claim granularity, with a test oracle. Riverbank shows the idea is easy to
 describe and easy to get wrong.
 
-### Known risk to the claim-level advantage
+### Known risk to the claim-level advantage, and how it was addressed
 
-Claim-level early cutoff depends on the extractor reproducing the same
-normalized text for unchanged facts when a paragraph is re-extracted. The
-deterministic and heuristic extractors do this by construction. An LLM may
-paraphrase. Mitigations:
+Claim-level early cutoff needs unchanged facts to keep identical claim ids
+when an edited paragraph is processed again. Deterministic extractors
+guarantee this. A real LLM does not. Measured with one hosted model
+(`gpt-4o-mini`, temperature 0), re-extracting an *unedited* paragraph of
+natural technical text reproduced only about half of its claims verbatim.
 
-- re-extract only *changed* passages (unchanged ones never reach the LLM);
-- pass the previous claims of the edited passage as anchors in the prompt
-  (`src/dakc/providers/llm.py`, `LLMExtractor`).
+1. **First attempt (rejected): anchoring.** Showing the model its previous
+   claims and asking it to reuse their wording. Measured: it kept stale facts
+   and missed new ones. Removed (ADR-15).
+2. **Current design: sentence-grounded reuse (ADR-17).** Claims carry the
+   sentences they come from. When a paragraph changes, claims of unchanged
+   sentences are reused verbatim, and only changed sentences go to the model,
+   plus any sentence that may refer back to a changed one. Measured on the
+   same model: unchanged facts kept with identical ids rose from about 50%
+   to about 80–90% on technical and explanatory prose, with zero stale
+   claims, and extraction output tokens fell by roughly 40–70%.
+3. **Not adopted: trusting only the model's declared dependencies.** It
+   reached about 96–100% reuse, but in the coreference set left 5 stale claims (10% of the claims that should have been retracted),
+   because the model under-reports which sentence a pronoun depends on. The
+   conservative pattern rule stays.
 
-**This mitigation is implemented but not measured in this repository**,
-because no LLM endpoint was available during development. The benchmark
-reports the deterministic setting only and says so.
+The exact figures are generated into docs/benchmark.md (*Real-LLM
+experiment*). They come from one model and small paragraph sets, so they are
+indicative.
 
 ## 4. Can we demonstrate an improvement?
 

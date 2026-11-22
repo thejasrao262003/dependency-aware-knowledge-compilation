@@ -52,6 +52,13 @@ class Config:
             "[provider.anthropic]",
             'model = "claude-opus-5-5"',
             "",
+            "# Bring your own LLM client: a callable returning an object with",
+            "# .fingerprint and .complete(system, user, json_schema=None) -> Completion.",
+            "[provider.custom]",
+            '# factory = "my_client:make"',
+            '# path = "plugins"                     # relative to this file',
+            "",
+
             "# Map alternative spellings to one entity, e.g. \"Postgres\" = \"PostgreSQL\".",
             "[aliases]",
         ]
@@ -119,4 +126,6 @@ class Workspace:
     def provider(self, override: str | None = None) -> ProviderBundle:
         name = override or self.config.provider
         options = {} if name in ("heuristic", "mock") else dict(self.config.provider_options.get(name, {}))
+        if name == "custom" and options.get("path"):
+            options["path"] = str((self.root / options["path"]).resolve())
         return make_provider(name, options)

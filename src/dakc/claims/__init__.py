@@ -58,6 +58,9 @@ def segment(source_id: str, doc: ParsedDocument) -> list[Passage]:
 class ExtractedClaim:
     text: str
     mentions: tuple[str, ...]
+    # Indices (into split_sentences(passage)) of every sentence needed to state
+    # the claim. Empty = unknown, which makes the claim non-reusable.
+    evidence: tuple[int, ...] = ()
 
 
 _SENT_SPLIT = re.compile(r"(?<=[.!?])\s+(?=[A-Z0-9\"'(\[])")
@@ -111,7 +114,7 @@ def split_sentences(text: str) -> list[str]:
     return [s.strip() for s in _SENT_SPLIT.split(text) if s.strip()]
 
 
-def heuristic_extract(passage_text: str) -> list[ExtractedClaim]:
+def heuristic_extract(passage_text: str, targets: tuple[int, ...] | None = None) -> list[ExtractedClaim]:
     """Deterministic claim extraction: sentences with >= 2 words and >= 1 entity.
 
     A baseline, not an NLP pipeline: any capitalized or camel-case term is an
@@ -120,13 +123,87 @@ def heuristic_extract(passage_text: str) -> list[ExtractedClaim]:
     guarantees do not depend on which extractor is used.
     """
     claims: list[ExtractedClaim] = []
-    for sentence in split_sentences(passage_text):
+    wanted = None if targets is None else set(targets)
+    for i, sentence in enumerate(split_sentences(passage_text)):
+        if wanted is not None and i not in wanted:
+            continue
         if len(_TOKEN.findall(sentence)) < 2:
             continue
         mentions = extract_mentions(sentence)
         if mentions:
-            claims.append(ExtractedClaim(sentence, mentions))
+            claims.append(ExtractedClaim(sentence, mentions, (i,)))
     return claims
+
+
+# --------------------------------------------------------------------------- #
+# Sentence-grounded reuse
+# --------------------------------------------------------------------------- #
+#
+# When a passage changes, claims whose evidence sentences are all unchanged are
+# reused verbatim instead of being re-generated (an LLM would reword them and
+# give them new ids). Only changed sentences are sent for extraction. A sentence
+# whose meaning may depend on an earlier sentence (pronouns, "the X" references,
+# continuation words) is treated as changed whenever an earlier sentence in the
+# passage changed.
+
+_ANAPHORA = re.compile(
+    r"\b(it|its|itself|they|them|their|theirs|themselves|he|him|his|she|her|hers|this|that|these|those|"
+    r"such|former|latter|there|here|both|each|either|neither|same|above|below|aforementioned)\b",
+    re.IGNORECASE,
+)
+_DEFINITE_START = re.compile(r"^(?:the|this|that|these|those|its|their)\s+[a-z]", re.IGNORECASE)
+_CONTINUATION_START = re.compile(r"^(?:also|however|instead|otherwise|then|therefore|thus|so|but|and|or|which|whereas)\b", re.IGNORECASE)
+
+
+def sentence_key(sentence: str) -> str:
+    return h(normalize_text(sentence))
+
+
+def is_context_dependent(sentence: str) -> bool:
+    """Conservative: may the sentence's meaning depend on an earlier sentence?"""
+    return bool(_ANAPHORA.search(sentence) or _DEFINITE_START.match(sentence) or _CONTINUATION_START.match(sentence))
+
+
+def plan_reuse(
+    prior: list[tuple[str, tuple[str, ...], tuple[str, ...]]],
+    prior_sentence_keys: set[str],
+    passage_text: str,
+    context_rule: bool = True,
+) -> tuple[list[ExtractedClaim], list[int]]:
+    """Decide which prior claims can be reused for a new passage version.
+
+    ``prior``: (claim text, mentions, evidence sentence keys) from extractions of
+    the passage versions being replaced. ``prior_sentence_keys``: keys of every
+    sentence in those versions. Returns (reused claims with evidence remapped to
+    the new sentence indices, indices of sentences that must be extracted).
+
+    ``context_rule=False`` relies only on the extractor's declared evidence
+    (a claim is reused only if every sentence it depends on is unchanged) and
+    skips the pattern-based re-extraction of context-dependent sentences.
+    """
+    sents = split_sentences(passage_text)
+    keys = [sentence_key(x) for x in sents]
+    dirty: set[int] = {i for i, k in enumerate(keys) if k not in prior_sentence_keys}
+    if context_rule:
+        for i, sentence in enumerate(sents):
+            if i not in dirty and is_context_dependent(sentence) and any(j < i for j in dirty):
+                dirty.add(i)
+    dirty_keys = {keys[i] for i in dirty}
+    clean_pos: dict[str, int] = {}
+    for i, k in enumerate(keys):
+        if i not in dirty and k not in dirty_keys:
+            clean_pos.setdefault(k, i)
+    reused: list[ExtractedClaim] = []
+    seen: set[str] = set()
+    for text, mentions, ev_keys in prior:
+        if not ev_keys or not all(k in clean_pos for k in ev_keys):
+            continue
+        ident = normalize_claim(text)
+        if ident in seen:
+            continue
+        seen.add(ident)
+        reused.append(ExtractedClaim(text, tuple(mentions), tuple(sorted({clean_pos[k] for k in ev_keys}))))
+    return reused, sorted(dirty)
 
 
 # --------------------------------------------------------------------------- #

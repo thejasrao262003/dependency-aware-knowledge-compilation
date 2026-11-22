@@ -63,9 +63,14 @@ def normalize_text(text: str) -> str:
     return _WS.sub(" ", text).strip()
 
 
+_COSMETIC = re.compile(r"[\"'`*_]")
+
+
 def normalize_claim(text: str) -> str:
-    """Identity form of a claim: normalized, case-folded, no trailing punctuation."""
-    return _TRAILING.sub("", normalize_text(text).casefold())
+    """Identity form of a claim: normalized, case-folded, without quote/markdown
+    characters and trailing punctuation (wording noise that does not change the fact)."""
+    text = _COSMETIC.sub("", normalize_text(text).casefold())
+    return _TRAILING.sub("", _WS.sub(" ", text).strip())
 
 
 def claim_id(text: str) -> str:

@@ -38,7 +38,7 @@ from dakc.artifacts import (
     SummaryArt,
     Usage,
 )
-from dakc.claims import ExtractedClaim, match_revisions, segment
+from dakc.claims import ExtractedClaim, match_revisions, plan_reuse, segment, sentence_key, split_sentences
 from dakc.hashing import claim_id, entity_key, h, h_obj, normalize_claim, normalize_text, slugify
 from dakc.ingestion import FileInfo, ScanResult, SourceRecord, new_source_id, scan
 from dakc.parsing import ParseError, parse_bytes
@@ -48,7 +48,6 @@ from dakc.transactions import ChangeSet, FaultInjector, commit
 
 STRATEGIES = ("dakc", "file", "full")
 RELATED_LIMIT = 10
-ANCHOR_LIMIT = 40
 T = TypeVar("T")
 R = TypeVar("R")
 
@@ -143,6 +142,7 @@ class Compiler:
         dry_run: bool = False,
         fault: FaultInjector | None = None,
         exclude: tuple[Path, ...] = (),
+        sentence_reuse: bool = True,
     ):
         if strategy not in STRATEGIES:
             raise ValueError(f"strategy must be one of {STRATEGIES}")
@@ -157,6 +157,7 @@ class Compiler:
         self.fault = fault or FaultInjector()
         self.exclude = exclude
         self.forced = strategy in ("file", "full")
+        self.sentence_reuse = sentence_reuse
 
     # ================================================================== run
     def run(self) -> tuple[BuildReport, KBState | None]:
@@ -256,7 +257,7 @@ class Compiler:
                 to_parse.append((sid, sr.files[old.sources[sid].path]))
 
         added: dict[str, PassageArt] = {}
-        anchors_by_source: dict[str, tuple[str, ...]] = {}
+        gone_by_source: dict[str, set[str]] = defaultdict(set)  # replaced passage versions, for sentence reuse
         for sid, info in sorted(to_parse, key=lambda t: t[1].path):
             raw = info.abspath.read_bytes()
             if h(raw) != info.raw_hash:
@@ -277,57 +278,108 @@ class Compiler:
             else:
                 gone, fresh = old_pids - set(new_by_id), set(new_by_id) - old_pids
             removed_pids |= gone
+            gone_by_source[sid] |= gone
             for pid in fresh:
                 p = new_by_id[pid]
-                added[pid] = PassageArt(pid, sid, p.text, p.text_hash, p.heading, p.occurrence)
-            if gone and not P.extractor.free:
-                prior = sorted({claims[c].text for pid in gone for c in claims_by_passage.get(pid, ()) if c in claims})
-                anchors_by_source[sid] = tuple(prior[:ANCHOR_LIMIT])
+                added[pid] = PassageArt(pid, sid, p.text, p.text_hash, p.heading, p.occurrence, P.extractor.fingerprint)
         report.counts["sources_processed"] = len(to_parse)
+
+        # Passages whose claims came from a different extractor (model, prompt or
+        # algorithm changed) are stale even though their text is unchanged.
+        for pid in sorted(passages):
+            p = passages[pid]
+            if pid not in removed_pids and pid not in added and p.extracted_by != P.extractor.fingerprint:
+                removed_pids.add(pid)
+                added[pid] = replace(p, extracted_by=P.extractor.fingerprint)
+                report.op("extractor_changed", pid)
 
         # --------------------------------------------------------- extraction
         ex = P.extractor
-        keys = {pid: h(f"{ex.fingerprint}\x00{p.text_hash}") for pid, p in added.items()}
-        cached = {} if self.forced else self.store.cache_get_many(set(keys.values()))
+
+        def cache_key(text_hash: str) -> str:
+            return h(f"{ex.fingerprint}\x00{text_hash}")
+
+        reuse = self.sentence_reuse and not self.forced
+        prior_keys_needed = {
+            cache_key(base_passages[g].text_hash) for gs in gone_by_source.values() for g in gs if g in base_passages
+        } if reuse else set()
+        keys = {pid: cache_key(p.text_hash) for pid, p in added.items()}
+        cached = {} if self.forced else self.store.cache_get_many(set(keys.values()) | prior_keys_needed)
+
+        def from_cache(entries: list, text: str) -> list[ExtractedClaim]:
+            pos = {}
+            for i, x in enumerate(split_sentences(text)):
+                pos.setdefault(sentence_key(x), i)
+            return [ExtractedClaim(e[0], tuple(e[1]), tuple(sorted(pos[k] for k in (e[2] if len(e) > 2 else []) if k in pos))) for e in entries]
+
+        def to_cache(claims_: list[ExtractedClaim], text: str) -> list:
+            skeys = [sentence_key(x) for x in split_sentences(text)]
+            return [[c.text, list(c.mentions), [skeys[i] for i in c.evidence if 0 <= i < len(skeys)]] for c in claims_]
+
         results: dict[str, list[ExtractedClaim] | None] = {}
-        to_call: list[PassageArt] = []
+        to_call: list[tuple[PassageArt, tuple[int, ...] | None, list[ExtractedClaim]]] = []
+        pending: list[tuple[str, list]] = []
+        n_sentences_reused = n_sentences_extracted = 0
         for pid in sorted(added):
-            key = keys[pid]
-            if key in cached:
+            p = added[pid]
+            if keys[pid] in cached:
                 report.usage.cache_hits += 1
-                results[pid] = [ExtractedClaim(t, tuple(m)) for t, m in cached[key]]
+                results[pid] = from_cache(cached[keys[pid]], p.text)
                 report.op("extraction_cache_hit", pid)
+                continue
+            targets: tuple[int, ...] | None = None
+            reused: list[ExtractedClaim] = []
+            if reuse and gone_by_source.get(p.source_id):
+                prior, prior_sentence_keys = [], set()
+                for g in gone_by_source[p.source_id]:
+                    gp = base_passages.get(g)
+                    entries = cached.get(cache_key(gp.text_hash)) if gp else None
+                    if entries is None:
+                        continue  # no evidence for this version: its sentences count as new
+                    prior += [(e[0], tuple(e[1]), tuple(e[2])) for e in entries if len(e) > 2]
+                    prior_sentence_keys |= {sentence_key(x) for x in split_sentences(gp.text)}
+                if prior_sentence_keys:
+                    reused, dirty = plan_reuse(prior, prior_sentence_keys, p.text)
+                    targets = tuple(dirty)
+                    n_sentences_reused += len(split_sentences(p.text)) - len(dirty)
+            if targets == ():
+                results[pid] = reused
+                report.op("sentence_reuse_only", pid)
+                if not self.dry_run:
+                    pending.append((keys[pid], to_cache(reused, p.text)))
             else:
-                to_call.append(added[pid])
-        for p in to_call:
-            report.op("reextract", p.id)
+                n_sentences_extracted += len(targets) if targets is not None else len(split_sentences(p.text))
+                to_call.append((p, targets, reused))
+                report.op("reextract", pid)
+        report.counts["sentences_reused"] = n_sentences_reused
+        report.counts["sentences_extracted"] = n_sentences_extracted
+
         if self.dry_run and not ex.free:
             report.exact = False
             report.planned_llm_calls["extract"] = len(to_call)
-            for p in to_call:
-                results[p.id] = None
+            for p, _t, reused in to_call:
+                results[p.id] = None if not reused else reused
         else:
-            def do_extract(p: PassageArt):
-                return ex.extract(p.text, anchors_by_source.get(p.source_id, ()))
-
             # Cache rows are content-addressed facts about provider output, not
             # knowledge: they are flushed even if the build later fails, so a
             # retry does not pay for the same extraction twice.
-            pending: list[tuple[str, list]] = []
             try:
-                for p, res in self._map(do_extract, to_call, ex.is_llm, "extract"):
-                    report.usage.add("extract", llm=ex.is_llm, input_tokens=res.input_tokens, output_tokens=res.output_tokens)
-                    results[p.id] = res.claims
+                for (p, targets, reused), res in self._map(lambda it: ex.extract(it[0].text, it[1]), to_call, ex.is_llm, "extract"):
+                    report.usage.add("extract", llm=ex.is_llm, input_tokens=res.input_tokens, output_tokens=res.output_tokens, calls=getattr(res, "calls", 1))
+                    seen = {claim_id(c.text) for c in reused}
+                    merged = list(reused) + [c for c in res.claims if claim_id(c.text) not in seen]
+                    results[p.id] = merged
+                    report.counts["claims_from_provider"] = report.counts.get("claims_from_provider", 0) + len(res.claims)
                     if not self.dry_run:
-                        pending.append((keys[p.id], [[c.text, list(c.mentions)] for c in res.claims]))
+                        pending.append((keys[p.id], to_cache(merged, p.text)))
                         if len(pending) >= 512:
                             self.store.cache_put_many(pending, ex.fingerprint)
                             pending.clear()
             finally:
-                if pending:
+                if pending and not self.dry_run:
                     self.store.cache_put_many(pending, ex.fingerprint)
         report.counts["claims_extracted"] = sum(len(v) for v in results.values() if v)
-        report.counts["claims_from_provider"] = sum(len(results[p.id] or ()) for p in to_call)
+        report.counts.setdefault("claims_from_provider", 0)
 
         # ------------------------------------------------------------- claims
         touched_claims: set[str] = set()

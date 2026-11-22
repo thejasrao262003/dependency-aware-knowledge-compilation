@@ -149,7 +149,7 @@ def test_dry_run_with_llm_provider_is_an_upper_bound_without_calls(kb):
     class Boom:
         free = False
         is_llm = True
-        fingerprint = "heuristic-extractor/2"  # same fingerprint: cache keys line up
+        fingerprint = __import__("dakc.providers.deterministic", fromlist=["x"]).HeuristicExtractor.fingerprint  # cache keys line up
 
         def extract(self, *a, **k):
             raise AssertionError("dry run must not call a paid provider")
@@ -220,3 +220,93 @@ def test_process_killed_mid_commit_leaves_previous_build_intact(tmp_path):
     rep = compile_once(store, tmp_path / "knowledge")
     assert store.build(running[0].id).status == "aborted"
     assert rep.status == "committed"
+
+
+def test_extractor_change_reextracts_unchanged_passages(kb, tmp_path):
+    """A new model/prompt/algorithm invalidates every claim it would have produced."""
+    from dakc.providers.deterministic import HeuristicExtractor
+
+    src, store = kb
+    write_files(src, POSTGRES_DOCS)
+    compile_once(store, src)
+    n_passages = len(store.load_state().of("passage"))
+
+    class NewExtractor(HeuristicExtractor):
+        fingerprint = "heuristic-extractor/99"
+
+    bundle = make_provider("mock")
+    bundle.extractor = NewExtractor(as_llm=True)
+    rep, _ = Compiler(store, bundle, src).run()
+    assert rep.n("extractor_changed") == n_passages
+    assert rep.usage.by_stage["extract"] == n_passages
+    assert rep.n("regenerate_page") == 0, "same claims -> pages cut off"
+    assert all(p.extracted_by == "heuristic-extractor/99" for p in store.load_state().of("passage").values())
+    again, _ = Compiler(store, bundle, src).run()
+    assert again.status == "noop"
+
+
+class RewordingExtractor:
+    """Imitates an LLM: correct claims, but worded differently on every call."""
+
+    fingerprint = "rewording-extractor/1"
+    is_llm = True
+    free = True  # deterministic per call count; safe for these tests
+
+    def __init__(self):
+        self.calls, self.targets = 0, []
+
+    def extract(self, passage_text, targets=None):
+        from dakc.claims import heuristic_extract
+        from dakc.providers.base import ExtractResult
+
+        self.calls += 1
+        self.targets.append(targets)
+        out = [type(c)(c.text.rstrip(".") + f" (wording {self.calls}).", c.mentions, c.evidence) for c in heuristic_extract(passage_text, targets)]
+        return ExtractResult(out, 10, 5)
+
+
+def _bundle_with(extractor):
+    b = make_provider("mock")
+    b.extractor = extractor
+    return b
+
+
+@pytest.mark.parametrize("sentence_reuse", [True, False])
+def test_unchanged_sentences_keep_claim_ids_despite_rewording(kb, sentence_reuse):
+    src, store = kb
+    write_files(src, {"db.md": "PostgreSQL supports Transactions. Redis caches Sessions. Kafka streams Events.\n"})
+    ex = RewordingExtractor()
+    Compiler(store, _bundle_with(ex), src, sentence_reuse=sentence_reuse).run()
+    before = versions(store)
+    write_files(src, {"db.md": "PostgreSQL supports Transactions. Redis caches Carts. Kafka streams Events.\n"})
+    rep, _ = Compiler(store, _bundle_with(ex), src, sentence_reuse=sentence_reuse).run()
+    after = versions(store)
+    if sentence_reuse:
+        assert ex.targets[-1] == (1,), "only the edited sentence is sent to the extractor"
+        assert sorted(rep.ops["regenerate_page"]) == ["page:carts", "page:redis"]
+        assert after["page:kafka"] == before["page:kafka"] and after["page:postgresql"] == before["page:postgresql"]
+    else:
+        assert ex.targets[-1] is None
+        assert {"page:kafka", "page:postgresql"} <= set(rep.ops["regenerate_page"]), "reworded claims look like changes"
+
+
+def test_sentence_deletion_needs_no_extraction_call(kb):
+    src, store = kb
+    write_files(src, {"db.md": "PostgreSQL supports Transactions. Redis caches Sessions. Kafka streams Events.\n"})
+    ex = RewordingExtractor()
+    Compiler(store, _bundle_with(ex), src).run()
+    calls = ex.calls
+    write_files(src, {"db.md": "PostgreSQL supports Transactions. Kafka streams Events.\n"})
+    rep, _ = Compiler(store, _bundle_with(ex), src).run()
+    assert ex.calls == calls and rep.n("sentence_reuse_only") == 1
+    assert store.current_artifact("page:redis") is None and store.current_artifact("page:kafka") is not None
+
+
+def test_pronoun_sentence_is_reextracted_when_its_antecedent_changes(kb):
+    src, store = kb
+    write_files(src, {"db.md": "PostgreSQL is the primary Database. It supports JSONB. Kafka streams Events.\n"})
+    ex = RewordingExtractor()
+    Compiler(store, _bundle_with(ex), src).run()
+    write_files(src, {"db.md": "MySQL is the primary Database. It supports JSONB. Kafka streams Events.\n"})
+    Compiler(store, _bundle_with(ex), src).run()
+    assert ex.targets[-1] == (0, 1)

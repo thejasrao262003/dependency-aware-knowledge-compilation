@@ -16,7 +16,7 @@ from typing import Protocol
 
 import httpx
 
-from dakc.claims import ExtractedClaim
+from dakc.claims import ExtractedClaim, split_sentences
 from dakc.hashing import h
 from dakc.providers.base import ClaimView, ExtractResult, GenResult, PageLead
 
@@ -44,13 +44,16 @@ class LLMClient(Protocol):
 # --------------------------------------------------------------------------- #
 
 EXTRACT_SYSTEM = """You extract atomic factual claims from one passage of a document, for a knowledge base.
+The passage is given as numbered sentences.
 Rules:
 - Each claim is one self-contained declarative sentence stated by the passage. Prefer the passage's own wording.
 - Replace pronouns with the named subject so each claim stands alone.
-- For each claim, list the named entities it mentions (people, organizations, products, technologies, places, named concepts), spelled as in the passage.
+- For each claim, list at least one entity it is about: named entities (people, organizations, products, technologies, places) and specific technical concepts (a component, feature, protocol or format, e.g. "file watcher"), spelled as in the passage. Do not list generic words such as "size" or "data".
+- For each claim, list in "sentences" the numbers of every sentence needed to state it, including any sentence that identifies what a pronoun or a phrase such as "the service" refers to.
 - Skip opinions, questions, instructions, navigation text and boilerplate.
-- If the passage states no facts, return an empty list.
-Respond only with JSON of the form {"claims": [{"text": "...", "entities": ["..."]}]}."""
+- If asked for claims of specific sentences only, return only claims that those sentences state at least in part; use the other sentences only as context.
+- If there are no such facts, return an empty list.
+Respond only with JSON of the form {"claims": [{"text": "...", "entities": ["..."], "sentences": [1]}]}."""
 
 EXTRACT_SCHEMA = {
     "type": "object",
@@ -62,8 +65,9 @@ EXTRACT_SCHEMA = {
                 "properties": {
                     "text": {"type": "string"},
                     "entities": {"type": "array", "items": {"type": "string"}},
+                    "sentences": {"type": "array", "items": {"type": "integer"}},
                 },
-                "required": ["text", "entities"],
+                "required": ["text", "entities", "sentences"],
                 "additionalProperties": False,
             },
         }
@@ -102,7 +106,21 @@ def _parse_json_object(text: str) -> dict:
         raise ProviderError(f"invalid JSON from model: {exc}") from exc
 
 
+JSON_REPAIR = (
+    "\n\nYour previous answer was not valid JSON. Answer again with only a valid JSON object: "
+    "escape every double quote and backslash inside strings, no comments, no trailing commas."
+)
+
+
 class LLMExtractor:
+    """LLM claim extraction over numbered sentences, with per-claim sentence evidence.
+
+    With ``targets``, the model sees the whole passage but extracts only claims
+    stated by the target sentences; DAKC reuses the cached claims of every other
+    (unchanged) sentence verbatim, so their ids cannot drift (see
+    ``dakc.claims.plan_reuse``).
+    """
+
     is_llm = True
     free = False
 
@@ -110,25 +128,41 @@ class LLMExtractor:
         self.client = client
         self.fingerprint = _fp("llm-extractor", client, EXTRACT_SYSTEM + json.dumps(EXTRACT_SCHEMA, sort_keys=True))
 
-    def extract(self, passage_text: str, anchors: tuple[str, ...] = ()) -> ExtractResult:
-        user = ""
-        if anchors:
-            # Anchoring: unchanged facts keep their exact wording, so they keep
-            # their content-addressed claim id and stop invalidation early.
+    def extract(self, passage_text: str, targets: tuple[int, ...] | None = None) -> ExtractResult:
+        sents = split_sentences(passage_text)
+        numbered = "\n".join(f"[{i + 1}] {x}" for i, x in enumerate(sents))
+        user = f"Passage (numbered sentences):\n<<<\n{numbered}\n>>>\n\n"
+        wanted = sorted(set(targets)) if targets is not None else list(range(len(sents)))
+        if targets is not None:
             user += (
-                "Claims extracted from an earlier version of this passage. When one of these facts is "
-                "still stated, reuse its wording exactly:\n" + "\n".join(f"- {a}" for a in anchors) + "\n\n"
+                f"Extract only the claims stated, at least in part, by sentence(s) {', '.join(str(i + 1) for i in wanted)}. "
+                "The other sentences are context only."
             )
-        user += f"Passage:\n<<<\n{passage_text}\n>>>"
-        c = self.client.complete(EXTRACT_SYSTEM, user, json_schema=EXTRACT_SCHEMA)
-        data = _parse_json_object(c.text)
+        else:
+            user += "Extract all claims."
+        tokens_in = tokens_out = calls = 0
+        for attempt in range(2):
+            prompt = user if attempt == 0 else user + JSON_REPAIR
+            c = self.client.complete(EXTRACT_SYSTEM, prompt, json_schema=EXTRACT_SCHEMA)
+            tokens_in, tokens_out, calls = tokens_in + c.input_tokens, tokens_out + c.output_tokens, calls + 1
+            try:
+                data = _parse_json_object(c.text)
+                break
+            except ProviderError:
+                if attempt == 1:
+                    raise
         claims: list[ExtractedClaim] = []
         for item in data.get("claims", []):
             text = str(item.get("text", "")).strip()
             ents = tuple(sorted({str(e).strip() for e in item.get("entities", []) if str(e).strip()}))
+            evidence = tuple(sorted({int(n) - 1 for n in item.get("sentences", []) if str(n).lstrip("-").isdigit() and 1 <= int(n) <= len(sents)}))
+            if not evidence:
+                evidence = tuple(wanted)  # unknown provenance: conservatively depend on every target sentence
+            if targets is not None and not set(evidence) & set(wanted):
+                continue  # states only context sentences, whose claims DAKC reuses
             if text and ents:
-                claims.append(ExtractedClaim(text, ents))
-        return ExtractResult(claims, c.input_tokens, c.output_tokens)
+                claims.append(ExtractedClaim(text, ents, evidence))
+        return ExtractResult(claims, tokens_in, tokens_out, calls)
 
 
 class LLMPageWriter:

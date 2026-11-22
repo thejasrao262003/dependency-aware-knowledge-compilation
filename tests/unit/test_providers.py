@@ -6,6 +6,7 @@ not and cannot verify any real model's behaviour.
 """
 
 import json
+from pathlib import Path
 from types import SimpleNamespace
 
 import httpx
@@ -32,21 +33,30 @@ def chat_response(content: str, finish="stop", usage=(11, 7)):
     })
 
 
-def test_openai_extractor_parses_json_and_sends_anchors():
+def test_openai_extractor_numbered_sentences_targets_and_evidence():
     seen = {}
 
     def handler(request: httpx.Request):
         body = json.loads(request.content)
         seen["body"] = body
-        return chat_response('```json\n{"claims": [{"text": "PostgreSQL supports JSONB.", "entities": ["PostgreSQL", "JSONB"]}, {"text": "No entities here.", "entities": []}]}\n```')
+        return chat_response('```json\n{"claims": ['
+                             '{"text": "PostgreSQL supports JSONB.", "entities": ["PostgreSQL", "JSONB"], "sentences": [2]},'
+                             '{"text": "PostgreSQL is a database.", "entities": ["PostgreSQL"], "sentences": [1]},'
+                             '{"text": "PostgreSQL is fast.", "entities": ["PostgreSQL"], "sentences": []},'
+                             '{"text": "No entities here.", "entities": [], "sentences": [2]}]}\n```')
 
     ex = LLMExtractor(fake_openai(handler))
-    res = ex.extract("PostgreSQL supports JSONB.", anchors=("PostgreSQL supports Transactions.",))
-    assert [c.text for c in res.claims] == ["PostgreSQL supports JSONB."]  # claims without entities dropped
+    res = ex.extract("PostgreSQL is a database. It supports JSONB.", targets=(1,))
+    user = seen["body"]["messages"][1]["content"]
+    assert "[1] PostgreSQL is a database.\n[2] It supports JSONB." in user
+    assert "by sentence(s) 2" in user and "context only" in user
+    # claim citing only the context sentence (1) is dropped; missing evidence -> the targets
+    assert [(c.text, c.evidence) for c in res.claims] == [("PostgreSQL supports JSONB.", (1,)), ("PostgreSQL is fast.", (1,))]
     assert res.claims[0].mentions == ("JSONB", "PostgreSQL")
     assert (res.input_tokens, res.output_tokens) == (11, 7)
-    user = seen["body"]["messages"][1]["content"]
-    assert "reuse its wording exactly" in user and "PostgreSQL supports Transactions." in user
+    full = ex.extract("PostgreSQL is a database. It supports JSONB.")
+    assert "Extract all claims." in seen["body"]["messages"][1]["content"]
+    assert [c.evidence for c in full.claims] == [(1,), (0,), (0, 1)]
     assert seen["body"]["temperature"] == 0.0 and seen["body"]["seed"] == 0
 
 
@@ -124,8 +134,11 @@ def test_compiler_llm_path_end_to_end(kb):
         body = json.loads(request.content)
         system, user = body["messages"][0]["content"], body["messages"][1]["content"]
         if "extract atomic factual claims" in system:
-            passage = user.split("<<<\n", 1)[1].split("\n>>>", 1)[0]
-            claims = [{"text": s.strip() + ".", "entities": [w for w in s.split() if w[:1].isupper()]} for s in passage.split(".") if s.strip()]
+            lines = user.split("<<<\n", 1)[1].split("\n>>>", 1)[0].splitlines()
+            claims = []
+            for line in lines:
+                n, text = line[1:].split("] ", 1)
+                claims.append({"text": text, "entities": [w.strip(".") for w in text.split() if w[:1].isupper()], "sentences": [int(n)]})
             return chat_response(json.dumps({"claims": claims}))
         if "wiki pages" in system:
             return chat_response("A short lead paragraph [^C1].\n\n## Details\n\nMore text [^C1].")
@@ -143,3 +156,40 @@ def test_compiler_llm_path_end_to_end(kb):
     plan, _ = Compiler(store, bundle, src, dry_run=True).run()
     assert not plan.exact and plan.usage.calls == 0
     assert plan.planned_llm_calls["extract"] == 1
+
+
+def test_custom_provider_loads_factory_from_workspace_path(tmp_path):
+    import shutil
+
+    from dakc.compiler import Compiler
+    from dakc.workspace import Workspace
+
+    fixtures = tmp_path / "plugins"
+    fixtures.mkdir()
+    shutil.copy(Path(__file__).parents[1] / "fixtures" / "fake_custom_client.py", fixtures / "byo_client.py")
+    write_files(tmp_path / "knowledge", POSTGRES_DOCS)
+    ws = Workspace.init(tmp_path, provider="custom")
+    ws.config.provider_options["custom"] = {"factory": "byo_client:make", "path": "plugins", "options": {"model": "m1"}}
+    bundle = ws.provider()
+    assert bundle.extractor.fingerprint.startswith("llm-extractor/1:echo:m1:")
+    rep, _ = Compiler(ws.store(), bundle, ws.source_root).run()
+    assert rep.status == "committed" and rep.usage.llm_calls > 0
+
+
+def test_custom_provider_errors():
+    from dakc.providers import make_provider
+
+    with pytest.raises(ProviderError, match="factory"):
+        make_provider("custom", {})
+    with pytest.raises(ProviderError, match="cannot load"):
+        make_provider("custom", {"factory": "no_such_module_xyz:make"})
+
+
+def test_invalid_json_is_repaired_once_and_counted():
+    replies = iter(['{"claims": [{"text": "Kafka "streams" events.", "entities": ["Kafka"]}]}',
+                    '{"claims": [{"text": "Kafka streams events.", "entities": ["Kafka"]}]}'])
+    res = LLMExtractor(fake_openai(lambda r: chat_response(next(replies)))).extract("Kafka streams events.")
+    assert res.calls == 2 and [c.text for c in res.claims] == ["Kafka streams events."]
+    assert (res.input_tokens, res.output_tokens) == (22, 14)
+    with pytest.raises(ProviderError):
+        LLMExtractor(fake_openai(lambda r: chat_response('{"claims": [oops]}'))).extract("x")

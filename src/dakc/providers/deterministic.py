@@ -19,14 +19,14 @@ SUMMARY_OVERHEAD = "Write a short topic overview from these page leads. " * 3
 
 
 class HeuristicExtractor:
-    fingerprint = "heuristic-extractor/2"
+    fingerprint = "heuristic-extractor/3"
     free = True
 
     def __init__(self, as_llm: bool = False):
         self.is_llm = as_llm
 
-    def extract(self, passage_text: str, anchors: tuple[str, ...] = ()) -> ExtractResult:
-        claims = heuristic_extract(passage_text)
+    def extract(self, passage_text: str, targets: tuple[int, ...] | None = None) -> ExtractResult:
+        claims = heuristic_extract(passage_text, targets)
         out_text = "\n".join(c.text + " | " + ", ".join(c.mentions) for c in claims)
         return ExtractResult(claims, estimate_tokens(EXTRACT_OVERHEAD + passage_text), estimate_tokens(out_text))
 

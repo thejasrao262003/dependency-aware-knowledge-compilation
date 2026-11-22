@@ -152,6 +152,99 @@ def render(results: dict) -> str:
     return "\n".join(out)
 
 
+def p100(x: float) -> str:
+    return f"{100 * x:.1f}%"
+
+
+def render_llm(res: dict, name: str) -> str:
+    m = res["machine"]
+    out = [
+        f"## Real-LLM experiment ({name})",
+        "",
+        f"_Generated from `benchmarks/results/{name}.json` by `python -m benchmarks.report`._",
+        "",
+        f"- Model: `{m['provider']}` (temperature 0), date {m['date']}. Token counts are **reported by the provider**, not estimated.",
+        "- Harness: `benchmarks/llm_experiment.py`. One model, small corpora: indicative, not a general result about LLMs.",
+        "",
+    ]
+    if "part_a" in res:
+        out += [
+            "### A. Does editing one sentence disturb the other facts of the paragraph?",
+            "",
+            "Each paragraph (3+ sentences) is extracted, extracted again unchanged (*repeat stability*), then one fact is "
+            "edited (an entity in one sentence replaced by an unseen one) and the new version is processed two ways. "
+            "**passage**: the whole paragraph is re-extracted (DAKC's original behaviour). **sentence**: claims of unchanged "
+            "sentences are reused verbatim and only changed or context-dependent sentences are sent to the model "
+            "(current behaviour), also re-extracting any sentence that may refer back to a changed one (pronouns, \"the X\"). "
+            "**sentence-evidence-only**: the same, but trusting only the model's declared sentence dependencies instead of "
+            "that pattern rule. *Unchanged-fact reproduction*: claims of untouched sentences kept with identical ids, "
+            "which is what lets DAKC skip their pages. *Stale retention*: old claims still stating the replaced detail "
+            "(should be 0). *New-fact capture*: paragraphs whose output states the edited fact. Paragraph sets: synthetic "
+            "sentences; code-heavy technical notes (`research/audits`); explanatory prose (this repository's design docs); "
+            "a coreference set in which the edited sentence is the antecedent of a pronoun in the next sentence.",
+            "",
+            "| Paragraph set | Paragraphs (failed) | Repeat stability | Mode | Unchanged-fact reproduction ↑ | Stale retention ↓ | New-fact capture ↑ | Output tokens |",
+            "|---|---|---|---|---|---|---|---|",
+        ]
+        for corpus, a in res["part_a"].items():
+            for i, mode in enumerate(m for m in ("passage", "sentence", "sentence-evidence-only") if m in a["modes"]):
+                r = a["modes"][mode]
+                head = (f"{corpus} | {a['paragraphs']} ({a.get('paragraphs_failed', 0)}) | {p100(a['repeat_stability'])}"
+                        if i == 0 else " | | ")
+                out.append(
+                    f"| {head} | {mode} | {p100(r['unchanged_fact_reproduction'])} | {p100(r['stale_retention'])} "
+                    f"({r['stale_claims']} of {a.get('detail_claims', 0)}) | {p100(r['new_fact_capture'])} | {r.get('tokens_out', 0):,} |"
+                )
+        total = sum(a.get("sentences_total", 0) for a in res["part_a"].values())
+        for mode in ("sentence", "sentence-evidence-only"):
+            sent = sum(a.get("sentences_sent", {}).get(mode, 0) for a in res["part_a"].values())
+            if sent:
+                out.append("")
+                out.append(f"In `{mode}` mode, {p100(sent / max(1, total))} of all sentences were sent to the model; the rest of each paragraph was reused.")
+        ex = [e for a in res["part_a"].values() for e in (a.get("stale_examples") or [])]
+        if ex:
+            out += ["", "Stale claims observed (old detail kept after the edit):", ""]
+            out += [f"- `{e['mode']}`: edited *{e['edited_sentence'][:150]}* → kept *{'; '.join(e['stale_claim_kept'])[:150]}*" for e in ex[:6]]
+        fails = [f for a in res["part_a"].values() for f in (a.get("failures") or [])]
+        if fails:
+            out += ["", "Provider failures: " + "; ".join(sorted(set(fails))[:5])]
+        out.append("")
+    if "part_b" in res:
+        b = res["part_b"]
+        f = b["full_build"]
+        out += [
+            f"### B. End-to-end incremental compilation, {b['n_docs']} synthetic documents",
+            "",
+            f"Full build with the real model: {f['llm_calls']:,} LLM calls, {f['input_tokens']:,} input / {f['output_tokens']:,} "
+            f"output tokens, {f['seconds']} s. Each scenario then starts from a copy of that store.",
+            "",
+            "| Scenario | Run | LLM calls | Tokens in / out | Claims new / retracted | Pages regenerated | Re-rendered (no LLM) | Seconds | Invariants |",
+            "|---|---|---|---|---|---|---|---|---|",
+        ]
+        s5 = []
+        order = ["file", "dakc-passage", "dakc"]
+        for key, sc in b["scenarios"].items():
+            for run in sorted(sc["runs"], key=lambda r: order.index(r) if r in order else 99):
+                r = sc["runs"][run]
+                if r.get("status") == "failed":
+                    out.append(f"| {SHORT[key]} | {run} | failed ({r['error']}) | | | | | | {'pass' if r['invariants_pass'] else 'FAIL'} |")
+                    continue
+                out.append(
+                    f"| {SHORT[key]} | {run} | {r['llm_calls']} | {r['input_tokens']:,} / {r['output_tokens']:,} | "
+                    f"{r['claims_new']} / {r['claims_retracted']} | {r['pages_regenerated']} | {r['pages_rerendered_no_llm']} | "
+                    f"{r['seconds']} | {'pass' if r['invariants_pass'] else '**FAIL**'} |"
+                )
+                if "old_value_still_claimed_by_doc" in r:
+                    s5.append((run, r))
+        if s5:
+            change = b["scenarios"]["S5_one_claim_modified"]["change"].get("claim", "")
+            out += ["", f"**Did the edited value actually change?** Scenario S5 edits `{change}`.", "",
+                    "| Run | Old value still claimed by the edited document ↓ | New value present ↑ |", "|---|---|---|"]
+            out += [f"| {run} | {'**yes (stale)**' if r['old_value_still_claimed_by_doc'] else 'no'} | {'yes' if r['new_value_claimed'] else '**no**'} |" for run, r in s5]
+        out.append("")
+    return "\n".join(out)
+
+
 README_START = "<!-- BENCHMARK:START (generated by python -m benchmarks.report) -->"
 README_END = "<!-- BENCHMARK:END -->"
 
@@ -185,16 +278,61 @@ def readme_summary(results: dict) -> str:
         for size in results["sizes"] for sc in size["scenarios"].values()
     )
     sizes = ", ".join(f"{s['n_docs']:,}" for s in results["sizes"])
+    why = {
+        "S7_contradiction": "a brand-new fact must be extracted and written under any strategy",
+        "S3_one_deleted": "retracted facts genuinely require regenerating the pages that stated them",
+        "S6_new_source_popular_entity": "new facts about a hub entity must reach its page under any strategy",
+    }
+    savings = sorted(
+        (1 - sc["strategies"]["dakc"]["llm_calls"] / sc["strategies"]["file"]["llm_calls"], key)
+        for key, sc in big["scenarios"].items() if sc["strategies"]["file"]["llm_calls"]
+    )
+    smallest = "; ".join(
+        f"{SHORT[k]}: {100 * s:.0f}%" + (f" ({why[k]})" if k in why else "") for s, k in savings[:2]
+    )
     lines += [
         "",
         f"Across all sizes ({sizes} documents) and scenarios, every strategy's result was "
         f"{'identical to an independent full rebuild' if all_eq else '**not always** identical to a full rebuild'}, and DAKC "
         f"{'never regenerated an artifact whose inputs were unchanged' if no_waste else '**did** regenerate some unchanged artifacts'}. "
-        "Deleting a source saves the least: retracted facts genuinely require regenerating the pages that stated them. "
+        f"The smallest LLM-call savings versus file-level at {n:,} documents: {smallest}. "
         "Full tables, method and caveats are in [docs/benchmark.md](docs/benchmark.md). Raw data: "
         "[benchmarks/results/latest.json](benchmarks/results/latest.json).",
-        README_END,
     ]
+    for llm_path in sorted((ROOT / "benchmarks" / "results").glob("llm-*.json")):
+        llm = json.loads(llm_path.read_text(encoding="utf-8"))
+        model = llm["machine"]["provider"].split(":", 1)[-1].strip()
+        if "part_b" in llm:
+            b = llm["part_b"]
+            lines += [
+                "",
+                f"**With a real LLM** (`{model}`, {b['n_docs']} synthetic documents; full build "
+                f"{b['full_build']['llm_calls']} calls, {b['full_build']['input_tokens']:,} input tokens). Tokens are provider-reported:",
+                "",
+                "| Scenario | LLM calls: file-level / DAKC | Input tokens: file-level / DAKC | Pages regenerated: file-level / DAKC |",
+                "|---|---|---|---|",
+            ]
+            for key, sc in b["scenarios"].items():
+                f, d = sc["runs"].get("file", {}), sc["runs"].get("dakc", {})
+                if "llm_calls" in f and "llm_calls" in d:
+                    lines.append(f"| {SHORT[key]} | {f['llm_calls']} / **{d['llm_calls']}** | {f['input_tokens']:,} / **{d['input_tokens']:,}** | {f['pages_regenerated']} / **{d['pages_regenerated']}** |")
+        if "part_a" in llm:
+            rows = llm["part_a"]
+            parts = []
+            for corpus in ("technical", "prose", "coreference"):
+                if corpus in rows:
+                    m = rows[corpus]["modes"]
+                    parts.append(
+                        f"{corpus}: {p100(m['passage']['unchanged_fact_reproduction'])} → **{p100(m['sentence']['unchanged_fact_reproduction'])}** "
+                        f"(stale {m['passage']['stale_claims']} → {m['sentence']['stale_claims']})"
+                    )
+            if parts:
+                lines += [
+                    "",
+                    "Unchanged facts kept with identical claim ids after a one-sentence edit, whole-paragraph re-extraction → "
+                    "sentence reuse: " + "; ".join(parts) + ". See *Real-LLM experiment* in docs/benchmark.md.",
+                ]
+    lines.append(README_END)
     return "\n".join(lines)
 
 
@@ -204,7 +342,10 @@ def main() -> None:
     results = json.loads(src.read_text(encoding="utf-8"))
     text = doc.read_text(encoding="utf-8")
     head = text.split("## Results", 1)[0].rstrip() + "\n\n"
-    doc.write_text(head + render(results), encoding="utf-8")
+    body = render(results)
+    for llm in sorted((ROOT / "benchmarks" / "results").glob("llm-*.json")):
+        body += "\n" + render_llm(json.loads(llm.read_text(encoding="utf-8")), llm.stem)
+    doc.write_text(head + body, encoding="utf-8")
     print(f"updated {doc}")
 
     readme = ROOT / "README.md"

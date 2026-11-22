@@ -1,0 +1,697 @@
+{
+ "fingerprints": {
+  "extractor": "llm-extractor/1:hosted-agent:gpt-4o-mini:t0.0:6753581e62",
+  "summarizer": "llm-summarizer/1:hosted-agent:gpt-4o-mini:t0.0:64882beec3",
+  "writer": "llm-writer/1:hosted-agent:gpt-4o-mini:t0.0:bdce6ea715"
+ },
+ "machine": {
+  "cpu": "Apple M5",
+  "cpu_count": 10,
+  "date": "2026-11-22T06:23:43Z",
+  "git_commit": "6c2cc88",
+  "platform": "macOS-27.2-arm64-arm-64bit",
+  "provider": "custom: hosted-agent:gpt-4o-mini:t0.0",
+  "python": "3.12.13"
+ },
+ "machine_by_part": {
+  "part_a": {
+   "cpu": "Apple M5",
+   "cpu_count": 10,
+   "date": "2026-11-22T06:23:43Z",
+   "git_commit": "6c2cc88",
+   "platform": "macOS-27.2-arm64-arm-64bit",
+   "provider": "custom: hosted-agent:gpt-4o-mini:t0.0",
+   "python": "3.12.13"
+  },
+  "part_b": {
+   "cpu": "Apple M5",
+   "cpu_count": 10,
+   "date": "2026-11-22T06:13:49Z",
+   "git_commit": "6c2cc88",
+   "platform": "macOS-27.2-arm64-arm-64bit",
+   "provider": "custom: hosted-agent:gpt-4o-mini:t0.0",
+   "python": "3.12.13"
+  }
+ },
+ "part_a": {
+  "coreference": {
+   "calls": 200,
+   "detail_claims": 50,
+   "edited_claims": 40,
+   "failures": [],
+   "modes": {
+    "passage": {
+     "calls": 40,
+     "edited_sentence_claims_unchanged": 0.0,
+     "new_fact_capture": 1.0,
+     "stale_claims": 0,
+     "stale_retention": 0.0,
+     "tokens_in": 32037,
+     "tokens_out": 3345,
+     "unchanged_fact_reproduction": 0.9344
+    },
+    "sentence": {
+     "calls": 40,
+     "edited_sentence_claims_unchanged": 0.0,
+     "new_fact_capture": 1.0,
+     "stale_claims": 0,
+     "stale_retention": 0.0,
+     "tokens_in": 32958,
+     "tokens_out": 1983,
+     "unchanged_fact_reproduction": 0.9672
+    },
+    "sentence-evidence-only": {
+     "calls": 40,
+     "edited_sentence_claims_unchanged": 0.0,
+     "new_fact_capture": 1.0,
+     "stale_claims": 5,
+     "stale_retention": 0.1,
+     "tokens_in": 32877,
+     "tokens_out": 1278,
+     "unchanged_fact_reproduction": 1.0
+    }
+   },
+   "paragraphs": 40,
+   "paragraphs_failed": 0,
+   "repeat_reproduced": 99,
+   "repeat_stability": 0.8919,
+   "sentences_sent": {
+    "sentence": 67,
+    "sentence-evidence-only": 40
+   },
+   "sentences_total": 120,
+   "stale_examples": [
+    {
+     "edited_sentence": "Atlasbridge is the main queue behind the Billing service.",
+     "mode": "sentence-evidence-only",
+     "stale_claim_kept": [
+      "Ulosql authenticates against Morogrid."
+     ]
+    },
+    {
+     "edited_sentence": "Atlasbridge is the main database behind the Identity service.",
+     "mode": "sentence-evidence-only",
+     "stale_claim_kept": [
+      "Ulosql streams data to Morogrid."
+     ]
+    },
+    {
+     "edited_sentence": "Atlasbridge is the main queue behind the Search service.",
+     "mode": "sentence-evidence-only",
+     "stale_claim_kept": [
+      "Draildock replicates to Feniovault."
+     ]
+    },
+    {
+     "edited_sentence": "Atlasbridge is the main database behind the Billing service.",
+     "mode": "sentence-evidence-only",
+     "stale_claim_kept": [
+      "Ulosql depends on Draildock."
+     ]
+    },
+    {
+     "edited_sentence": "Atlasbridge is the main scheduler behind the Billing service.",
+     "mode": "sentence-evidence-only",
+     "stale_claim_kept": [
+      "Halecast authenticates against Nexiodyn."
+     ]
+    }
+   ],
+   "tokens_in": 162028,
+   "tokens_out": 13320,
+   "unchanged_claims": 61,
+   "v1_claims": 111
+  },
+  "prose": {
+   "calls": 200,
+   "detail_claims": 31,
+   "edited_claims": 49,
+   "failures": [],
+   "modes": {
+    "passage": {
+     "calls": 40,
+     "edited_sentence_claims_unchanged": 0.1837,
+     "new_fact_capture": 0.775,
+     "stale_claims": 0,
+     "stale_retention": 0.0,
+     "tokens_in": 33603,
+     "tokens_out": 4946,
+     "unchanged_fact_reproduction": 0.5185
+    },
+    "sentence": {
+     "calls": 40,
+     "edited_sentence_claims_unchanged": 0.2041,
+     "new_fact_capture": 0.775,
+     "stale_claims": 0,
+     "stale_retention": 0.0,
+     "tokens_in": 34509,
+     "tokens_out": 2945,
+     "unchanged_fact_reproduction": 0.8765
+    },
+    "sentence-evidence-only": {
+     "calls": 40,
+     "edited_sentence_claims_unchanged": 0.1224,
+     "new_fact_capture": 0.85,
+     "stale_claims": 0,
+     "stale_retention": 0.0,
+     "tokens_in": 34443,
+     "tokens_out": 2178,
+     "unchanged_fact_reproduction": 1.0
+    }
+   },
+   "paragraphs": 40,
+   "paragraphs_failed": 0,
+   "repeat_reproduced": 75,
+   "repeat_stability": 0.5769,
+   "sentences_sent": {
+    "sentence": 62,
+    "sentence-evidence-only": 40
+   },
+   "sentences_total": 146,
+   "stale_examples": [],
+   "tokens_in": 169791,
+   "tokens_out": 20088,
+   "unchanged_claims": 81,
+   "v1_claims": 130
+  },
+  "synthetic": {
+   "calls": 190,
+   "detail_claims": 35,
+   "edited_claims": 35,
+   "failures": [],
+   "modes": {
+    "passage": {
+     "calls": 38,
+     "edited_sentence_claims_unchanged": 0.0,
+     "new_fact_capture": 1.0,
+     "stale_claims": 0,
+     "stale_retention": 0.0,
+     "tokens_in": 30725,
+     "tokens_out": 4026,
+     "unchanged_fact_reproduction": 1.0
+    },
+    "sentence": {
+     "calls": 38,
+     "edited_sentence_claims_unchanged": 0.0,
+     "new_fact_capture": 1.0,
+     "stale_claims": 0,
+     "stale_retention": 0.0,
+     "tokens_in": 31523,
+     "tokens_out": 1221,
+     "unchanged_fact_reproduction": 1.0
+    },
+    "sentence-evidence-only": {
+     "calls": 38,
+     "edited_sentence_claims_unchanged": 0.0,
+     "new_fact_capture": 1.0,
+     "stale_claims": 0,
+     "stale_retention": 0.0,
+     "tokens_in": 31523,
+     "tokens_out": 1221,
+     "unchanged_fact_reproduction": 1.0
+    }
+   },
+   "paragraphs": 38,
+   "paragraphs_failed": 0,
+   "repeat_reproduced": 111,
+   "repeat_stability": 0.881,
+   "sentences_sent": {
+    "sentence": 38,
+    "sentence-evidence-only": 38
+   },
+   "sentences_total": 135,
+   "stale_examples": [],
+   "tokens_in": 155289,
+   "tokens_out": 13998,
+   "unchanged_claims": 91,
+   "v1_claims": 126
+  },
+  "technical": {
+   "calls": 175,
+   "detail_claims": 24,
+   "edited_claims": 34,
+   "failures": [],
+   "modes": {
+    "passage": {
+     "calls": 35,
+     "edited_sentence_claims_unchanged": 0.1765,
+     "new_fact_capture": 0.7714,
+     "stale_claims": 0,
+     "stale_retention": 0.0,
+     "tokens_in": 30173,
+     "tokens_out": 4662,
+     "unchanged_fact_reproduction": 0.5059
+    },
+    "sentence": {
+     "calls": 35,
+     "edited_sentence_claims_unchanged": 0.2059,
+     "new_fact_capture": 0.8,
+     "stale_claims": 0,
+     "stale_retention": 0.0,
+     "tokens_in": 30992,
+     "tokens_out": 2719,
+     "unchanged_fact_reproduction": 0.7765
+    },
+    "sentence-evidence-only": {
+     "calls": 35,
+     "edited_sentence_claims_unchanged": 0.2353,
+     "new_fact_capture": 0.8286,
+     "stale_claims": 0,
+     "stale_retention": 0.0,
+     "tokens_in": 30908,
+     "tokens_out": 1890,
+     "unchanged_fact_reproduction": 0.9647
+    }
+   },
+   "paragraphs": 35,
+   "paragraphs_failed": 0,
+   "repeat_reproduced": 71,
+   "repeat_stability": 0.5917,
+   "sentences_sent": {
+    "sentence": 63,
+    "sentence-evidence-only": 35
+   },
+   "sentences_total": 129,
+   "stale_examples": [],
+   "tokens_in": 152443,
+   "tokens_out": 18716,
+   "unchanged_claims": 85,
+   "v1_claims": 120
+  }
+ },
+ "part_b": {
+  "full_build": {
+   "calls_by_stage": {
+    "extract": 169,
+    "page": 61,
+    "summary": 2
+   },
+   "counts": {
+    "claim": 334,
+    "edges": 1958,
+    "entity": 61,
+    "index": 1,
+    "page": 61,
+    "passage": 169,
+    "relationship": 172,
+    "source": 30,
+    "summary": 2
+   },
+   "extraction_cache_hits": 0,
+   "input_tokens": 176260,
+   "llm_calls": 232,
+   "output_tokens": 22832,
+   "provider_calls": 232,
+   "seconds": 69.97
+  },
+  "n_docs": 30,
+  "scenarios": {
+   "S0_no_change": {
+    "change": {
+     "changed": []
+    },
+    "runs": {
+     "dakc": {
+      "claims_new": 0,
+      "claims_reproduced_or_provenance_only": 0,
+      "claims_retracted": 0,
+      "input_tokens": 0,
+      "invariants_pass": true,
+      "llm_calls": 0,
+      "output_tokens": 0,
+      "pages_cutoff": 0,
+      "pages_regenerated": 0,
+      "pages_rerendered_no_llm": 0,
+      "passages_reextracted": 0,
+      "seconds": 0.02,
+      "sentences_extracted": 0,
+      "sentences_reused": 0,
+      "status": "noop",
+      "summaries_regenerated": 0
+     },
+     "dakc-passage": {
+      "claims_new": 0,
+      "claims_reproduced_or_provenance_only": 0,
+      "claims_retracted": 0,
+      "input_tokens": 0,
+      "invariants_pass": true,
+      "llm_calls": 0,
+      "output_tokens": 0,
+      "pages_cutoff": 0,
+      "pages_regenerated": 0,
+      "pages_rerendered_no_llm": 0,
+      "passages_reextracted": 0,
+      "seconds": 0.02,
+      "sentences_extracted": 0,
+      "sentences_reused": 0,
+      "status": "noop",
+      "summaries_regenerated": 0
+     },
+     "file": {
+      "claims_new": 0,
+      "claims_reproduced_or_provenance_only": 0,
+      "claims_retracted": 0,
+      "input_tokens": 0,
+      "invariants_pass": true,
+      "llm_calls": 0,
+      "output_tokens": 0,
+      "pages_cutoff": 0,
+      "pages_regenerated": 0,
+      "pages_rerendered_no_llm": 0,
+      "passages_reextracted": 0,
+      "seconds": 0.04,
+      "sentences_extracted": 0,
+      "sentences_reused": 0,
+      "status": "noop",
+      "summaries_regenerated": 0
+     }
+    }
+   },
+   "S1_one_modified": {
+    "change": {
+     "modified": [
+      "topic-000/doc-00010.md"
+     ]
+    },
+    "runs": {
+     "dakc": {
+      "claims_new": 2,
+      "claims_reproduced_or_provenance_only": 1,
+      "claims_retracted": 1,
+      "input_tokens": 8165,
+      "invariants_pass": true,
+      "llm_calls": 6,
+      "output_tokens": 1802,
+      "pages_cutoff": 0,
+      "pages_regenerated": 3,
+      "pages_rerendered_no_llm": 2,
+      "passages_reextracted": 1,
+      "seconds": 28.9,
+      "sentences_extracted": 3,
+      "sentences_reused": 0,
+      "status": "committed",
+      "summaries_regenerated": 2
+     },
+     "dakc-passage": {
+      "claims_new": 2,
+      "claims_reproduced_or_provenance_only": 1,
+      "claims_retracted": 1,
+      "input_tokens": 8168,
+      "invariants_pass": true,
+      "llm_calls": 6,
+      "output_tokens": 1687,
+      "pages_cutoff": 0,
+      "pages_regenerated": 3,
+      "pages_rerendered_no_llm": 2,
+      "passages_reextracted": 1,
+      "seconds": 19.64,
+      "sentences_extracted": 3,
+      "sentences_reused": 0,
+      "status": "committed",
+      "summaries_regenerated": 2
+     },
+     "file": {
+      "claims_new": 2,
+      "claims_reproduced_or_provenance_only": 12,
+      "claims_retracted": 1,
+      "input_tokens": 23329,
+      "invariants_pass": true,
+      "llm_calls": 27,
+      "output_tokens": 5810,
+      "pages_cutoff": 0,
+      "pages_regenerated": 18,
+      "pages_rerendered_no_llm": 0,
+      "passages_reextracted": 7,
+      "seconds": 25.07,
+      "sentences_extracted": 15,
+      "sentences_reused": 0,
+      "status": "committed",
+      "summaries_regenerated": 2
+     }
+    }
+   },
+   "S3_one_deleted": {
+    "change": {
+     "deleted": [
+      "topic-000/doc-00014.md"
+     ]
+    },
+    "runs": {
+     "dakc": {
+      "claims_new": 0,
+      "claims_reproduced_or_provenance_only": 12,
+      "claims_retracted": 12,
+      "input_tokens": 15119,
+      "invariants_pass": true,
+      "llm_calls": 16,
+      "output_tokens": 4458,
+      "pages_cutoff": 0,
+      "pages_regenerated": 14,
+      "pages_rerendered_no_llm": 3,
+      "passages_reextracted": 0,
+      "seconds": 20.83,
+      "sentences_extracted": 0,
+      "sentences_reused": 0,
+      "status": "committed",
+      "summaries_regenerated": 2
+     },
+     "dakc-passage": {
+      "claims_new": 0,
+      "claims_reproduced_or_provenance_only": 12,
+      "claims_retracted": 12,
+      "input_tokens": 15155,
+      "invariants_pass": true,
+      "llm_calls": 16,
+      "output_tokens": 4911,
+      "pages_cutoff": 0,
+      "pages_regenerated": 14,
+      "pages_rerendered_no_llm": 3,
+      "passages_reextracted": 0,
+      "seconds": 15.94,
+      "sentences_extracted": 0,
+      "sentences_reused": 0,
+      "status": "committed",
+      "summaries_regenerated": 2
+     },
+     "file": {
+      "claims_new": 0,
+      "claims_reproduced_or_provenance_only": 12,
+      "claims_retracted": 12,
+      "input_tokens": 17003,
+      "invariants_pass": true,
+      "llm_calls": 19,
+      "output_tokens": 4900,
+      "pages_cutoff": 0,
+      "pages_regenerated": 17,
+      "pages_rerendered_no_llm": 0,
+      "passages_reextracted": 0,
+      "seconds": 17.51,
+      "sentences_extracted": 0,
+      "sentences_reused": 0,
+      "status": "committed",
+      "summaries_regenerated": 2
+     }
+    }
+   },
+   "S4_one_renamed": {
+    "change": {
+     "renamed": [
+      [
+       "topic-000/doc-00010.md",
+       "topic-000/doc-00010-renamed.md"
+      ]
+     ]
+    },
+    "runs": {
+     "dakc": {
+      "claims_new": 0,
+      "claims_reproduced_or_provenance_only": 0,
+      "claims_retracted": 0,
+      "input_tokens": 0,
+      "invariants_pass": true,
+      "llm_calls": 0,
+      "output_tokens": 0,
+      "pages_cutoff": 0,
+      "pages_regenerated": 0,
+      "pages_rerendered_no_llm": 17,
+      "passages_reextracted": 0,
+      "seconds": 0.02,
+      "sentences_extracted": 0,
+      "sentences_reused": 0,
+      "status": "committed",
+      "summaries_regenerated": 0
+     },
+     "dakc-passage": {
+      "claims_new": 0,
+      "claims_reproduced_or_provenance_only": 0,
+      "claims_retracted": 0,
+      "input_tokens": 0,
+      "invariants_pass": true,
+      "llm_calls": 0,
+      "output_tokens": 0,
+      "pages_cutoff": 0,
+      "pages_regenerated": 0,
+      "pages_rerendered_no_llm": 17,
+      "passages_reextracted": 0,
+      "seconds": 0.03,
+      "sentences_extracted": 0,
+      "sentences_reused": 0,
+      "status": "committed",
+      "summaries_regenerated": 0
+     },
+     "file": {
+      "claims_new": 0,
+      "claims_reproduced_or_provenance_only": 12,
+      "claims_retracted": 0,
+      "input_tokens": 22191,
+      "invariants_pass": true,
+      "llm_calls": 25,
+      "output_tokens": 5318,
+      "pages_cutoff": 0,
+      "pages_regenerated": 16,
+      "pages_rerendered_no_llm": 0,
+      "passages_reextracted": 7,
+      "seconds": 18.85,
+      "sentences_extracted": 13,
+      "sentences_reused": 0,
+      "status": "committed",
+      "summaries_regenerated": 2
+     }
+    }
+   },
+   "S5_one_claim_modified": {
+    "change": {
+     "claim": "has a default port of: 36248 -> 36249",
+     "modified": [
+      "topic-000/doc-00010.md"
+     ]
+    },
+    "runs": {
+     "dakc": {
+      "claims_new": 1,
+      "claims_reproduced_or_provenance_only": 2,
+      "claims_retracted": 1,
+      "input_tokens": 6456,
+      "invariants_pass": true,
+      "llm_calls": 4,
+      "new_value_claimed": true,
+      "old_value_still_claimed_by_doc": false,
+      "output_tokens": 1082,
+      "pages_cutoff": 4,
+      "pages_regenerated": 1,
+      "pages_rerendered_no_llm": 0,
+      "passages_reextracted": 1,
+      "seconds": 13.62,
+      "sentences_extracted": 1,
+      "sentences_reused": 2,
+      "status": "committed",
+      "summaries_regenerated": 2
+     },
+     "dakc-passage": {
+      "claims_new": 1,
+      "claims_reproduced_or_provenance_only": 2,
+      "claims_retracted": 1,
+      "input_tokens": 6991,
+      "invariants_pass": true,
+      "llm_calls": 5,
+      "new_value_claimed": true,
+      "old_value_still_claimed_by_doc": false,
+      "output_tokens": 1128,
+      "pages_cutoff": 4,
+      "pages_regenerated": 2,
+      "pages_rerendered_no_llm": 0,
+      "passages_reextracted": 1,
+      "seconds": 16.19,
+      "sentences_extracted": 3,
+      "sentences_reused": 0,
+      "status": "committed",
+      "summaries_regenerated": 2
+     },
+     "file": {
+      "claims_new": 1,
+      "claims_reproduced_or_provenance_only": 12,
+      "claims_retracted": 1,
+      "input_tokens": 22162,
+      "invariants_pass": true,
+      "llm_calls": 25,
+      "new_value_claimed": true,
+      "old_value_still_claimed_by_doc": false,
+      "output_tokens": 5225,
+      "pages_cutoff": 0,
+      "pages_regenerated": 16,
+      "pages_rerendered_no_llm": 0,
+      "passages_reextracted": 7,
+      "seconds": 16.68,
+      "sentences_extracted": 13,
+      "sentences_reused": 0,
+      "status": "committed",
+      "summaries_regenerated": 2
+     }
+    }
+   },
+   "S8_many_pages": {
+    "change": {
+     "modified": [
+      "topic-000/doc-00010.md"
+     ]
+    },
+    "runs": {
+     "dakc": {
+      "claims_new": 7,
+      "claims_reproduced_or_provenance_only": 1,
+      "claims_retracted": 2,
+      "input_tokens": 14300,
+      "invariants_pass": true,
+      "llm_calls": 15,
+      "output_tokens": 3959,
+      "pages_cutoff": 0,
+      "pages_regenerated": 12,
+      "pages_rerendered_no_llm": 2,
+      "passages_reextracted": 1,
+      "seconds": 18.16,
+      "sentences_extracted": 7,
+      "sentences_reused": 0,
+      "status": "committed",
+      "summaries_regenerated": 2
+     },
+     "dakc-passage": {
+      "claims_new": 7,
+      "claims_reproduced_or_provenance_only": 1,
+      "claims_retracted": 2,
+      "input_tokens": 14231,
+      "invariants_pass": true,
+      "llm_calls": 15,
+      "output_tokens": 3964,
+      "pages_cutoff": 0,
+      "pages_regenerated": 12,
+      "pages_rerendered_no_llm": 2,
+      "passages_reextracted": 1,
+      "seconds": 18.47,
+      "sentences_extracted": 7,
+      "sentences_reused": 0,
+      "status": "committed",
+      "summaries_regenerated": 2
+     },
+     "file": {
+      "claims_new": 7,
+      "claims_reproduced_or_provenance_only": 11,
+      "claims_retracted": 2,
+      "input_tokens": 25157,
+      "invariants_pass": true,
+      "llm_calls": 30,
+      "output_tokens": 6047,
+      "pages_cutoff": 0,
+      "pages_regenerated": 21,
+      "pages_rerendered_no_llm": 0,
+      "passages_reextracted": 7,
+      "seconds": 17.7,
+      "sentences_extracted": 17,
+      "sentences_reused": 0,
+      "status": "committed",
+      "summaries_regenerated": 2
+     }
+    }
+   }
+  }
+ }
+}

@@ -1,0 +1,632 @@
+{
+ "fingerprints": {
+  "extractor": "llm-extractor/1:hosted-agent:gpt-4o-mini:t0.0:ff03f36f6a",
+  "summarizer": "llm-summarizer/1:hosted-agent:gpt-4o-mini:t0.0:64882beec3",
+  "writer": "llm-writer/1:hosted-agent:gpt-4o-mini:t0.0:bdce6ea715"
+ },
+ "machine": {
+  "cpu": "Apple M5",
+  "cpu_count": 10,
+  "date": "2026-11-22T05:57:54Z",
+  "git_commit": "6c2cc88",
+  "platform": "macOS-27.2-arm64-arm-64bit",
+  "provider": "custom: hosted-agent:gpt-4o-mini:t0.0",
+  "python": "3.12.13"
+ },
+ "machine_by_part": {
+  "part_a": {
+   "cpu": "Apple M5",
+   "cpu_count": 10,
+   "date": "2026-11-22T05:57:54Z",
+   "git_commit": "6c2cc88",
+   "platform": "macOS-27.2-arm64-arm-64bit",
+   "provider": "custom: hosted-agent:gpt-4o-mini:t0.0",
+   "python": "3.12.13"
+  },
+  "part_b": {
+   "cpu": "Apple M5",
+   "cpu_count": 10,
+   "date": "2026-11-22T05:48:13Z",
+   "git_commit": "6c2cc88",
+   "platform": "macOS-27.2-arm64-arm-64bit",
+   "provider": "custom: hosted-agent:gpt-4o-mini:t0.0",
+   "python": "3.12.13"
+  }
+ },
+ "part_a": {
+  "natural": {
+   "calls": 159,
+   "detail_claims": 23,
+   "edited_claims": 32,
+   "modes": {
+    "loose": {
+     "edited_sentence_claims_unchanged": 0.3125,
+     "new_fact_capture": 0.3548,
+     "stale_claims": 6,
+     "stale_retention": 0.2609,
+     "unchanged_fact_reproduction": 0.4507
+    },
+    "off": {
+     "edited_sentence_claims_unchanged": 0.0625,
+     "new_fact_capture": 0.8387,
+     "stale_claims": 0,
+     "stale_retention": 0.0,
+     "unchanged_fact_reproduction": 0.3662
+    },
+    "strict": {
+     "edited_sentence_claims_unchanged": 0.1875,
+     "new_fact_capture": 0.6129,
+     "stale_claims": 0,
+     "stale_retention": 0.0,
+     "unchanged_fact_reproduction": 0.4225
+    }
+   },
+   "paragraphs": 31,
+   "paragraphs_failed": 5,
+   "repeat_reproduced": 41,
+   "repeat_stability": 0.3981,
+   "stale_examples": [
+    {
+     "edited_sentence": "Chosen by a new Atlasbridge plan call that sees the current wiki briefs (compiler.py:1716-1739), not by the sources: back-references.",
+     "mode": "loose",
+     "stale_claim_kept": [
+      "The new LLM plan sees the current wiki briefs."
+     ]
+    },
+    {
+     "edited_sentence": "The annotation holds the source display name or document title, not an id or hash (Atlasbridge:2079-2087 builds it from the metadata title or file name).",
+     "mode": "loose",
+     "stale_claim_kept": [
+      "WriterAgent.java builds the annotation from the metadata title or file name."
+     ]
+    },
+    {
+     "edited_sentence": "This is \"Atlasbridge - capture an external source as raw reference material ...",
+     "mode": "loose",
+     "stale_claim_kept": [
+      "Ingest captures an external source as raw reference material."
+     ]
+    },
+    {
+     "edited_sentence": "GitHub issues and Atlasbridge were read with gh.",
+     "mode": "loose",
+     "stale_claim_kept": [
+      "GitHub issues and PRs were read with gh."
+     ]
+    },
+    {
+     "edited_sentence": "It has a document-level reverse index (wiki_pages.source_refs JSONB with a Atlasbridge index).",
+     "mode": "loose",
+     "stale_claim_kept": [
+      "The document-level reverse index is wiki_pages.source_refs JSONB with a GIN index."
+     ]
+    },
+    {
+     "edited_sentence": "Users can edit concept, entity and summary pages through the Atlasbridge (page_ops.py:31-38, 194+).",
+     "mode": "loose",
+     "stale_claim_kept": [
+      "Users can edit concept, entity and summary pages through the Web UI."
+     ]
+    }
+   ],
+   "tokens_in": 106111,
+   "tokens_out": 20278,
+   "unchanged_claims": 71,
+   "v1_claims": 103
+  },
+  "synthetic": {
+   "calls": 195,
+   "detail_claims": 39,
+   "edited_claims": 39,
+   "modes": {
+    "loose": {
+     "edited_sentence_claims_unchanged": 0.0,
+     "new_fact_capture": 0.2821,
+     "stale_claims": 0,
+     "stale_retention": 0.0,
+     "unchanged_fact_reproduction": 0.92
+    },
+    "off": {
+     "edited_sentence_claims_unchanged": 0.0,
+     "new_fact_capture": 1.0,
+     "stale_claims": 0,
+     "stale_retention": 0.0,
+     "unchanged_fact_reproduction": 1.0
+    },
+    "strict": {
+     "edited_sentence_claims_unchanged": 0.0,
+     "new_fact_capture": 0.9744,
+     "stale_claims": 0,
+     "stale_retention": 0.0,
+     "unchanged_fact_reproduction": 0.92
+    }
+   },
+   "paragraphs": 39,
+   "paragraphs_failed": 0,
+   "repeat_reproduced": 139,
+   "repeat_stability": 1.0,
+   "stale_examples": [],
+   "tokens_in": 119535,
+   "tokens_out": 16658,
+   "unchanged_claims": 100,
+   "v1_claims": 139
+  }
+ },
+ "part_b": {
+  "full_build": {
+   "calls_by_stage": {
+    "extract": 169,
+    "page": 48,
+    "summary": 2
+   },
+   "counts": {
+    "claim": 338,
+    "edges": 1808,
+    "entity": 48,
+    "index": 1,
+    "page": 48,
+    "passage": 169,
+    "relationship": 141,
+    "source": 30,
+    "summary": 2
+   },
+   "extraction_cache_hits": 0,
+   "input_tokens": 130213,
+   "llm_calls": 219,
+   "output_tokens": 20182,
+   "provider_calls": 219,
+   "seconds": 62.08
+  },
+  "n_docs": 30,
+  "scenarios": {
+   "S0_no_change": {
+    "change": {
+     "changed": []
+    },
+    "runs": {
+     "dakc/loose": {
+      "claims_new": 0,
+      "claims_reproduced_or_provenance_only": 0,
+      "claims_retracted": 0,
+      "input_tokens": 0,
+      "invariants_pass": true,
+      "llm_calls": 0,
+      "output_tokens": 0,
+      "pages_cutoff": 0,
+      "pages_regenerated": 0,
+      "pages_rerendered_no_llm": 0,
+      "passages_reextracted": 0,
+      "seconds": 0.02,
+      "status": "noop",
+      "summaries_regenerated": 0
+     },
+     "dakc/off": {
+      "claims_new": 0,
+      "claims_reproduced_or_provenance_only": 0,
+      "claims_retracted": 0,
+      "input_tokens": 0,
+      "invariants_pass": true,
+      "llm_calls": 0,
+      "output_tokens": 0,
+      "pages_cutoff": 0,
+      "pages_regenerated": 0,
+      "pages_rerendered_no_llm": 0,
+      "passages_reextracted": 0,
+      "seconds": 0.02,
+      "status": "noop",
+      "summaries_regenerated": 0
+     },
+     "dakc/strict": {
+      "claims_new": 0,
+      "claims_reproduced_or_provenance_only": 0,
+      "claims_retracted": 0,
+      "input_tokens": 0,
+      "invariants_pass": true,
+      "llm_calls": 0,
+      "output_tokens": 0,
+      "pages_cutoff": 0,
+      "pages_regenerated": 0,
+      "pages_rerendered_no_llm": 0,
+      "passages_reextracted": 0,
+      "seconds": 0.02,
+      "status": "noop",
+      "summaries_regenerated": 0
+     },
+     "file/off": {
+      "claims_new": 0,
+      "claims_reproduced_or_provenance_only": 0,
+      "claims_retracted": 0,
+      "input_tokens": 0,
+      "invariants_pass": true,
+      "llm_calls": 0,
+      "output_tokens": 0,
+      "pages_cutoff": 0,
+      "pages_regenerated": 0,
+      "pages_rerendered_no_llm": 0,
+      "passages_reextracted": 0,
+      "seconds": 0.03,
+      "status": "noop",
+      "summaries_regenerated": 0
+     }
+    }
+   },
+   "S1_one_modified": {
+    "change": {
+     "modified": [
+      "topic-000/doc-00010.md"
+     ]
+    },
+    "runs": {
+     "dakc/loose": {
+      "claims_new": 2,
+      "claims_reproduced_or_provenance_only": 1,
+      "claims_retracted": 1,
+      "input_tokens": 7600,
+      "invariants_pass": true,
+      "llm_calls": 6,
+      "output_tokens": 2384,
+      "pages_cutoff": 0,
+      "pages_regenerated": 3,
+      "pages_rerendered_no_llm": 2,
+      "passages_reextracted": 1,
+      "seconds": 21.25,
+      "status": "committed",
+      "summaries_regenerated": 2
+     },
+     "dakc/off": {
+      "claims_new": 2,
+      "claims_reproduced_or_provenance_only": 1,
+      "claims_retracted": 1,
+      "input_tokens": 7573,
+      "invariants_pass": true,
+      "llm_calls": 6,
+      "output_tokens": 1726,
+      "pages_cutoff": 0,
+      "pages_regenerated": 3,
+      "pages_rerendered_no_llm": 2,
+      "passages_reextracted": 1,
+      "seconds": 16.47,
+      "status": "committed",
+      "summaries_regenerated": 2
+     },
+     "dakc/strict": {
+      "claims_new": 2,
+      "claims_reproduced_or_provenance_only": 1,
+      "claims_retracted": 1,
+      "input_tokens": 7649,
+      "invariants_pass": true,
+      "llm_calls": 6,
+      "output_tokens": 1667,
+      "pages_cutoff": 0,
+      "pages_regenerated": 3,
+      "pages_rerendered_no_llm": 2,
+      "passages_reextracted": 1,
+      "seconds": 17.99,
+      "status": "committed",
+      "summaries_regenerated": 2
+     },
+     "file/off": {
+      "claims_new": 2,
+      "claims_reproduced_or_provenance_only": 13,
+      "claims_retracted": 1,
+      "input_tokens": 20878,
+      "invariants_pass": true,
+      "llm_calls": 26,
+      "output_tokens": 5649,
+      "pages_cutoff": 0,
+      "pages_regenerated": 17,
+      "pages_rerendered_no_llm": 0,
+      "passages_reextracted": 7,
+      "seconds": 22.6,
+      "status": "committed",
+      "summaries_regenerated": 2
+     }
+    }
+   },
+   "S3_one_deleted": {
+    "change": {
+     "deleted": [
+      "topic-000/doc-00014.md"
+     ]
+    },
+    "runs": {
+     "dakc/loose": {
+      "claims_new": 0,
+      "claims_reproduced_or_provenance_only": 12,
+      "claims_retracted": 11,
+      "input_tokens": 14037,
+      "invariants_pass": true,
+      "llm_calls": 15,
+      "output_tokens": 3960,
+      "pages_cutoff": 0,
+      "pages_regenerated": 13,
+      "pages_rerendered_no_llm": 2,
+      "passages_reextracted": 0,
+      "seconds": 13.48,
+      "status": "committed",
+      "summaries_regenerated": 2
+     },
+     "dakc/off": {
+      "claims_new": 0,
+      "claims_reproduced_or_provenance_only": 12,
+      "claims_retracted": 11,
+      "input_tokens": 14022,
+      "invariants_pass": true,
+      "llm_calls": 15,
+      "output_tokens": 3958,
+      "pages_cutoff": 0,
+      "pages_regenerated": 13,
+      "pages_rerendered_no_llm": 2,
+      "passages_reextracted": 0,
+      "seconds": 13.95,
+      "status": "committed",
+      "summaries_regenerated": 2
+     },
+     "dakc/strict": {
+      "claims_new": 0,
+      "claims_reproduced_or_provenance_only": 12,
+      "claims_retracted": 11,
+      "input_tokens": 14076,
+      "invariants_pass": true,
+      "llm_calls": 15,
+      "output_tokens": 4202,
+      "pages_cutoff": 0,
+      "pages_regenerated": 13,
+      "pages_rerendered_no_llm": 2,
+      "passages_reextracted": 0,
+      "seconds": 13.48,
+      "status": "committed",
+      "summaries_regenerated": 2
+     },
+     "file/off": {
+      "claims_new": 0,
+      "claims_reproduced_or_provenance_only": 12,
+      "claims_retracted": 11,
+      "input_tokens": 15420,
+      "invariants_pass": true,
+      "llm_calls": 17,
+      "output_tokens": 5007,
+      "pages_cutoff": 0,
+      "pages_regenerated": 15,
+      "pages_rerendered_no_llm": 0,
+      "passages_reextracted": 0,
+      "seconds": 15.19,
+      "status": "committed",
+      "summaries_regenerated": 2
+     }
+    }
+   },
+   "S4_one_renamed": {
+    "change": {
+     "renamed": [
+      [
+       "topic-000/doc-00010.md",
+       "topic-000/doc-00010-renamed.md"
+      ]
+     ]
+    },
+    "runs": {
+     "dakc/loose": {
+      "claims_new": 0,
+      "claims_reproduced_or_provenance_only": 0,
+      "claims_retracted": 0,
+      "input_tokens": 0,
+      "invariants_pass": true,
+      "llm_calls": 0,
+      "output_tokens": 0,
+      "pages_cutoff": 0,
+      "pages_regenerated": 0,
+      "pages_rerendered_no_llm": 16,
+      "passages_reextracted": 0,
+      "seconds": 0.02,
+      "status": "committed",
+      "summaries_regenerated": 0
+     },
+     "dakc/off": {
+      "claims_new": 0,
+      "claims_reproduced_or_provenance_only": 0,
+      "claims_retracted": 0,
+      "input_tokens": 0,
+      "invariants_pass": true,
+      "llm_calls": 0,
+      "output_tokens": 0,
+      "pages_cutoff": 0,
+      "pages_regenerated": 0,
+      "pages_rerendered_no_llm": 16,
+      "passages_reextracted": 0,
+      "seconds": 0.03,
+      "status": "committed",
+      "summaries_regenerated": 0
+     },
+     "dakc/strict": {
+      "claims_new": 0,
+      "claims_reproduced_or_provenance_only": 0,
+      "claims_retracted": 0,
+      "input_tokens": 0,
+      "invariants_pass": true,
+      "llm_calls": 0,
+      "output_tokens": 0,
+      "pages_cutoff": 0,
+      "pages_regenerated": 0,
+      "pages_rerendered_no_llm": 16,
+      "passages_reextracted": 0,
+      "seconds": 0.02,
+      "status": "committed",
+      "summaries_regenerated": 0
+     },
+     "file/off": {
+      "claims_new": 0,
+      "claims_reproduced_or_provenance_only": 13,
+      "claims_retracted": 0,
+      "input_tokens": 20186,
+      "invariants_pass": true,
+      "llm_calls": 25,
+      "output_tokens": 5021,
+      "pages_cutoff": 0,
+      "pages_regenerated": 16,
+      "pages_rerendered_no_llm": 0,
+      "passages_reextracted": 7,
+      "seconds": 17.74,
+      "status": "committed",
+      "summaries_regenerated": 2
+     }
+    }
+   },
+   "S5_one_claim_modified": {
+    "change": {
+     "claim": "has a default port of: 36248 -> 36249",
+     "modified": [
+      "topic-000/doc-00010.md"
+     ]
+    },
+    "runs": {
+     "dakc/loose": {
+      "claims_new": 1,
+      "claims_reproduced_or_provenance_only": 2,
+      "claims_retracted": 1,
+      "input_tokens": 4239,
+      "invariants_pass": true,
+      "llm_calls": 3,
+      "new_value_claimed": true,
+      "old_value_still_claimed_by_doc": false,
+      "output_tokens": 1052,
+      "pages_cutoff": 4,
+      "pages_regenerated": 1,
+      "pages_rerendered_no_llm": 0,
+      "passages_reextracted": 1,
+      "seconds": 22.83,
+      "status": "committed",
+      "summaries_regenerated": 1
+     },
+     "dakc/off": {
+      "claims_new": 1,
+      "claims_reproduced_or_provenance_only": 2,
+      "claims_retracted": 1,
+      "input_tokens": 4172,
+      "invariants_pass": true,
+      "llm_calls": 3,
+      "new_value_claimed": true,
+      "old_value_still_claimed_by_doc": false,
+      "output_tokens": 864,
+      "pages_cutoff": 4,
+      "pages_regenerated": 1,
+      "pages_rerendered_no_llm": 0,
+      "passages_reextracted": 1,
+      "seconds": 12.77,
+      "status": "committed",
+      "summaries_regenerated": 1
+     },
+     "dakc/strict": {
+      "claims_new": 1,
+      "claims_reproduced_or_provenance_only": 2,
+      "claims_retracted": 1,
+      "input_tokens": 4279,
+      "invariants_pass": true,
+      "llm_calls": 3,
+      "new_value_claimed": true,
+      "old_value_still_claimed_by_doc": false,
+      "output_tokens": 842,
+      "pages_cutoff": 4,
+      "pages_regenerated": 1,
+      "pages_rerendered_no_llm": 0,
+      "passages_reextracted": 1,
+      "seconds": 13.13,
+      "status": "committed",
+      "summaries_regenerated": 1
+     },
+     "file/off": {
+      "claims_new": 1,
+      "claims_reproduced_or_provenance_only": 12,
+      "claims_retracted": 1,
+      "input_tokens": 20228,
+      "invariants_pass": true,
+      "llm_calls": 25,
+      "new_value_claimed": true,
+      "old_value_still_claimed_by_doc": false,
+      "output_tokens": 5091,
+      "pages_cutoff": 0,
+      "pages_regenerated": 16,
+      "pages_rerendered_no_llm": 0,
+      "passages_reextracted": 7,
+      "seconds": 24.79,
+      "status": "committed",
+      "summaries_regenerated": 2
+     }
+    }
+   },
+   "S8_many_pages": {
+    "change": {
+     "modified": [
+      "topic-000/doc-00010.md"
+     ]
+    },
+    "runs": {
+     "dakc/loose": {
+      "claims_new": 0,
+      "claims_reproduced_or_provenance_only": 3,
+      "claims_retracted": 0,
+      "input_tokens": 670,
+      "invariants_pass": true,
+      "llm_calls": 1,
+      "output_tokens": 87,
+      "pages_cutoff": 5,
+      "pages_regenerated": 0,
+      "pages_rerendered_no_llm": 0,
+      "passages_reextracted": 1,
+      "seconds": 4.02,
+      "status": "committed",
+      "summaries_regenerated": 0
+     },
+     "dakc/off": {
+      "claims_new": 7,
+      "claims_reproduced_or_provenance_only": 1,
+      "claims_retracted": 2,
+      "input_tokens": 13786,
+      "invariants_pass": true,
+      "llm_calls": 15,
+      "output_tokens": 3790,
+      "pages_cutoff": 0,
+      "pages_regenerated": 12,
+      "pages_rerendered_no_llm": 2,
+      "passages_reextracted": 1,
+      "seconds": 20.9,
+      "status": "committed",
+      "summaries_regenerated": 2
+     },
+     "dakc/strict": {
+      "claims_new": 7,
+      "claims_reproduced_or_provenance_only": 1,
+      "claims_retracted": 2,
+      "input_tokens": 13874,
+      "invariants_pass": true,
+      "llm_calls": 15,
+      "output_tokens": 3735,
+      "pages_cutoff": 0,
+      "pages_regenerated": 12,
+      "pages_rerendered_no_llm": 2,
+      "passages_reextracted": 1,
+      "seconds": 18.46,
+      "status": "committed",
+      "summaries_regenerated": 2
+     },
+     "file/off": {
+      "claims_new": 7,
+      "claims_reproduced_or_provenance_only": 11,
+      "claims_retracted": 2,
+      "input_tokens": 23368,
+      "invariants_pass": true,
+      "llm_calls": 30,
+      "output_tokens": 6235,
+      "pages_cutoff": 0,
+      "pages_regenerated": 21,
+      "pages_rerendered_no_llm": 0,
+      "passages_reextracted": 7,
+      "seconds": 25.01,
+      "status": "committed",
+      "summaries_regenerated": 2
+     }
+    }
+   }
+  }
+ }
+}

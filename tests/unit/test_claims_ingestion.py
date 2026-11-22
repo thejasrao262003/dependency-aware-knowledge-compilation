@@ -65,3 +65,51 @@ def test_source_ids_avoid_collisions():
     taken = {"src:a-md"}
     assert new_source_id("a.md", taken) == "src:a-md-2"
     assert new_source_id("a.md", taken) == "src:a-md-3"
+
+
+# --------------------------------------------------------------- sentence reuse
+from dakc.claims import is_context_dependent, plan_reuse, sentence_key, split_sentences
+
+
+def _prior(text):
+    sents = split_sentences(text)
+    entries = [(c.text, c.mentions, tuple(sentence_key(sents[i]) for i in c.evidence)) for c in heuristic_extract(text)]
+    return entries, {sentence_key(x) for x in sents}
+
+
+def test_plan_reuse_only_changed_sentences_are_dirty():
+    old = "PostgreSQL is the primary database. Redis caches sessions. Kafka streams events."
+    prior, keys = _prior(old)
+    reused, dirty = plan_reuse(prior, keys, "PostgreSQL is the primary database. Redis caches carts. Kafka streams events.")
+    assert dirty == [1]
+    assert [c.text for c in reused] == ["PostgreSQL is the primary database.", "Kafka streams events."]
+    assert [c.evidence for c in reused] == [(0,), (2,)]
+
+
+def test_plan_reuse_deletion_and_reordering_need_no_extraction():
+    prior, keys = _prior("PostgreSQL is fast. Redis caches sessions. Kafka streams events.")
+    reused, dirty = plan_reuse(prior, keys, "Kafka streams events. PostgreSQL is fast.")
+    assert dirty == [] and sorted(c.text for c in reused) == ["Kafka streams events.", "PostgreSQL is fast."]
+    assert {c.text: c.evidence for c in reused}["Kafka streams events."] == (0,)
+
+
+def test_plan_reuse_context_dependent_sentences_follow_their_antecedent():
+    prior, keys = _prior("PostgreSQL is the primary database. It supports JSONB. The service also uses Redis.")
+    reused, dirty = plan_reuse(prior, keys, "MySQL is the primary database. It supports JSONB. The service also uses Redis.")
+    assert dirty == [0, 1, 2], "pronoun and 'the service' depend on the edited first sentence"
+    assert reused == []
+    reused, dirty = plan_reuse(prior, keys, "PostgreSQL is the primary database. It supports JSONB. The service also uses Valkey.")
+    assert dirty == [2] and len(reused) == 2, "edits after an antecedent do not invalidate it"
+
+
+def test_plan_reuse_never_reuses_claims_with_unknown_evidence():
+    _, keys = _prior("Redis caches sessions.")
+    reused, dirty = plan_reuse([("Redis caches sessions.", ("Redis",), ())], keys, "Redis caches sessions.")
+    assert reused == [] and dirty == []
+
+
+def test_context_dependency_heuristic():
+    assert is_context_dependent("It supports JSONB.")
+    assert is_context_dependent("The service uses Redis.")
+    assert is_context_dependent("However, Kafka retains events.")
+    assert not is_context_dependent("Kafka retains events for 7 days.")

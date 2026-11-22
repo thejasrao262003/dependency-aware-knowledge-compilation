@@ -1,10 +1,26 @@
 [project]
 name = "dakc"
-version = "0.2.0"
+version = "0.2.1"
 description = "Incremental compiler for AI-generated knowledge: claim-level dependency tracking, selective rebuilds, and verification against full rebuilds"
-readme = "README.md"
+dynamic = ["readme"]  # README.md with repository-relative links made absolute (see below)
 requires-python = ">=3.12"
-license = { text = "Apache-2.0" }
+license = "Apache-2.0"
+license-files = ["LICENSE"]
+authors = [{ name = "thejasrao262003" }]
+keywords = ["llm", "knowledge-base", "incremental-compilation", "build-system", "provenance", "rag", "mcp"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Science/Research",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Software Development :: Build Tools",
+    "Topic :: Text Processing :: Markup :: Markdown",
+]
 dependencies = [
     "blake3>=1.0",
     "networkx>=3.3",
@@ -28,9 +44,26 @@ dev = ["pytest>=8", "pymupdf>=1.24", "watchdog>=4", "fastapi>=0.110", "uvicorn>=
 [project.scripts]
 dakc = "dakc.cli:main"
 
+[project.urls]
+Homepage = "https://github.com/thejasrao262003/dependency-aware-knowledge-compilation"
+Documentation = "https://github.com/thejasrao262003/dependency-aware-knowledge-compilation#readme"
+Changelog = "https://github.com/thejasrao262003/dependency-aware-knowledge-compilation/blob/main/CHANGELOG.md"
+Issues = "https://github.com/thejasrao262003/dependency-aware-knowledge-compilation/issues"
+
 [build-system]
-requires = ["hatchling>=1.24"]
+requires = ["hatchling>=1.27", "hatch-fancy-pypi-readme>=24"]
 build-backend = "hatchling.build"
+
+# PyPI renders README.md away from the repository, so relative links would break there.
+[tool.hatch.metadata.hooks.fancy-pypi-readme]
+content-type = "text/markdown"
+
+[[tool.hatch.metadata.hooks.fancy-pypi-readme.fragments]]
+path = "README.md"
+
+[[tool.hatch.metadata.hooks.fancy-pypi-readme.substitutions]]
+pattern = '\]\((?!https?://|#|mailto:)([^)\s]+)\)'
+replacement = '](https://github.com/thejasrao262003/dependency-aware-knowledge-compilation/blob/main/\1)'
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/dakc"]

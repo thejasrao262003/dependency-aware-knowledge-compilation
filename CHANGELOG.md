@@ -1,5 +1,19 @@
 # Changelog
 
+## v0.2.1: first PyPI release
+
+There are no code changes from v0.2.0. This release is packaging only:
+
+- **Published to PyPI** as `dakc`:
+  `pip install dakc`, `pip install 'dakc[mcp]'`.
+- **Package metadata:**
+  - project URLs;
+  - author, keywords and classifiers;
+  - an SPDX license expression (`Apache-2.0`) with the license file.
+- **PyPI page links:** repository-relative README links are rewritten to
+  absolute GitHub URLs at build time, so they work there.
+- **Install instructions** in the README and `docs/mcp.md` now use PyPI.
+
 ## v0.2.0: Python API and MCP server
 
 ### Added

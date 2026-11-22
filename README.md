@@ -64,12 +64,19 @@ oracle.
 ## Quick start
 
 ```bash
+pip install dakc                 # Python 3.12+; add [mcp] for the MCP server, [api] for the REST API
+dakc ingest ./my-documents       # discover, hash, extract, compile -> ./wiki
+```
+
+To run the examples, tests and benchmarks, work from a clone:
+
+```bash
 git clone https://github.com/thejasrao262003/dependency-aware-knowledge-compilation.git
 cd dependency-aware-knowledge-compilation
 uv sync --locked --extra dev && source .venv/bin/activate   # or: pip install -e '.[dev]'
 
 mkdir demo && cp -r examples/sample-knowledge-base demo/knowledge && cd demo
-dakc ingest ./knowledge          # discover, hash, extract, compile -> ./wiki
+dakc ingest ./knowledge
 ```
 
 `ingest` creates `dakc.toml`, the store in `.dakc/dakc.db`, and Markdown
@@ -202,7 +209,7 @@ one SQLite connection, so use one per thread. Details are in
 ## MCP server for AI agents
 
 `dakc mcp` exposes a workspace to agents over the Model Context Protocol.
-It needs the `mcp` extra: `pip install -e '.[mcp]'`.
+It needs the `mcp` extra: `pip install 'dakc[mcp]'`.
 
 ```bash
 claude mcp add dakc -- dakc mcp --workspace /absolute/path/to/demo   # Claude Code

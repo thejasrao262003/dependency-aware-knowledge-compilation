@@ -41,7 +41,9 @@ def paid_workspace(root: Path) -> Path:
 
 
 def test_public_surface():
-    assert dakc.__version__ == "0.2.0"
+    from importlib.metadata import version
+
+    assert dakc.__version__ == version("dakc")  # source and package metadata agree
     for name in dakc.__all__:
         assert hasattr(dakc, name), name
     assert issubclass(dakc.WorkspaceNotFound, FileNotFoundError) and issubclass(dakc.ArtifactNotFound, LookupError)

@@ -6,7 +6,7 @@ official MCP Python SDK (2.x) and is a thin layer over the
 [Python API](python-api.md).
 
 ```bash
-pip install -e '.[mcp]'
+pip install 'dakc[mcp]'
 dakc mcp --workspace /absolute/path/to/workspace            # stdio (local agents)
 dakc mcp --workspace ... --transport streamable-http        # HTTP on 127.0.0.1:8766/mcp
 dakc mcp --workspace ... --read-only                        # inspection tools only

@@ -1,5 +1,52 @@
 # Changelog
 
+## v0.2.0: Python API and MCP server
+
+### Added
+
+- **Python API.**
+  - `dakc.open(path)`, `dakc.init(...)` and `dakc.ingest(...)`, plus a
+    `KnowledgeBase` with these methods: `status`, `check`, `plan`, `compile`,
+    `artifacts`, `read`, `explain`, `trace`, `downstream`, `graph_stats`,
+    `export_graph`, `builds`, `diff`, `duplicates`, `verify` and `rollback`.
+  - Typed results with `to_dict()`.
+  - One error hierarchy under `dakc.DakcError`.
+  - See [docs/python-api.md](docs/python-api.md).
+- **MCP server: `dakc mcp`**, on the official MCP Python SDK 2.x, over stdio
+  or streamable HTTP.
+  - 12 read-only tools, plus `compile` (previews by default and builds only
+    with `apply=true`) and `rollback` (an explicit build id, marked
+    destructive).
+  - A cost guard for LLM providers (`--max-llm-calls`), `--read-only` mode,
+    and bounded outputs.
+  - See [docs/mcp.md](docs/mcp.md).
+- **REST API:** `GET /artifacts`, `/artifacts/{id}/trace`,
+  `/artifacts/{id}/downstream`, `/duplicates` and `/health`, plus `?full=` on
+  `/plan`.
+- **CLI:** `--json` for `status` and `builds`.
+- **Build reports:** `BuildReport.has_work()`, and `has_work` in report JSON.
+- **Packaging:** an `mcp` extra.
+
+### Changed
+
+- **The CLI and the REST API are now thin layers over the Python API.** The
+  REST API opens and closes a connection per request; before, it leaked one
+  per request.
+- **REST `/status`** returns the full status object. It now has `stale`
+  (artifact counts per kind) instead of `stale_sources`.
+- **`--json` output** of `check` and `verify` gained fields (`root`,
+  `has_work`, `ok`). Existing fields are unchanged.
+- **A failed compile** is reported as
+  `compilation failed: <ErrorType>: <message>`.
+
+### Fixed
+
+- **The README was imprecise about `rollback`** ("rollback to any build").
+  Rolling back to build N discards the artifact versions written by later
+  builds, and their records stay in the history as `rolled_back`. The README,
+  the API and the MCP tool now say so, and MCP marks the tool destructive.
+  `docs/architecture.md` already described this correctly.
+
 ## v0.1.0: first public release
 
 DAKC is an incremental compiler for AI-generated knowledge bases. It turns a

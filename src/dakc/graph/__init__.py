@@ -9,7 +9,7 @@ Edges point from a dependent artifact to the artifact it depends on.
 from __future__ import annotations
 
 import json
-from collections import Counter, deque
+from collections import Counter
 
 import networkx as nx
 

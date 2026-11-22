@@ -14,9 +14,9 @@ import os
 import time
 from pathlib import Path
 
+from dakc.errors import BuildLocked
 
-class BuildLocked(RuntimeError):
-    """Another process holds the workspace build lock."""
+__all__ = ["BuildLock", "BuildLocked", "workspace_lock"]
 
 
 class BuildLock:

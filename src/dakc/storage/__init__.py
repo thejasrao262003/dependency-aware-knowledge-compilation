@@ -11,7 +11,7 @@ import json
 import sqlite3
 from collections.abc import Iterable, Iterator
 from contextlib import contextmanager
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -81,6 +81,9 @@ class BuildRecord:
     finished_at: str | None
     stats: dict[str, Any] = field(default_factory=dict)
     error: str | None = None
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
 
 
 @dataclass

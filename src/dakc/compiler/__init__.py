@@ -29,7 +29,6 @@ from typing import Any, TypeVar
 
 from dakc.artifacts import (
     INDEX_ID,
-    Artifact,
     ClaimArt,
     EntityArt,
     IndexArt,
@@ -111,6 +110,11 @@ class BuildReport:
     def llm_calls(self) -> int:
         return self.usage.llm_calls + sum(self.planned_llm_calls.values())
 
+    def has_work(self) -> bool:
+        """True when the build changes anything. ``cutoff_*`` operations record
+        artifacts that were checked and found unchanged, so they are not work."""
+        return any(v for k, v in self.ops.items() if not k.startswith("cutoff_"))
+
     def to_dict(self, limit: int | None = None) -> dict[str, Any]:
         return {
             "strategy": self.strategy,
@@ -118,6 +122,7 @@ class BuildReport:
             "exact": self.exact,
             "build_id": self.build_id,
             "status": self.status,
+            "has_work": self.has_work(),
             "scan": {k: (v[:limit] if limit and isinstance(v, list) else v) for k, v in self.scan.items()},
             "operations": {k: sorted(v)[:limit] for k, v in sorted(self.ops.items())},
             "operation_counts": {k: len(v) for k, v in sorted(self.ops.items())},

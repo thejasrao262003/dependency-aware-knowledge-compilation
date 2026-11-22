@@ -151,16 +151,87 @@ make them, and labels downstream numbers as an **upper bound**.
 | `dakc duplicates` | Advisory list of claims that are likely the same fact in other words (nothing is merged) |
 | `dakc status` | HEAD, counts, and what is stale against the current sources |
 | `dakc builds` / `dakc diff A [B]` | Audit log; artifact-level diff between builds |
-| `dakc rollback [--to N]` | Restore any earlier committed build |
+| `dakc rollback [--to N]` | Restore an earlier committed build (later builds' artifact versions are discarded; their records stay in `builds`) |
 | `dakc verify [--against-full]` | Invariant and provenance checks, citation coverage, equality with a full rebuild |
-| `dakc serve` | Read-only REST API (`/status /check /plan /graph /artifacts/{id} /builds /diff`) |
+| `dakc serve` | Read-only REST API (`/status /check /plan /graph /artifacts /artifacts/{id}[/content\|/trace\|/downstream] /builds /diff /duplicates`) |
+| `dakc mcp [--read-only]` | MCP server for AI agents ([below](#mcp-server-for-ai-agents)) |
 | `dakc watch` | Recompile incrementally on file changes |
 
 IDs can be given in friendly form: `page:database-architecture`,
 `entity_postgresql`, `source:databases/redis.md`, a source path, or a page
 title. Commands that write (`ingest`, `compile`, `rollback`) take the
 workspace build lock; pass `--wait SECONDS` to queue behind a running build
-instead of failing.
+instead of failing. Most commands accept `--json`.
+
+## Python API
+
+Everything the CLI does is available as a library; the CLI, the REST API and
+the MCP server are thin layers over it.
+
+```python
+import dakc
+
+with dakc.open("demo") as kb:                 # a directory holding dakc.toml
+    plan = kb.plan()                          # what a compile would do; nothing written or spent
+    if plan.has_work():
+        report = kb.compile()                 # incremental; atomic; wiki files updated
+        print(report.status, report.llm_calls())
+
+    page = kb.read("PostgreSQL")              # rendered Markdown, version, metadata
+    for s in kb.trace("page:postgresql").sentences:
+        print(s.sentence, "->", s.cites)      # each sentence and the claims it cites
+
+    kb.explain("page:jsonb").status           # VALID / STALE, with reasons
+    kb.downstream("databases/postgresql.md")  # what an edit to this file would invalidate
+```
+
+Module functions: `dakc.open(path)`, `dakc.init(path, source_dir=...)`,
+`dakc.ingest(directory, workspace)`. `KnowledgeBase` methods: `status`,
+`check`, `plan`, `compile`, `artifacts`, `read`, `explain`, `trace`,
+`downstream`, `graph_stats`, `export_graph`, `builds`, `diff`, `duplicates`,
+`verify`, `rollback`. Every result is a dataclass with `to_dict()`.
+
+Errors derive from `dakc.DakcError`: `WorkspaceNotFound`, `ArtifactNotFound`,
+`InvalidArgument`, `BuildLocked`, `CompileFailed` (with `.preserved`: HEAD
+still points at the previous build), `CostNotAllowed` and `RollbackError`.
+`compile` and `rollback` hold the workspace build lock. Read methods never take
+it and see a consistent snapshot while a build runs. A `KnowledgeBase` holds
+one SQLite connection, so use one per thread. Details are in
+[docs/python-api.md](docs/python-api.md).
+
+## MCP server for AI agents
+
+`dakc mcp` exposes a workspace to agents over the Model Context Protocol.
+It needs the `mcp` extra: `pip install -e '.[mcp]'`.
+
+```bash
+claude mcp add dakc -- dakc mcp --workspace /absolute/path/to/demo   # Claude Code
+```
+
+Other clients take the usual JSON configuration:
+
+```json
+{ "mcpServers": { "dakc": { "command": "dakc", "args": ["mcp", "--workspace", "/absolute/path/to/demo"] } } }
+```
+
+| Tools | Kind |
+|---|---|
+| `status`, `check_sources`, `list_artifacts`, `read_artifact`, `explain`, `trace`, `downstream`, `graph_stats`, `builds`, `diff_builds`, `duplicates`, `verify` | read-only |
+| `compile` | previews by default; builds only with `apply=true` |
+| `rollback` | needs an explicit build id; marked destructive |
+
+Safety rules:
+
+- **One workspace.** The server is bound to the workspace it was started with.
+- **Preview first.** `compile` previews unless called with `apply=true`.
+- **Cost guard.** With an LLM provider, a build planned to exceed
+  `--max-llm-calls` (default 100) is refused.
+- **Read-only mode.** `--read-only` removes `compile` and `rollback`.
+- **Bounded outputs.** Every list is capped by a `limit` argument, and totals
+  are always reported.
+
+The default transport is stdio. `--transport streamable-http` serves HTTP on
+`127.0.0.1:8766`. See [docs/mcp.md](docs/mcp.md).
 
 ## Guarantees, and how each is checked
 
@@ -173,7 +244,7 @@ instead of failing.
 | Provenance | Every claim records the exact evidence sentences in each supporting passage. `dakc trace` follows displayed sentence → claim → passage → source version. `provenance = "strict"` renders only sentences that cite a claim | `tests/integration/test_provenance.py`; `dakc verify` reports citation coverage |
 | Contradictions | Conflicting claims are both kept, each with its own sources; deleting a source retracts exactly the claims it alone supported | `tests/integration/test_contradictions.py`; benchmark scenario S9 |
 | Claim identity | Exact after normalization (never merged by similarity); paraphrases are only *reported* | `benchmarks/equivalence.py` (precision/recall incl. hard negatives) |
-| Failures and crashes | All-or-nothing commit; the extraction cache survives for retries; rollback to any build | failure-injection and process-kill tests |
+| Failures and crashes | All-or-nothing commit; the extraction cache survives for retries; rollback to any earlier committed build | failure-injection and process-kill tests |
 
 ## How it decides what to rebuild
 
@@ -305,13 +376,14 @@ indicative.
 ## Project layout
 
 ```text
-src/dakc/      hashing · parsing · ingestion · claims · artifacts · graph · invalidation
-               compiler (+ projection) · transactions · provenance (explain, compare, verify)
-               providers (heuristic, mock, openai-compatible, anthropic) · storage · cli · api
+src/dakc/      kb (the Python API) · errors · cli · api (REST) · mcp_server
+               hashing · parsing · ingestion · claims · artifacts · graph · invalidation
+               compiler (+ projection) · transactions · provenance (explain, trace, compare, verify)
+               providers (heuristic, mock, openai-compatible, anthropic, custom) · storage
 research/      competitive analysis, technical gap, architecture decisions, per-repo audits
-docs/          architecture, dependency model, benchmark (design + generated results), implementation log
-benchmarks/    seeded corpus generator + scenarios, runner, report generator, results/latest.json
-tests/         unit · integration · regression (incremental == full) · benchmark properties
+docs/          architecture, dependency model, Python API, MCP, benchmark (design + generated results), implementation log
+benchmarks/    seeded corpus generator + scenarios, runner, report generator, equivalence evaluation, results/
+tests/         unit · integration (incl. Python API, MCP) · regression (incremental == full) · benchmark properties
 examples/      sample-knowledge-base (Markdown, TXT, JSON, HTML)
 ```
 

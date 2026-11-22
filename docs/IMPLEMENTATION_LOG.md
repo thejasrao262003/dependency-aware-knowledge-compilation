@@ -206,6 +206,35 @@ reproducible benchmark command and a clean CI run.
       was checked byte for byte against the old generator and is identical.
       20,000 documents now generate in about 4 s.
     - A regression test covers this.
+40. **Python API (v0.2).**
+    - Added `dakc.kb.KnowledgeBase` and `dakc.open` / `init` / `ingest`,
+      with typed results and the `dakc.DakcError` hierarchy (ADR-23).
+    - The CLI and the REST API were rebuilt on top of it. The REST API now
+      opens one connection per request and closes it; before, it leaked one
+      per request. It also gained `/artifacts`, `/trace`, `/downstream` and
+      `/duplicates`.
+    - `dakc status` and `dakc builds` gained `--json`.
+    - `BuildReport.has_work()` separates real work from cutoffs (checks that
+      found nothing to do).
+    - While writing the API docstring, I found that `rollback` discards the
+      artifact versions of later builds rather than keeping them. The API and
+      MCP descriptions now say so, and MCP marks it destructive.
+41. **MCP server (v0.2).**
+    - `dakc mcp` is built on the official MCP Python SDK 2.x. Version 2
+      renamed `FastMCP` to `MCPServer` and changed other APIs. Rather than
+      writing from memory of 1.x, I read the API from the installed package
+      and probed its behaviour (structured results, `ToolError`, annotations,
+      the in-process client) before writing any server code.
+    - 12 read-only tools, plus `compile` (preview by default, with an LLM cost
+      guard) and `rollback` (explicit, destructive). It also has a read-only
+      mode, bounded outputs, and a connection per call (ADR-24).
+    - Tests use the official client, both in-process and over a real stdio
+      subprocess, which catches any stray output on stdout. The
+      streamable-HTTP transport was smoke-tested by hand.
+42. **Clean-up.** Removed five unused imports and variables flagged by
+    pyflakes, including a stale comment in the real-LLM experiment that
+    contradicted the code below it. Behaviour is unchanged, and the benchmark
+    still reproduces exactly.
 
 ## Not done (deliberately or for lack of resources)
 

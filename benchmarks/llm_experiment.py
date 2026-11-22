@@ -45,7 +45,7 @@ from pathlib import Path
 
 from rapidfuzz import fuzz
 
-from benchmarks.corpus import SCENARIOS, apply_scenario, generate
+from benchmarks.corpus import apply_scenario, generate
 from benchmarks.run import machine
 from dakc.claims import extract_mentions, plan_reuse, sentence_key, split_sentences
 from dakc.compiler import Compiler
@@ -231,12 +231,8 @@ def part_a(config: Path, paragraphs: dict[str, list], jobs: int, log, work: Path
             agg["sentences_total"] += len(sents)
             for m, d in dirty_by_mode.items():
                 agg["sentences_sent"][m] += len(d)
-            dirty = dirty_by_mode["sentence"]
             ids_v1 = [claim_id(c.text) for c in v1.claims]
             groups = [assign(c.text, sents) for c in v1.claims]
-            # If the replaced entity occurs only in the edited sentence, every old claim naming it derives from
-            # that sentence (directly or through a pronoun) and is stale if it survives. Otherwise only claims
-            # attributed to the edited sentence count.
             # The replaced entity occurs exactly once in the paragraph (edit_paragraph guarantees it), so every
             # old claim naming it derives from the edited sentence, directly or through a pronoun.
             detail_ids = {claim_id(c.text) for c in v1.claims if target.casefold() in c.text.casefold()}

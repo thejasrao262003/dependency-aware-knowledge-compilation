@@ -316,6 +316,56 @@ third of the true paraphrases. An LLM judge did well on the templated set,
 but real text is harder, and a false merge silently corrupts knowledge.
 Redundant claims are the safer failure.
 
+## ADR-23: One library API; the CLI, REST and MCP layers are thin
+
+**Decision.** `dakc.kb.KnowledgeBase` is the only place where operations
+are orchestrated: taking the lock, compiling, writing the wiki projection,
+mapping failures to errors. Every method returns a dataclass with `to_dict()`.
+The CLI, the REST API and the MCP server only parse arguments and present the
+results. Errors form one hierarchy under `dakc.DakcError`, and each error also
+derives from the matching built-in.
+
+**Why.** Before v0.2 the orchestration lived inside CLI command functions.
+The REST API duplicated parts of it and leaked a SQLite connection per
+request. A second and third front end would have meant a second and third
+copy of the lock and projection logic, which is exactly where concurrency
+bugs hide. With one code path, a test of the library covers every front end.
+
+**Trade-off.** `CompileFailed.preserved` is computed from HEAD (did it
+move?), not from a full state digest. Hashing the whole store would cost
+seconds per build at 20,000 documents. The transactional commit is what
+guarantees preservation, and fault-injection tests check it with full
+digests.
+
+## ADR-24: The MCP server previews by default and is bound to one workspace
+
+**Decision.** `dakc mcp` serves exactly one workspace, fixed at start-up.
+
+- **Inspection tools** are annotated read-only.
+- **`compile`** returns a plan unless called with `apply=true`. With an LLM
+  provider it refuses a build planned to exceed `--max-llm-calls`.
+- **`rollback`** needs an explicit build id and is annotated destructive.
+- **`--read-only`** drops both mutating tools.
+- **Every list output is capped**, and totals are always reported.
+- **Each tool call opens its own `KnowledgeBase`.**
+
+**Why.** An agent calling tools is an untrusted, cost-unaware caller.
+
+- **Previewing first** costs nothing, because a dry run is free and exact for
+  free providers. It turns an accidental full rebuild into a visible plan.
+- **The cost guard** uses the plan's upper bound, so it can only refuse too
+  much, never too little.
+- **Bounding outputs** keeps a hub page or a big build from flooding the
+  model's context.
+- **Binding to one workspace** stops an agent from compiling arbitrary
+  directories.
+- **A connection per call**, because the SDK runs synchronous tools on
+  worker threads.
+
+**Not done.** There are no MCP resources or prompts yet; the tools cover the
+use cases. There is no authentication for the HTTP transport, which binds to
+127.0.0.1 by default.
+
 ## Libraries reused rather than reimplemented
 
 | Need | Library |
@@ -330,4 +380,5 @@ Redundant claims are the safer failure.
 | Fuzzy claim matching | `rapidfuzz` |
 | File watching | `watchdog` (optional extra) |
 | HTTP API / clients | `fastapi`, `httpx` |
+| MCP server | `mcp` (official Python SDK, v2; optional extra) |
 | Tests | `pytest` |

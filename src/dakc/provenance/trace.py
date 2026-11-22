@@ -37,6 +37,9 @@ class ClaimTrace:
     text: str
     evidence: list[Evidence] = field(default_factory=list)
 
+    def to_dict(self) -> dict:
+        return asdict(self)
+
 
 @dataclass
 class SentenceTrace:

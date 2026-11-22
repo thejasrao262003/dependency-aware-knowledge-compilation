@@ -95,3 +95,12 @@ def test_rest_api(ws):
     assert plan["dry_run"] and plan["operation_counts"]["reextract"] == 1
     assert client.get("/builds").json()[0]["status"] in ("committed", "noop")
     assert client.get("/artifacts/page:nope").status_code == 404
+
+
+def test_missing_extra_hint_keeps_brackets(ws, monkeypatch):
+    """Rich would swallow `[mcp]` as a markup tag; the install hint must show it."""
+    import importlib.util
+
+    monkeypatch.setattr(importlib.util, "find_spec", lambda name, *a: None)
+    r = run("mcp", "-w", ws, ok=False)
+    assert r.exit_code == 2 and "pip install 'dakc[mcp]'" in r.output

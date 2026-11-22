@@ -1,99 +1,109 @@
 """Read-only REST API over a workspace (``dakc serve``).
 
-Endpoints mirror the CLI: status, check, plan (dry run), graph (React Flow
-format for a frontend), explain, builds and diff. Nothing here mutates the
-knowledge base; compiling stays an explicit CLI action.
+A thin layer over :class:`dakc.kb.KnowledgeBase`: status, check, plan (dry
+run), artifacts, explain, trace, downstream, graph (React Flow format for a
+frontend), builds and diff. Nothing here mutates the knowledge base; compiling
+stays an explicit CLI, Python or MCP action. Each request opens its own
+connection and closes it when the response is sent.
 """
 
-from __future__ import annotations
-
+# No `from __future__ import annotations`: FastAPI must evaluate the local
+# `KB` dependency annotation at definition time.
 import json
+from collections.abc import Iterator
 from pathlib import Path
+from typing import Annotated
 
-from fastapi import FastAPI, HTTPException, Query
-from fastapi.responses import PlainTextResponse
+from fastapi import Depends, FastAPI, HTTPException, Query, Request
+from fastapi.responses import JSONResponse, PlainTextResponse
 
-from dakc.compiler import Compiler
-from dakc.graph import build_graph, downstream, export, resolve_id, stats
-from dakc.provenance import changed_sources, explain
+from dakc import __version__
+from dakc.errors import ArtifactNotFound, InvalidArgument, WorkspaceNotFound
+from dakc.kb import KnowledgeBase
 from dakc.workspace import Workspace
+
+GRAPH_EXPORT_LIMIT = 20_000  # edges; larger graphs are only exported around one node
 
 
 def create_app(root: Path) -> FastAPI:
-    ws = Workspace.load(root)
-    app = FastAPI(title="DAKC", version="0.1.0", description="Dependency-Aware Knowledge Compiler (read-only API)")
+    try:
+        ws = Workspace.load(root)
+    except FileNotFoundError as exc:
+        raise WorkspaceNotFound(str(exc)) from exc
+    app = FastAPI(title="DAKC", version=__version__, description="Dependency-Aware Knowledge Compiler (read-only API)")
 
-    def store():
-        return ws.store()
+    def open_kb() -> Iterator[KnowledgeBase]:
+        kb = KnowledgeBase(ws)
+        try:
+            yield kb
+        finally:
+            kb.close()
+
+    KB = Annotated[KnowledgeBase, Depends(open_kb)]
+
+    @app.exception_handler(ArtifactNotFound)
+    def _not_found(_: Request, exc: ArtifactNotFound) -> JSONResponse:
+        return JSONResponse({"detail": str(exc)}, status_code=404)
+
+    @app.exception_handler(InvalidArgument)
+    def _bad_request(_: Request, exc: InvalidArgument) -> JSONResponse:
+        return JSONResponse({"detail": str(exc)}, status_code=400)
 
     @app.get("/status")
-    def status():
-        st = store()
-        sr, changed = changed_sources(st, ws.source_root, ws.excluded)
-        return {"head": st.head, "counts": st.counts(), "source_changes": sr.summary(), "stale_sources": sorted(changed)}
+    def status(kb: KB):
+        return kb.status().to_dict()
 
     @app.get("/check")
-    def check():
-        st = store()
-        sr, _ = changed_sources(st, ws.source_root, ws.excluded)
-        reg = st.load_sources()
-        return {
-            "new": sr.new,
-            "modified": [p for _, p in sr.modified],
-            "deleted": [reg[s].path for s in sr.deleted],
-            "renamed": [[o, n] for _, o, n in sr.renamed],
-            "unchanged": len(sr.unchanged),
-        }
+    def check(kb: KB):
+        return kb.check().to_dict()
 
     @app.get("/plan")
-    def plan():
+    def plan(kb: KB, full: bool = False):
         """Dry-run compilation plan. Free providers give an exact plan; LLM providers an upper bound."""
-        st = store()
-        report, _ = Compiler(
-            st, ws.provider(), ws.source_root, aliases=ws.config.alias_map,
-            config_fingerprint=ws.config.fingerprint, dry_run=True, exclude=ws.excluded, provenance=ws.config.provenance,
-        ).run()
-        return report.to_dict(limit=500)
+        return kb.plan(full=full).to_dict(limit=500)
 
     @app.get("/graph")
-    def graph(source: str | None = None, format: str = Query("reactflow", pattern="^(json|reactflow)$")):
-        st = store()
-        if source is None:
-            if st.counts().get("edges", 0) > 20_000:
-                return {"stats": stats(st), "note": "graph too large to export whole; pass ?source="}
-            return json.loads(export(build_graph(st, with_titles=True), format))
-        root = resolve_id(st, source)
-        if root is None:
-            raise HTTPException(404, f"no artifact or source matches {source!r}")
-        return json.loads(export(build_graph(st, set(downstream(st, root)), with_titles=True), format))
+    def graph(kb: KB, source: str | None = None, format: str = Query("reactflow", pattern="^(json|reactflow)$")):
+        if source is None and kb.store.counts().get("edges", 0) > GRAPH_EXPORT_LIMIT:
+            return {"stats": kb.graph_stats(), "note": "graph too large to export whole; pass ?source="}
+        return json.loads(kb.export_graph(format, around=source))
 
-    # The more specific route must be registered first.
+    @app.get("/artifacts")
+    def artifacts(kb: KB, kind: str | None = None, query: str | None = None, limit: int = Query(100, ge=1, le=1000)):
+        return [a.to_dict() for a in kb.artifacts(kind, query=query, limit=limit)]
+
+    # The more specific routes must be registered before /artifacts/{id}.
     @app.get("/artifacts/{artifact_id:path}/content", response_class=PlainTextResponse)
-    def artifact_content(artifact_id: str):
-        st = store()
-        aid = resolve_id(st, artifact_id) or artifact_id
-        cur = st.current_artifact(aid)
-        if cur is None:
-            raise HTTPException(404, f"no artifact matches {artifact_id!r}")
-        payload = cur[0].payload()
-        return payload.get("rendered") or payload.get("text") or json.dumps(payload, indent=1)
+    def artifact_content(artifact_id: str, kb: KB):
+        return kb.read(artifact_id).text
+
+    @app.get("/artifacts/{artifact_id:path}/trace")
+    def artifact_trace(artifact_id: str, kb: KB):
+        return kb.trace(artifact_id).to_dict()
+
+    @app.get("/artifacts/{artifact_id:path}/downstream")
+    def artifact_downstream(artifact_id: str, kb: KB, limit: int = Query(200, ge=1)):
+        return kb.downstream(artifact_id).to_dict(limit=limit)
 
     @app.get("/artifacts/{artifact_id:path}")
-    def artifact(artifact_id: str):
-        st = store()
-        aid = resolve_id(st, artifact_id) or artifact_id
-        _, changed = changed_sources(st, ws.source_root, ws.excluded)
-        exp = explain(st, aid, changed)
-        if exp.status == "UNKNOWN":
-            raise HTTPException(404, f"no artifact matches {artifact_id!r}")
-        return exp.to_dict()
+    def artifact(artifact_id: str, kb: KB):
+        return kb.explain(artifact_id).to_dict()
 
     @app.get("/builds")
-    def builds(limit: int = 50):
-        return [b.__dict__ for b in store().builds(limit)]
+    def builds(kb: KB, limit: int = 50):
+        return [b.to_dict() for b in kb.builds(limit)]
 
     @app.get("/diff/{a}/{b}")
-    def diff(a: int, b: int):
-        return store().diff_builds(a, b)
+    def diff(a: int, b: int, kb: KB):
+        return kb.diff(a, b).changes
 
+    @app.get("/duplicates")
+    def duplicates(kb: KB, limit: int = Query(100, ge=1)):
+        return [p.to_dict() for p in kb.duplicates(limit)]
+
+    @app.get("/health")
+    def health():
+        return {"ok": True, "version": __version__}
+
+    _ = HTTPException  # re-exported for callers that extend the app
     return app

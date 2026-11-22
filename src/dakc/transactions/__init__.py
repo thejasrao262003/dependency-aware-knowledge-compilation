@@ -19,16 +19,13 @@ from dataclasses import dataclass, field
 import blake3
 
 from dakc.artifacts import Artifact
+from dakc.errors import ConcurrentBuildError, RollbackError  # re-exported
 from dakc.ingestion import SourceRecord
 from dakc.storage import Store, now_iso
 
 
 class InjectedFault(RuntimeError):
     """Raised by :class:`FaultInjector` to simulate a failure."""
-
-
-class ConcurrentBuildError(RuntimeError):
-    """HEAD moved between loading the state and committing (a concurrent writer)."""
 
 
 class FaultInjector:
@@ -162,10 +159,6 @@ def commit(
             "UPDATE builds SET status='committed', finished_at=?, stats=? WHERE id=?",
             (now_iso(), json.dumps(stats, sort_keys=True), build_id),
         )
-
-
-class RollbackError(ValueError):
-    pass
 
 
 def rollback(store: Store, to_build: int) -> int:

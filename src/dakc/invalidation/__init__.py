@@ -50,6 +50,10 @@ def render(report: BuildReport) -> str:
         + (f"   (new {n('conflict_found')}, resolved {n('conflict_resolved')})" if n("conflict_found") or n("conflict_resolved") else "")
         + ("   `dakc conflicts` lists them" if c.get("conflicts_open") else ""),
     ]
+    if c.get("links_broken") or n("link_broken") or n("link_fixed"):
+        lines.append(f"Links:                      {c.get('links_broken', 0)} broken"
+                     + (f"   (new {n('link_broken')}, fixed {n('link_fixed')})" if n("link_broken") or n("link_fixed") else "")
+                     + ("   `dakc links` lists them" if c.get("links_broken") else ""))
     if "conflict_candidates" in c:  # the conflict verifier is on (RFC 0002, phase 2)
         judged = (f"{report.planned_llm_calls.get('verify', 0)} call(s) planned" if report.dry_run and "verify" in report.planned_llm_calls
                   else f"{c.get('conflict_pairs_checked', 0)} pair(s) judged")

@@ -20,7 +20,7 @@ from tests.conftest import POSTGRES_DOCS, write_files  # noqa: E402
 from tests.integration.test_python_api import paid_workspace  # noqa: E402
 
 READ_TOOLS = {"status", "check_sources", "list_artifacts", "read_artifact", "explain", "trace", "downstream",
-              "graph_stats", "builds", "diff_builds", "duplicates", "verify", "conflicts"}
+              "graph_stats", "builds", "diff_builds", "duplicates", "verify", "conflicts", "links"}
 
 
 def session(server, *calls: tuple[str, dict[str, Any]]):

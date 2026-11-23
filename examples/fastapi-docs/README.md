@@ -107,6 +107,14 @@ A team's notes copied from the earlier docs still say Bcrypt.
 
 It runs in about 20 seconds and calls no model.
 
+## Links broken by renames
+
+[results/links.md](results/links.md): of FastAPI's 8,182 links, 166 point inside
+the docs, and none is broken. For each of the 42 links to a heading in another
+document, renaming that heading was reported every time, with the right fix; so was
+moving the linked document. None of the last 50 real commits broke a link.
+`python examples/fastapi-docs/links_eval.py` reproduces it in about two minutes.
+
 ## An agent doing it over MCP
 
 [results/agent-session.md](results/agent-session.md) records two real sessions.

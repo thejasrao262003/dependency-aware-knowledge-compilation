@@ -208,6 +208,8 @@ async function overview(view) {
     <p class="lede">${lede}</p>
     ${st.conflicts_open ? `<div class="callout conflict"><a href="#/conflicts"><strong>${plural(st.conflicts_open, "open conflict", "open conflicts")}</strong></a>
       between documents: statements that cannot both be true.</div>` : ""}
+    ${st.links_broken ? `<div class="callout conflict"><a href="#/links"><strong>${plural(st.links_broken, "broken link", "broken links")}</strong></a>
+      between documents: a link to a document or heading that no longer exists.</div>` : ""}
     ${stack(st.counts, ov)}
     <div class="grid-2" style="margin-top:36px">
       <section class="card"><h3>Recent builds</h3><ul class="list timeline">${recent.map((b) => buildRow(b, st.head)).join("")}</ul>
@@ -295,7 +297,7 @@ async function artifact(view, ident, params) {
     view.innerHTML = `<p class="eyebrow">Not found</p><h1 class="title">${esc(ident)}</h1><div class="empty">${esc(e.message)}</div>`;
     return;
   }
-  const notice = await conflictNotice(exp);
+  const notice = (await conflictNotice(exp)) + (await linkNotice(exp));
   if (!live()) return;
   const id = exp.id, kind = exp.kind;
   const statusCls = { VALID: "valid", STALE: "stale", DELETED: "deleted" }[exp.status] || "";
@@ -406,7 +408,8 @@ async function depsTab(pane, exp, live) {
 }
 
 async function impactTab(pane, exp, live) {
-  const [d, st] = await Promise.all([api(`/artifacts/${enc(exp.id)}/downstream?limit=30`), api("/status")]);
+  const [d, st, into] = await Promise.all([api(`/artifacts/${enc(exp.id)}/downstream?limit=30`), api("/status"),
+    exp.kind === "source" ? api(`/links/to?path=${enc(exp.title)}`).catch(() => []) : Promise.resolve([])]);
   if (!live()) return;
   const counts = Object.fromEntries(LAYERS.map((l) => [l.kind, st.counts[l.kind] || 0]));
   const ov = { mode: "impact", layers: Object.fromEntries(LAYERS.map((l) => [l.kind, {
@@ -416,7 +419,13 @@ async function impactTab(pane, exp, live) {
     ${stack(counts, ov)}
     <div class="grid-2" style="margin-top:28px">${Object.entries(d.by_kind).filter(([k]) => k !== "relationship").map(([k, items]) =>
       `<section class="card"><h3>${esc(KIND[k] || k)} · ${fmt(d.counts[k])}</h3><ul class="list">${items.map((a) =>
-        `<li><a class="row" href="#/a/${enc(a.id)}">${swatch(a.kind)}<span class="t">${esc(a.title)}</span><span></span></a></li>`).join("")}</ul>${d.counts[k] > items.length ? `<p class="muted">and ${fmt(d.counts[k] - items.length)} more</p>` : ""}</section>`).join("") || '<div class="empty">Nothing is built from it.</div>'}</div>`;
+        `<li><a class="row" href="#/a/${enc(a.id)}">${swatch(a.kind)}<span class="t">${esc(a.title)}</span><span></span></a></li>`).join("")}</ul>${d.counts[k] > items.length ? `<p class="muted">and ${fmt(d.counts[k] - items.length)} more</p>` : ""}</section>`).join("") || '<div class="empty">Nothing is built from it.</div>'}</div>
+    ${exp.kind === "source" ? `<section class="card" style="margin-top:28px"><h3>Linked from · ${fmt(into.length)}</h3>
+      ${into.length ? `<p class="muted" style="margin:0 0 8px;font-size:13.5px">Renaming or moving this document, or a heading these links name, breaks them. DAKC reports it at the next compile.</p>
+      <ul class="list">${into.slice(0, 30).map((x) => `<li class="row" style="grid-template-columns:minmax(0,1fr) auto">
+        <span class="t"><a class="mono" href="#/a/${enc(x.path)}">${esc(x.path)}:${x.line}</a> <span class="muted">${esc(x.text)}</span></span>
+        <span class="id">${esc(x.anchor ? "#" + x.anchor : "")}</span></li>`).join("")}</ul>${into.length > 30 ? `<p class="muted">and ${fmt(into.length - 30)} more</p>` : ""}`
+      : '<p class="muted">No other document links here.</p>'}</section>` : ""}`;
 }
 
 async function graphTab(pane, exp, live) {
@@ -689,6 +698,44 @@ async function conflictNotice(exp) {
     ${hit.slice(0, 3).map((c) => `<a href="#/conflicts/${enc(c.id)}">${esc(c.property)}</a>`).join("; ")}${hit.length > 3 ? ` and ${fmt(hit.length - 3)} more` : ""}.</div>`;
 }
 
+// ------------------------------------------------------------------ links between documents
+const linkRow = (b) => `<li class="row link-row">
+    <span class="pill conflict">${b.kind === "missing_anchor" ? "no such heading" : "no such document"}</span>
+    <span class="t"><a class="mono" href="#/a/${enc(b.path)}">${esc(b.path)}:${b.line}</a>
+      <span class="muted">[${esc(b.text)}](${esc(b.href)})</span>
+      <span class="sub">${esc(b.reason)}.${b.suggestion ? ` Fix: <code>${esc(b.suggestion)}</code>` : ""}</span></span>
+    <span class="id">since #${b.since_build}</span></li>`;
+
+async function brokenLinks(view) {
+  const live = begin(view);
+  const [st, found] = await Promise.all([api("/status"), api("/links")]);
+  if (!live()) return;
+  view.innerHTML = `
+    <p class="eyebrow">${swatch("source")} Links · build ${st.head || "–"}</p>
+    <h1 class="title">${found.length ? `${plural(found.length, "broken link", "broken links")} between documents.` : "No broken links between documents."}</h1>
+    <p class="lede">Links from one document to another that no longer exists, or to a heading it no longer has. When DAKC saw
+      the rename that broke a link, it names the new target. External links are not checked.</p>
+    ${found.length ? `<ul class="list card" style="padding:4px 12px">${found.map(linkRow).join("")}</ul>`
+      : `<div class="empty">Every link between documents points at a document and heading that exist.</div>`}
+    <div class="callout">This UI is read-only: fix the link in its document, then compile. <code>dakc links --check</code> fails CI while one is broken.</div>`;
+}
+
+// Broken links in a document, or pointing at it.
+async function linkNotice(exp) {
+  if (exp.kind !== "source") return "";
+  let found;
+  try { found = await api(`/links?path=${enc(exp.title)}`); } catch (e) { return ""; }
+  if (!found.length) return "";
+  const out = found.filter((b) => b.path === exp.title), into = found.filter((b) => b.path !== exp.title);
+  const parts = [];
+  if (out.length) parts.push(out.length === 1 ? "1 link in this document is broken" : `${fmt(out.length)} links in this document are broken`);
+  if (into.length) parts.push(into.length === 1 ? "1 link from another document points at a heading or path this one no longer has"
+    : `${fmt(into.length)} links from other documents point at headings or paths this one no longer has`);
+  return `<div class="callout conflict">${parts.join("; ")}: ${found.slice(0, 3).map((b) =>
+    `<code>${esc(b.path)}:${b.line}</code>${b.suggestion ? ` (fix: <code>${esc(b.suggestion)}</code>)` : ""}`).join(", ")}${found.length > 3 ? " …" : ""}.
+    <a href="#/links">All broken links</a>.</div>`;
+}
+
 // ------------------------------------------------------------------ shell
 function setNav(section) {
   document.querySelectorAll(".rail a").forEach((a) => {
@@ -719,7 +766,7 @@ async function route() {
   const params = new URLSearchParams(qs || "");
   const parts = path.split("/").filter(Boolean);
   const view = $("#view");
-  const section = { explore: "explore", a: "explore", changes: "changes", builds: "builds", conflicts: "conflicts" }[parts[0]] || "overview";
+  const section = { explore: "explore", a: "explore", changes: "changes", builds: "builds", conflicts: "conflicts", links: "overview" }[parts[0]] || "overview";
   setNav(section);
   if (parts[0] !== "explore") window.scrollTo(0, 0); // explore re-renders while typing; keep its scroll
   try {
@@ -729,6 +776,7 @@ async function route() {
     else if (parts[0] === "changes") await changes(view);
     else if (parts[0] === "builds") await builds(view, parts[1]);
     else if (parts[0] === "conflicts") await conflicts(view, parts[1] ? decodeURIComponent(parts.slice(1).join("/")) : null, params);
+    else if (parts[0] === "links") await brokenLinks(view);
     else view.innerHTML = `<h1 class="title">No such page.</h1><p><a href="#/">Back to the overview</a></p>`;
   } catch (e) {
     view.innerHTML = `<h1 class="title">Could not load this view.</h1><div class="empty err">${esc(e.message)}</div>`;

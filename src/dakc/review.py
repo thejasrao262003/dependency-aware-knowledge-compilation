@@ -74,12 +74,15 @@ class Review:
     conflicts_introduced: list[dict[str, Any]] = field(default_factory=list)  # {id, property, values: [{value, paths}]}
     conflicts_resolved: list[dict[str, Any]] = field(default_factory=list)
     conflicts_open: int = 0  # at head, not accepted in dakc.toml
+    links_broken: list[dict[str, Any]] = field(default_factory=list)  # {id, path, line, text, href, reason, suggestion}
+    links_fixed: list[dict[str, Any]] = field(default_factory=list)
+    links_broken_total: int = 0  # at head
 
     @property
     def has_changes(self) -> bool:
         return bool(self.facts_added or self.facts_retracted or any(self.pages.values())
                     or any(self.documents.values()) or any(self.summaries.values())
-                    or self.conflicts_introduced or self.conflicts_resolved)
+                    or self.conflicts_introduced or self.conflicts_resolved or self.links_broken or self.links_fixed)
 
     def to_dict(self) -> dict[str, Any]:
         return {**asdict(self), "has_changes": self.has_changes}
@@ -147,6 +150,15 @@ def _open_conflicts(store: Store, accepted: dict[str, str]) -> dict[str, dict[st
     return out
 
 
+def _broken_links(store: Store) -> dict[str, dict[str, Any]]:
+    """Broken links at HEAD: {id: {id, path, line, text, href, reason, suggestion}}."""
+    out = {}
+    for lid, payload in store.conn.execute("SELECT id, payload FROM links WHERE to_build IS NULL"):
+        d = json.loads(payload)
+        out[lid] = {"id": lid, **{k: d.get(k, "") for k in ("path", "line", "text", "href", "reason", "suggestion")}}
+    return out
+
+
 def _title(store: Store, aid: str, at_build: int) -> str:
     row = store.conn.execute(
         "SELECT json_extract(payload,'$.title') FROM artifacts WHERE id=? AND from_build<=? AND (to_build IS NULL OR to_build>?)",
@@ -189,6 +201,7 @@ def review(workspace: Path, base_ref: str, *, state_dir: Path | None = None, pri
             base_paths = {r.id: r.path for r in store.load_sources().values()}
             accepted = ws.config.accepted_conflicts
             before = _open_conflicts(store, accepted)
+            links_before = _broken_links(store)
             rep = _compile(store, ws, head_sources)
             b = store.head
             out = Review(base_sha[:10], head_ref)
@@ -196,6 +209,11 @@ def review(workspace: Path, base_ref: str, *, state_dir: Path | None = None, pri
             out.conflicts_introduced = [after[i] for i in sorted(set(after) - set(before))]
             out.conflicts_resolved = [before[i] for i in sorted(set(before) - set(after))]
             out.conflicts_open = len(after)
+            links_after = _broken_links(store)
+            out.links_broken = [links_after[i] for i in sorted(links_after, key=lambda i: (links_after[i]["path"], links_after[i]["line"]))
+                                if i not in links_before]
+            out.links_fixed = [links_before[i] for i in sorted(set(links_before) - set(links_after))]
+            out.links_broken_total = len(links_after)
             sc = rep.scan
             out.documents = {"new": sc.get("new_paths", []), "modified": sc.get("modified_paths", []),
                              "deleted": [base_paths.get(i, i) for i in sc.get("deleted_ids", [])],
@@ -275,8 +293,16 @@ def render_markdown(r: Review, limit: int = 25) -> str:
              + (f", resolve {len(r.conflicts_resolved)}" if r.conflicts_resolved else "") + " (below)")
             if r.conflicts_introduced else
             (f"- resolve {_n(len(r.conflicts_resolved), 'conflict')} between documents" if r.conflicts_resolved else None),
+            (f"- **break {_n(len(r.links_broken), 'link')} between documents**"
+             + (f", fix {len(r.links_fixed)}" if r.links_fixed else "") + " (below)")
+            if r.links_broken else
+            (f"- fix {_n(len(r.links_fixed), 'broken link')}" if r.links_fixed else None),
             "",
         ]
+        if r.links_broken:
+            items = [f"`{esc(x['path'])}:{x['line']}` [{esc(x['text'])}]({esc(x['href'])}): {esc(x['reason'])}"
+                     + (f". Fix: `{esc(x['suggestion'])}`" if x["suggestion"] else "") for x in r.links_broken]
+            lines.append(_details(f"Links broken ({len(items)})", items, limit).replace("<details>", "<details open>", 1))
         if r.conflicts_introduced:
             items = [f"{esc(c['property'])}: " + " vs ".join(
                 f"**{esc(v['value'])}** <sub>{esc(', '.join(v['paths']))}</sub>" for v in c["values"]) + f" <sub>`{c['id']}`</sub>"

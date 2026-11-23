@@ -95,6 +95,20 @@ def verify_store(store: Store, output_root: Path | None = None, state_dir: Path 
                     [f"{i}: {'missing' if i not in have else 'unexpected' if i not in want else 'differs'}"
                      for i in sorted(set(want) | set(have)) if want.get(i) != have.get(i)])
 
+    if store.get_meta("links_fp"):  # else the next compile checks every link
+        from dakc.compiler import link_history
+        from dakc.links import DocLinks, check
+
+        st = store.load_state()
+        index = {sid: DocLinks.from_json(ln, an) for sid, ln, an in
+                 store.conn.execute("SELECT source_id, links, anchors FROM link_index")}
+        found = check(index, {sid: r.path for sid, r in st.sources.items()}, *link_history(store.conn, st.sources, st.of("passage")))
+        want = {i: b.payload() for i, b in found.items()}
+        have = {i: json.loads(p) for i, p in store.conn.execute("SELECT id, payload FROM links WHERE to_build IS NULL")}
+        res.add("broken-link findings equal a check from scratch",
+                [f"{i}: {'missing' if i not in have else 'unexpected' if i not in want else 'differs'}"
+                 for i in sorted(set(want) | set(have)) if want.get(i) != have.get(i)])
+
     if output_root is not None and state_dir is not None:
         problems = []
         manifest_path = state_dir / MANIFEST

@@ -199,11 +199,14 @@ class LLMSummarizer:
 
 
 class OpenAICompatibleClient:
-    """Minimal ``/v1/chat/completions`` client (OpenAI, Ollama, vLLM, LM Studio).
+    """Minimal ``/v1/chat/completions`` client (OpenAI, Gemini, Grok, DeepSeek, Mistral,
+    Groq, OpenRouter, Together, Ollama, vLLM, LM Studio: see ``dakc.providers.PRESETS``).
 
     ``json_mode`` controls structured output: ``"none"`` (prompt + lenient
     parsing, works everywhere), ``"json_object"`` or ``"json_schema"`` (server
-    must support it).
+    must support it). ``temperature`` and ``seed`` set to None are left out, for
+    models that reject them. ``token_param`` names the output limit:
+    ``max_tokens``, or ``max_completion_tokens`` for OpenAI's reasoning models.
     """
 
     def __init__(
@@ -213,10 +216,13 @@ class OpenAICompatibleClient:
         api_key_env: str = "OPENAI_API_KEY",
         timeout: float = 180.0,
         json_mode: str = "none",
-        temperature: float = 0.0,
+        temperature: float | None = 0.0,
         seed: int | None = 0,
         max_tokens: int = 4096,
         retries: int = 3,
+        token_param: str = "max_tokens",
+        require_key: bool = False,
+        name: str = "openai-compat",
     ):
         self.base_url = base_url.rstrip("/")
         self.model = model
@@ -225,20 +231,26 @@ class OpenAICompatibleClient:
         self.seed = seed
         self.max_tokens = max_tokens
         self.retries = retries
+        self.token_param = token_param
         headers = {"Content-Type": "application/json"}
-        key = os.environ.get(api_key_env, "")
+        key = os.environ.get(api_key_env, "") if api_key_env else ""
         if key:
             headers["Authorization"] = f"Bearer {key}"
+        self.missing_key = api_key_env if require_key and not key else None  # reported at the first call
         self.http = httpx.Client(timeout=timeout, headers=headers)
-        self.fingerprint = f"openai-compat:{model}"
+        self.fingerprint = f"{name}:{model}"
 
     def complete(self, system: str, user: str, json_schema: dict | None = None) -> Completion:
+        if self.missing_key:
+            raise ProviderError(f"{self.missing_key} is not set: export the provider's API key as {self.missing_key} "
+                                "(or name another variable with api_key_env)")
         payload: dict = {
             "model": self.model,
             "messages": [{"role": "system", "content": system}, {"role": "user", "content": user}],
-            "temperature": self.temperature,
-            "max_tokens": self.max_tokens,
+            self.token_param: self.max_tokens,
         }
+        if self.temperature is not None:
+            payload["temperature"] = self.temperature
         if self.seed is not None:
             payload["seed"] = self.seed
         if json_schema is not None and self.json_mode == "json_schema":

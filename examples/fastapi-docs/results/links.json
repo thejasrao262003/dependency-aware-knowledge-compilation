@@ -1,0 +1,382 @@
+{
+ "generated": "2026-11-23T18:24:33+00:00",
+ "dakc_version": "0.6.1",
+ "source": {
+  "repo": "fastapi/fastapi",
+  "commit": "05e6df7e906c3decba377c37548019973f40bf15"
+ },
+ "as_is": {
+  "documents": 159,
+  "links": 8182,
+  "internal_links": 166,
+  "anchors": 2943,
+  "broken": [],
+  "read_seconds": 0.676,
+  "check_ms": 4.92
+ },
+ "planted": {
+  "heading": {
+   "links": 42,
+   "caught": 42,
+   "fix_correct": 42,
+   "not_renamable": 0
+  },
+  "document": {
+   "links": 42,
+   "caught": 42,
+   "fix_correct": 42
+  }
+ },
+ "replay": [
+  {
+   "commit": "84d5f8ea75",
+   "subject": "🔖 Release version 0.162.3 (#16729)",
+   "broken_now": 0,
+   "newly_broken": 0,
+   "fixed": 0
+  },
+  {
+   "commit": "af628068e7",
+   "subject": "📝 Update release notes",
+   "broken_now": 0,
+   "newly_broken": 0,
+   "fixed": 0
+  },
+  {
+   "commit": "e10178c18d",
+   "subject": "🔖 Release version 0.162.4 (#16731)",
+   "broken_now": 0,
+   "newly_broken": 0,
+   "fixed": 0
+  },
+  {
+   "commit": "e1144f6954",
+   "subject": "📝 Update release notes",
+   "broken_now": 0,
+   "newly_broken": 0,
+   "fixed": 0
+  },
+  {
+   "commit": "067f9d4777",
+   "subject": "📝 Update release notes",
+   "broken_now": 0,
+   "newly_broken": 0,
+   "fixed": 0
+  },
+  {
+   "commit": "5add7a458d",
+   "subject": "🔖 Release version 0.162.5 (#16735)",
+   "broken_now": 0,
+   "newly_broken": 0,
+   "fixed": 0
+  },
+  {
+   "commit": "28eaf6a22c",
+   "subject": "💥 Drop support for Python 3.10 (#16737)",
+   "broken_now": 0,
+   "newly_broken": 0,
+   "fixed": 0
+  },
+  {
+   "commit": "445c570ba8",
+   "subject": "📝 Update release notes",
+   "broken_now": 0,
+   "newly_broken": 0,
+   "fixed": 0
+  },
+  {
+   "commit": "12e66580a8",
+   "subject": "🔖 Release version 0.162.6 (#16738)",
+   "broken_now": 0,
+   "newly_broken": 0,
+   "fixed": 0
+  },
+  {
+   "commit": "7030191986",
+   "subject": "📝 Update release notes",
+   "broken_now": 0,
+   "newly_broken": 0,
+   "fixed": 0
+  },
+  {
+   "commit": "315f093f74",
+   "subject": "📝 Update release notes",
+   "broken_now": 0,
+   "newly_broken": 0,
+   "fixed": 0
+  },
+  {
+   "commit": "5758a9c834",
+   "subject": "🔖 Release version 0.162.7 (#16740)",
+   "broken_now": 0,
+   "newly_broken": 0,
+   "fixed": 0
+  },
+  {
+   "commit": "fc07dde880",
+   "subject": "✨ Add dependency concurrency limits with `Depends(max_concurrency=...)` (#16746)",
+   "broken_now": 0,
+   "newly_broken": 0,
+   "fixed": 0
+  },
+  {
+   "commit": "6e5130aad6",
+   "subject": "📝 Update release notes",
+   "broken_now": 0,
+   "newly_broken": 0,
+   "fixed": 0
+  },
+  {
+   "commit": "913c68062c",
+   "subject": "🔖 Release version 0.163.0 (#16747)",
+   "broken_now": 0,
+   "newly_broken": 0,
+   "fixed": 0
+  },
+  {
+   "commit": "b11137461f",
+   "subject": "📝 Update release notes",
+   "broken_now": 0,
+   "newly_broken": 0,
+   "fixed": 0
+  },
+  {
+   "commit": "a3260d49e9",
+   "subject": "🔖 Release version 0.163.1 (#16775)",
+   "broken_now": 0,
+   "newly_broken": 0,
+   "fixed": 0
+  },
+  {
+   "commit": "2a1bd230b4",
+   "subject": "📝 Update release notes",
+   "broken_now": 0,
+   "newly_broken": 0,
+   "fixed": 0
+  },
+  {
+   "commit": "25584a5bc8",
+   "subject": "📝 Update release notes",
+   "broken_now": 0,
+   "newly_broken": 0,
+   "fixed": 0
+  },
+  {
+   "commit": "e404fd160e",
+   "subject": "📝 Update release notes",
+   "broken_now": 0,
+   "newly_broken": 0,
+   "fixed": 0
+  },
+  {
+   "commit": "aa8e89334e",
+   "subject": "📝 Update release notes",
+   "broken_now": 0,
+   "newly_broken": 0,
+   "fixed": 0
+  },
+  {
+   "commit": "8b83841a2e",
+   "subject": "📝 Update release notes",
+   "broken_now": 0,
+   "newly_broken": 0,
+   "fixed": 0
+  },
+  {
+   "commit": "c172667d74",
+   "subject": "📝 Update release notes",
+   "broken_now": 0,
+   "newly_broken": 0,
+   "fixed": 0
+  },
+  {
+   "commit": "588459730a",
+   "subject": "📝 Update release notes",
+   "broken_now": 0,
+   "newly_broken": 0,
+   "fixed": 0
+  },
+  {
+   "commit": "9e34bf058d",
+   "subject": "📝 Update release notes",
+   "broken_now": 0,
+   "newly_broken": 0,
+   "fixed": 0
+  },
+  {
+   "commit": "d85d47a416",
+   "subject": "📝 Update release notes",
+   "broken_now": 0,
+   "newly_broken": 0,
+   "fixed": 0
+  },
+  {
+   "commit": "a3e066e05b",
+   "subject": "📝 Update release notes",
+   "broken_now": 0,
+   "newly_broken": 0,
+   "fixed": 0
+  },
+  {
+   "commit": "beb0cbab7d",
+   "subject": "📝 Update release notes",
+   "broken_now": 0,
+   "newly_broken": 0,
+   "fixed": 0
+  },
+  {
+   "commit": "55da91f49b",
+   "subject": "📝 Update release notes",
+   "broken_now": 0,
+   "newly_broken": 0,
+   "fixed": 0
+  },
+  {
+   "commit": "4b7840ff3d",
+   "subject": "📝 Update release notes",
+   "broken_now": 0,
+   "newly_broken": 0,
+   "fixed": 0
+  },
+  {
+   "commit": "94c3302e2d",
+   "subject": "📝 Update release notes",
+   "broken_now": 0,
+   "newly_broken": 0,
+   "fixed": 0
+  },
+  {
+   "commit": "c43a17886f",
+   "subject": "📝 Update release notes",
+   "broken_now": 0,
+   "newly_broken": 0,
+   "fixed": 0
+  },
+  {
+   "commit": "18c10d847e",
+   "subject": "📝 Update release notes",
+   "broken_now": 0,
+   "newly_broken": 0,
+   "fixed": 0
+  },
+  {
+   "commit": "fc3cda4849",
+   "subject": "📝 Update release notes",
+   "broken_now": 0,
+   "newly_broken": 0,
+   "fixed": 0
+  },
+  {
+   "commit": "03121f84a1",
+   "subject": "📝 Update release notes",
+   "broken_now": 0,
+   "newly_broken": 0,
+   "fixed": 0
+  },
+  {
+   "commit": "4b9caed6ac",
+   "subject": "📝 Update release notes",
+   "broken_now": 0,
+   "newly_broken": 0,
+   "fixed": 0
+  },
+  {
+   "commit": "4d8e818ee2",
+   "subject": "📝 Update release notes",
+   "broken_now": 0,
+   "newly_broken": 0,
+   "fixed": 0
+  },
+  {
+   "commit": "ec663f531e",
+   "subject": "📝 Update release notes",
+   "broken_now": 0,
+   "newly_broken": 0,
+   "fixed": 0
+  },
+  {
+   "commit": "a76e828286",
+   "subject": "📝 Update release notes",
+   "broken_now": 0,
+   "newly_broken": 0,
+   "fixed": 0
+  },
+  {
+   "commit": "e4157c7c6c",
+   "subject": "📝 Update release notes",
+   "broken_now": 0,
+   "newly_broken": 0,
+   "fixed": 0
+  },
+  {
+   "commit": "dd567e0aa7",
+   "subject": "📝 Update release notes",
+   "broken_now": 0,
+   "newly_broken": 0,
+   "fixed": 0
+  },
+  {
+   "commit": "a1b3be01aa",
+   "subject": "📝 Update release notes",
+   "broken_now": 0,
+   "newly_broken": 0,
+   "fixed": 0
+  },
+  {
+   "commit": "a978e511eb",
+   "subject": "📝 Update release notes",
+   "broken_now": 0,
+   "newly_broken": 0,
+   "fixed": 0
+  },
+  {
+   "commit": "b2831196bf",
+   "subject": "🔖 Release version 0.163.2 (#16780)",
+   "broken_now": 0,
+   "newly_broken": 0,
+   "fixed": 0
+  },
+  {
+   "commit": "55ee14be5e",
+   "subject": "✨ Add configurable request body size limits (#16781)",
+   "broken_now": 0,
+   "newly_broken": 0,
+   "fixed": 0
+  },
+  {
+   "commit": "74038ff79f",
+   "subject": "📝 Update release notes",
+   "broken_now": 0,
+   "newly_broken": 0,
+   "fixed": 0
+  },
+  {
+   "commit": "821d37eec1",
+   "subject": "🔖 Release version 0.164.0 (#16782)",
+   "broken_now": 0,
+   "newly_broken": 0,
+   "fixed": 0
+  },
+  {
+   "commit": "b0a616d9fa",
+   "subject": "✨ Add configurable form parsing limits (#16784)",
+   "broken_now": 0,
+   "newly_broken": 0,
+   "fixed": 0
+  },
+  {
+   "commit": "57be707b5b",
+   "subject": "📝 Update release notes",
+   "broken_now": 0,
+   "newly_broken": 0,
+   "fixed": 0
+  },
+  {
+   "commit": "05e6df7e90",
+   "subject": "🔖 Release version 0.165.0 (#16785)",
+   "broken_now": 0,
+   "newly_broken": 0,
+   "fixed": 0
+  }
+ ]
+}

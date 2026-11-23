@@ -126,7 +126,8 @@ def init(
     workspace: WS = Path("."),
     source: Annotated[str, typer.Option(help="Source directory, relative to the workspace.")] = "knowledge",
     output: Annotated[str, typer.Option(help="Output (wiki) directory.")] = "wiki",
-    provider: Annotated[str, typer.Option(help="heuristic | mock | openai | anthropic | custom")] = "heuristic",
+    provider: Annotated[str, typer.Option(help="heuristic | mock | claude-code | anthropic (claude) | openai | gemini | grok | "
+                                               "deepseek | mistral | groq | openrouter | together | ollama | lmstudio | custom")] = "heuristic",
 ) -> None:
     """Create dakc.toml in a workspace."""
     existed = (workspace / CONFIG_NAME).exists()
@@ -394,6 +395,44 @@ def conflicts(
         raise typer.Exit(1)
 
 
+@app.command()
+def links(
+    path: Annotated[Optional[str], typer.Argument(help="Only links in this document or pointing at it.")] = None,
+    workspace: WS = Path("."),
+    to: Annotated[bool, typer.Option("--to", help="List every link pointing at PATH, working or not.")] = False,
+    check: Annotated[bool, typer.Option("--check", help="Exit with status 1 if a link is broken (for CI).")] = False,
+    as_json: JSON = False,
+) -> None:
+    """Links between documents that point at a document or heading that no longer exists.
+    Advisory: nothing is changed."""
+    with _open(workspace) as kb:
+        if to:
+            if not path:
+                raise typer.BadParameter("--to needs a document path")
+            into = kb.linked_from(path)
+            if as_json:
+                _emit_json({"path": path, "linked_from": into})
+                return
+            for x in into:
+                console.print(f"{escape(x['path'])}:{x['line']}  [dim]{escape(x['href'])}[/dim]  {escape(x['text'])}")
+            console.print(f"\n{len(into)} link(s) point at {escape(path)}.")
+            return
+        found = kb.links(path)
+    if as_json:
+        _emit_json({"broken": len(found), "links": [b.to_dict() for b in found]})
+    elif not found:
+        console.print("[green]No broken links[/green] between documents at HEAD.")
+    else:
+        for b in found:
+            console.print(f"[red]broken[/red]  [bold]{escape(b.path)}:{b.line}[/bold]  [{escape(b.text)}]({escape(b.href)})")
+            console.print(f"        {escape(b.reason)}")
+            if b.suggestion:
+                console.print(f"        [green]fix:[/green] {escape(b.suggestion)}")
+        console.print(f"\n{len(found)} broken link(s). Advisory: nothing was changed.")
+    if check and found:
+        raise typer.Exit(1)
+
+
 def _show_conflict(c, as_json: bool) -> None:
     if as_json:
         _emit_json(c.to_dict())
@@ -440,6 +479,8 @@ def status(workspace: WS = Path("."), as_json: JSON = False) -> None:
     console.print("Artifacts: " + ", ".join(f"{k} {v}" for k, v in sorted(st.counts.items(), key=lambda kv: _layer(kv[0]))))
     if st.conflicts_open:
         console.print(f"[red]Conflicts[/red]: {st.conflicts_open} open (`dakc conflicts`)")
+    if st.links_broken:
+        console.print(f"[red]Links[/red]: {st.links_broken} broken (`dakc links`)")
     if st.up_to_date:
         console.print("[green]Up to date[/green]: no source changes since HEAD.")
         return

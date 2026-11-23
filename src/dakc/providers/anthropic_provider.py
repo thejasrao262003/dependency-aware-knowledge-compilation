@@ -20,6 +20,8 @@ from dakc.providers.llm import Completion, ProviderError
 
 DEFAULT_MODEL = "claude-opus-5-5"
 FALLBACK_BETA = "server-side-fallback-2026-07-01"
+# Server-side refusal fallbacks exist for these models only (not Haiku); others are sent without them.
+FALLBACK_MODELS = ("claude-fable-", "claude-mythos-", "claude-opus-5", "claude-sonnet-5-5")
 
 
 class AnthropicClient:
@@ -59,7 +61,7 @@ class AnthropicClient:
         if output_config:
             kwargs["output_config"] = output_config
 
-        if self.fallbacks:
+        if self.fallbacks and self.model.startswith(FALLBACK_MODELS):
             response = self.client.beta.messages.create(betas=[FALLBACK_BETA], fallbacks="default", **kwargs)
         else:
             response = self.client.messages.create(**kwargs)

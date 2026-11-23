@@ -103,6 +103,30 @@ class Status:
     # configuration, or the provider changed since HEAD. Empty when there is none.
     outdated: list[str] = field(default_factory=list)
     conflicts_open: int = 0  # conflicts found at HEAD and not accepted in dakc.toml (RFC 0002)
+    links_broken: int = 0  # links between documents that point at a missing document or heading
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass
+class BrokenLink:
+    """A link from one document to another document, or heading, that no longer exists.
+
+    ``kind`` is ``missing_document`` or ``missing_anchor``. ``suggestion`` is the link's new
+    target when DAKC saw the rename that broke it (a moved file, a renamed heading), else empty."""
+
+    id: str
+    kind: str
+    path: str
+    line: int
+    text: str
+    href: str
+    target: str
+    anchor: str
+    reason: str
+    suggestion: str
+    since_build: int
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -497,6 +521,7 @@ class KnowledgeBase:
             up_to_date=not sr.has_changes and not outdated,
             outdated=outdated,
             conflicts_open=sum(1 for c in self.conflicts()),
+            links_broken=self.store.conn.execute("SELECT COUNT(*) FROM links WHERE to_build IS NULL").fetchone()[0],
             source_changes=sr.summary(),
             stale={k: len(v) for k, v in sorted(stale.items(), key=lambda kv: LAYER.get(kv[0], 9))},
             new_sources=len(sr.new),
@@ -607,6 +632,13 @@ class KnowledgeBase:
             out.append("configuration changed (entity aliases, entity resolution or provenance mode)")
         from dakc.conflicts import fingerprint as conflicts_fingerprint
 
+        from dakc.links import LINKS_VERSION
+
+        lfp = store.get_meta("links_fp")
+        if lfp is None:
+            out.append("links between documents have not been checked on this knowledge base yet")
+        elif lfp and lfp != LINKS_VERSION:
+            out.append("link checking changed")
         cfp = store.get_meta("conflicts_fp")
         if cfp is None:
             out.append("conflict detection has not run on this knowledge base yet")
@@ -689,6 +721,36 @@ class KnowledgeBase:
         return trace_page(self.store, art) if art.kind == "page" else trace_claim(self.store, art)  # type: ignore[arg-type]
 
     # ------------------------------------------------------------- conflicts
+    def links(self, path: str | None = None) -> list[BrokenLink]:
+        """Broken links between documents at HEAD, in document and line order. With ``path``,
+        only those in that document or pointing at it. Advisory: nothing is changed."""
+        out = []
+        for lid, payload, from_build in self.store.conn.execute(
+                "SELECT id, payload, from_build FROM links WHERE to_build IS NULL"):
+            d = json.loads(payload)
+            if path and path not in (d["path"], d["target"]):
+                continue
+            out.append(BrokenLink(lid, d["kind"], d["path"], d["line"], d["text"], d["href"], d["target"], d["anchor"],
+                                  d["reason"], d.get("suggestion", ""), from_build))
+        return sorted(out, key=lambda b: (b.path, b.line, b.id))
+
+    def linked_from(self, path: str) -> list[dict[str, Any]]:
+        """Every link in another document that points at the document ``path`` (working or not):
+        who would be affected by renaming or moving it, or its headings."""
+        from dakc.links import DocLinks, resolve
+
+        paths = {sid: p for sid, p in self.store.conn.execute("SELECT id, path FROM sources WHERE to_build IS NULL")}
+        out = []
+        for sid, links, anchors in self.store.conn.execute("SELECT source_id, links, anchors FROM link_index"):
+            src = paths.get(sid)
+            if src is None or src == path:
+                continue
+            for link in DocLinks.from_json(links, anchors).links:
+                r = resolve(src, link.href)
+                if r and path in r[0]:
+                    out.append({"path": src, "line": link.line, "text": link.text, "href": link.href, "anchor": r[1]})
+        return sorted(out, key=lambda d: (d["path"], d["line"]))
+
     def conflicts(self, *, scoped: bool = False, accepted: bool = False) -> list[Conflict]:
         """Properties the sources disagree on, at HEAD (RFC 0002). By default only open
         conflicts: ``scoped=True`` adds differences explained by scope, ``accepted=True``

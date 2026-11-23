@@ -37,6 +37,8 @@ Instances are cheap to open.
 | `builds(limit=20)` | `list[BuildRecord]` | Newest first: committed, noop, failed, rolled_back |
 | `diff(a, b=None)` | `BuildDiff` | Artifacts created / updated / deleted between two builds (`b` defaults to HEAD) |
 | `duplicates(limit=None)` | `list[DuplicatePair]` | Advisory. Claims are never merged. |
+| `links(path=None)` | `list[BrokenLink]` | Links between documents that point at a document or heading that no longer exists, each with `path`, `line`, `href`, `reason` and, when DAKC saw the rename that broke it, a `suggestion`. With `path`, only links in that document or pointing at it. |
+| `linked_from(path)` | `list[dict]` | Every link in another document that points at `path`, working or not: who a rename of it, or of its headings, affects. |
 | `conflicts(scoped=False, accepted=False)` | `list[Conflict]` | Open conflicts between sources at HEAD (RFC 0002): `kind` is `conflict` (found by the rules) or `possible` (judged by the optional verifier). `scoped=True` adds differences explained by time, release, environment or status. `accepted=True` adds those accepted in `dakc.toml`. Advisory: nothing is changed. |
 | `conflict(id)` | `Conflict` | One finding: each value with its `locations` (path, `line` in the source on disk, heading, scope, claim and the source's own `evidence` sentence), and `affected` pages and summaries. `id` is `cfl:…`, a unique prefix, or `conflict:…`. |
 | `verify(against_full=False, allow_cost=False)` | `VerifyReport` | Invariants. `against_full` also compares with a full rebuild; with an LLM provider it needs `allow_cost=True` (`CostNotAllowed` otherwise). |

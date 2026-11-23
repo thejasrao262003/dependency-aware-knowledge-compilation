@@ -44,6 +44,7 @@ from dakc.conflicts import fingerprint as conflicts_fingerprint
 from dakc.conflicts import index_rows, judge
 from dakc.conflicts import verifier as cverify
 from dakc.conflicts.verifier import Settings as VerifierSettings
+from dakc import links as dlinks
 from dakc.claims import ExtractedClaim, match_revisions, plan_reuse, segment, sentence_key, split_sentences
 from dakc.hashing import claim_id, entity_key, h, h_obj, normalize_claim, normalize_text, slugify
 from dakc.ingestion import FileInfo, ScanResult, SourceRecord, new_source_id
@@ -286,6 +287,14 @@ class Compiler:
         try:
             cs, new_state = self._compute(old, result, report)
             report.changes = cs.counts()
+            if self.provider.name == "claude-code":
+                from dakc.providers.claude_code import LARGE_BUILD_CALLS
+
+                if report.llm_calls() > LARGE_BUILD_CALLS:
+                    report.notes.append(
+                        f"{report.llm_calls():,} calls through Claude Code: subscription limits assume ordinary individual "
+                        "use, and each call takes a few seconds. For a build this size, an API-key provider is better suited "
+                        "(anthropic, openai, gemini, ...).")
             stats = {
                 **report.to_dict(limit=200),
                 "config_fingerprint": self.config_fingerprint,
@@ -383,6 +392,7 @@ class Compiler:
         to_parse = list(dict(to_parse).items())  # a source that was moved and edited is parsed once
 
         added: dict[str, PassageArt] = {}
+        doc_links: dict[str, dlinks.DocLinks] = {}  # the links and anchors of every document read in this build
         reheaded: set[str] = set()  # kept passages whose heading changed
         gone_by_source: dict[str, set[str]] = defaultdict(set)  # replaced passage versions, for sentence reuse
         for sid, info in sorted(to_parse, key=lambda t: t[1].path):
@@ -394,6 +404,10 @@ class Compiler:
                 raise SourceError(f"{info.path} (source {info.origin!r}) could not be read: {type(exc).__name__}: {exc}") from exc
             if h(raw) != info.raw_hash:
                 raise SourceChangedDuringBuild(f"{info.path} changed while compiling; run again")
+            try:
+                doc_links[sid] = dlinks.extract(raw, info.source_type)
+            except Exception:  # a document whose links cannot be read still compiles
+                doc_links[sid] = dlinks.DocLinks()
             try:
                 doc = parse_bytes(raw, info.source_type)
                 new_passages = segment(sid, doc)
@@ -941,6 +955,7 @@ class Compiler:
 
         self._conflicts(cs, report, claims, passages, sources, entities, touched_claims, reheaded, renamed_sources,
                         passages_by_source, claims_by_passage, full)
+        self._links(cs, report, sources, sr, doc_links, passages, full)
 
         report.counts.update({
             "passages_added": len(added),
@@ -1112,6 +1127,60 @@ class Compiler:
         if self.verifier_settings is not None:
             report.counts["possible_conflicts_open"] = sum(1 for k in unaccepted.values() if k == "possible")
 
+    # ================================================================ links
+    def _links(self, cs: ChangeSet, report: BuildReport, sources, sr: ScanResult, doc_links, passages, full: bool) -> None:
+        """Keep the broken-link findings current. Each document's links and anchors are kept in
+        ``link_index`` and re-read only when the document is; every link is judged again when
+        anything changed, which is milliseconds even for thousands of links."""
+        conn = self.store.conn
+        reindex_all = full or self.store.get_meta("links_fp") != dlinks.LINKS_VERSION
+        if not (reindex_all or doc_links or sr.deleted or sr.renamed):
+            report.counts["links_broken"] = conn.execute("SELECT COUNT(*) FROM links WHERE to_build IS NULL").fetchone()[0]
+            return
+        index: dict[str, dlinks.DocLinks] = {}
+        if not reindex_all:
+            index = {sid: dlinks.DocLinks.from_json(ln, an) for sid, ln, an in conn.execute(
+                "SELECT source_id, links, anchors FROM link_index")}
+        else:
+            for sid, rec in sources.items():
+                if sid not in doc_links:  # unchanged documents: read again for their links
+                    raw = self.sources.read_current(rec.path)
+                    try:
+                        doc_links[sid] = dlinks.extract(raw, rec.type) if raw is not None else dlinks.DocLinks()
+                    except Exception:
+                        doc_links[sid] = dlinks.DocLinks()
+            # rewritten only if it differs, so a full rebuild with nothing to do stays a no-op
+            fresh = {sid: dl.to_json() for sid, dl in doc_links.items() if sid in sources}
+            stored = {sid: (ln, an) for sid, ln, an in conn.execute("SELECT source_id, links, anchors FROM link_index")}
+            if fresh != stored:
+                cs.link_index_reset = True
+                cs.link_index_upserts = [(sid, *v) for sid, v in sorted(fresh.items())]
+            if self.store.get_meta("links_fp") != dlinks.LINKS_VERSION:
+                cs.meta["links_fp"] = dlinks.LINKS_VERSION
+            index = {sid: dl for sid, dl in doc_links.items() if sid in sources}
+        for sid in list(index):
+            if sid not in sources:
+                index.pop(sid)
+                cs.link_index_deletes.append(sid)
+        if not reindex_all:
+            for sid, dl in doc_links.items():
+                if sid in sources:
+                    index[sid] = dl
+                    cs.link_index_upserts.append((sid, *dl.to_json()))
+        found = dlinks.check(index, {sid: rec.path for sid, rec in sources.items()},
+                             *link_history(conn, sources, passages, sr.renamed))
+        current = {i: pl for i, pl in conn.execute("SELECT id, payload FROM links WHERE to_build IS NULL")}
+        new = {i: json.dumps(b.payload(), sort_keys=True, ensure_ascii=False) for i, b in found.items()}
+        for lid in sorted(set(current) | set(new)):
+            if lid not in new:
+                cs.link_deletes.append(lid)
+                report.op("link_fixed", lid)
+            elif current.get(lid) != new[lid]:
+                cs.link_upserts.append((lid, new[lid]))
+                if lid not in current:
+                    report.op("link_broken", lid)
+        report.counts["links_broken"] = len(new)
+
     @staticmethod
     def _occurrences(ids, claims, passages, sources) -> list[tuple[Occurrence, tuple[str, ...], str]]:
         out = []
@@ -1273,6 +1342,40 @@ class Compiler:
         parts += ["## Sources", ""]
         parts += [f"[^C{i + 1}]: {', '.join(paths)}" for i, paths in enumerate(citations)]
         return "\n".join(parts) + "\n"
+
+
+def link_history(conn, sources, passages, renamed=()) -> tuple[dict[str, str], Any]:
+    """(moved, renamed_anchor) for :func:`dakc.links.check`, from the store's history plus the
+    state being built: documents that had another path, and sections that had another heading.
+    Called after a build (``dakc verify``) it sees the same history, so it gives the same answers."""
+    moved: dict[str, str] = {}
+    for sid, path in conn.execute("SELECT id, path FROM sources"):
+        rec = sources.get(sid)
+        if rec is not None and path != rec.path:
+            moved[path] = rec.path
+    for sid, old_path, new_path in renamed:
+        if sid in sources:
+            moved[old_path] = sources[sid].path
+
+    by_source: dict[str, dict[str, str]] = defaultdict(dict)
+    for pid, p in passages.items():
+        by_source[p.source_id][pid] = p.heading
+
+    def renamed_anchor(sid: str, anchor: str):
+        current = by_source.get(sid, {})
+        if not current:
+            return None
+        history: dict[str, list[str]] = defaultdict(list)
+        ids = sorted(current)
+        for i in range(0, len(ids), 500):
+            chunk = ids[i:i + 500]
+            for pid, payload in conn.execute(
+                    f"SELECT id, payload FROM artifacts WHERE kind='passage' AND id IN ({','.join('?' * len(chunk))}) "
+                    "ORDER BY version", chunk):
+                history[pid].append(json.loads(payload).get("heading", ""))
+        return dlinks.anchor_renames(history, current)(anchor)
+
+    return moved, renamed_anchor
 
 
 def candidates_page_ids(entity_ids: Iterable[str]) -> set[str]:

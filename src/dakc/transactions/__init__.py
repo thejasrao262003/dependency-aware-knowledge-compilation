@@ -81,12 +81,19 @@ class ChangeSet:
     conflict_index_reset: bool = False
     conflict_index_claims: list[str] = field(default_factory=list)  # claims whose index rows are replaced
     conflict_index_rows: list[tuple] = field(default_factory=list)
+    # links between documents: versioned findings (broken links), and each document's links and anchors
+    link_upserts: list[tuple[str, str]] = field(default_factory=list)  # (id, payload)
+    link_deletes: list[str] = field(default_factory=list)
+    link_index_reset: bool = False
+    link_index_upserts: list[tuple[str, str, str]] = field(default_factory=list)  # (source_id, links, anchors)
+    link_index_deletes: list[str] = field(default_factory=list)
 
     @property
     def empty(self) -> bool:
         return not (self.upserts or self.deletes or self.edges or self.source_upserts or self.source_deletes
                     or self.conflict_upserts or self.conflict_deletes or self.conflict_index_reset
-                    or self.conflict_index_claims or self.meta)
+                    or self.conflict_index_claims or self.meta or self.link_upserts or self.link_deletes
+                    or self.link_index_reset or self.link_index_upserts or self.link_index_deletes)
 
     def counts(self) -> dict[str, int]:
         by_kind: dict[str, int] = {}
@@ -173,6 +180,15 @@ def commit(
         c.executemany("UPDATE conflicts SET to_build=? WHERE id=? AND to_build IS NULL", [(build_id, i) for i in closed])
         c.executemany("INSERT INTO conflicts(id, key, kind, payload, from_build) VALUES(?,?,?,?,?)",
                       [(fid, key, kind, payload, build_id) for fid, key, kind, payload in cs.conflict_upserts])
+        # links: the index is replaced per document, findings are versioned
+        if cs.link_index_reset:
+            c.execute("DELETE FROM link_index")
+        c.executemany("DELETE FROM link_index WHERE source_id=?", [(s,) for s in cs.link_index_deletes])
+        c.executemany("INSERT OR REPLACE INTO link_index(source_id, links, anchors) VALUES(?,?,?)", cs.link_index_upserts)
+        closed = [lid for lid, _ in cs.link_upserts] + cs.link_deletes
+        c.executemany("UPDATE links SET to_build=? WHERE id=? AND to_build IS NULL", [(build_id, i) for i in closed])
+        c.executemany("INSERT INTO links(id, payload, from_build) VALUES(?,?,?)",
+                      [(lid, payload, build_id) for lid, payload in cs.link_upserts])
 
         for k, v in cs.meta.items():
             store.set_meta(k, v)
@@ -191,11 +207,13 @@ def rollback(store: Store, to_build: int) -> int:
     if to_build == store.head:
         raise RollbackError(f"build {to_build} is already HEAD")
     with store.transaction() as c:
-        for table in ("artifacts", "edges", "sources", "conflicts"):
+        for table in ("artifacts", "edges", "sources", "conflicts", "links"):
             c.execute(f"DELETE FROM {table} WHERE from_build > ?", (to_build,))
             c.execute(f"UPDATE {table} SET to_build=NULL WHERE to_build > ?", (to_build,))
         c.execute("DELETE FROM conflict_index")  # derived: rebuilt by the next build
         store.set_meta("conflicts_fp", "")
+        c.execute("DELETE FROM link_index")  # derived: rebuilt by the next build
+        store.set_meta("links_fp", "")
         c.execute("UPDATE builds SET status='rolled_back' WHERE id > ? AND status='committed'", (to_build,))
         cur = c.execute(
             "INSERT INTO builds(parent,strategy,mode,status,started_at,finished_at,stats) VALUES(?,?,?,?,?,?,?)",

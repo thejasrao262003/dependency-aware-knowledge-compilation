@@ -1,5 +1,69 @@
 # Changelog
 
+## v0.7.0: Claude without an API key, named providers, and broken-link checking
+
+### Added
+
+- **Links between documents are checked at every compile.**
+  - What it reports: a link to a document that no longer exists, or to a
+    heading it no longer has. When DAKC saw the rename that broke a link (a
+    moved file, a renamed heading, even one with only subsections under it),
+    the finding names the new target.
+  - Where: `dakc links [PATH] [--to] [--check] [--json]`, the compile report,
+    `status`, the `dakc review` PR comment ("break 1 link between documents"
+    with the fix), an MCP `links` tool, `GET /links` and `GET /links/to`.
+  - In the web UI: a broken-links list, notices on the documents involved,
+    and "Linked from" on a document's Impact tab.
+  - Advisory and free: no claim or page changes, and no model is called.
+    `dakc verify` requires the findings to equal a check from scratch, and
+    rollback restores them.
+  - On FastAPI's docs: 0 false alarms among 166 internal links; 42 of 42
+    planted heading renames and 42 of 42 moved documents reported, each with
+    the right fix (`examples/fastapi-docs/links_eval.py`).
+
+- **`provider = "claude-code"`: Claude without an API key.**
+  - DAKC's model calls go through the Claude Code CLI, with its login
+    (including a Claude subscription), and the model you choose (`haiku`,
+    `sonnet`, `opus`).
+  - Each call runs in an empty scratch directory with tools, MCP servers and
+    settings off. DAKC never touches credentials.
+  - Measured with `haiku`: about 4 seconds and about 950 tokens of Claude
+    Code's own overhead per call. A one-sentence edit took 3 calls in 13
+    seconds.
+  - A compile planning more than 200 calls notes that an API-key provider
+    suits it better.
+- **Named providers with defaults:** `openai`, `gemini` (or `google`), `grok`
+  (or `xai`), `deepseek`, `mistral`, `groq`, `openrouter`, `together`,
+  `ollama`, `lmstudio`, and `claude` as another name for `anthropic`.
+  - Each knows its endpoint, its key variable and a default model, so
+    `provider = "gemini"` plus `GEMINI_API_KEY` is enough.
+  - `[provider.<name>]` overrides any of it.
+  - A missing key is reported at the first call, by name. Providers with no
+    sensible default (Groq, OpenRouter, Together, LM Studio) ask for a model
+    and say where to find one.
+
+### Fixed
+
+- **On a phone, short pages in the web UI stretched the navigation bar** to
+  fill the screen.
+- **The Claude provider sent server-side refusal fallbacks to every model.**
+  Only Fable, Mythos, Opus 5 and 5.5 and Sonnet 5.5 have them, so a cheaper
+  model such as `claude-haiku-5-5` could fail. They are now sent only to
+  those models.
+
+### Upgrading from 0.6.1
+
+- **The store schema moves to version 4** (the `links` and `link_index`
+  tables). This happens automatically. The first compile reads every
+  document's links once.
+
+- **`provider = "openai"` without a `base_url` now means OpenAI's own API**,
+  with `gpt-5.4-mini` and `OPENAI_API_KEY`. It used to default to a local
+  Ollama server.
+  - For Ollama, use `provider = "ollama"`.
+  - Workspaces created by `dakc init` set `base_url` explicitly, and keep
+    working as before, including their cache.
+
 ## v0.6.1: conflicts in the web UI, a FastAPI walkthrough, and a cheaper verifier
 
 ### Added

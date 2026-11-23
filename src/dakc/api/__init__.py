@@ -133,6 +133,14 @@ def create_app(root: Path) -> FastAPI:
     def conflict(conflict_id: str, kb: KB):
         return kb.conflict(conflict_id).to_dict()
 
+    @app.get("/links")
+    def links(kb: KB, path: str | None = None):
+        return [b.to_dict() for b in kb.links(path)]
+
+    @app.get("/links/to")
+    def linked_from(path: str, kb: KB):
+        return kb.linked_from(path)
+
     @app.get("/duplicates")
     def duplicates(kb: KB, limit: int = Query(100, ge=1)):
         return [p.to_dict() for p in kb.duplicates(limit)]

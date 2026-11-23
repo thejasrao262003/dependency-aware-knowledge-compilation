@@ -17,7 +17,7 @@ Options (all optional)::
 
     - dakc:
         workspace: .dakc-kb      # DAKC state, next to mkdocs.yml; cache this directory in CI
-        provider: heuristic      # used when the workspace is created: heuristic | openai | anthropic | custom
+        provider: heuristic      # used when the workspace is created: heuristic | claude-code | anthropic | openai | gemini | ... (see the README)
         publish: true            # add the generated pages to the site
         prefix: knowledge        # where they appear in the site
         min_claims: 2            # publish entity pages backed by at least this many facts (all stay in the KB)

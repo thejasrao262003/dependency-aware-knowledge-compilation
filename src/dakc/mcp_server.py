@@ -51,7 +51,10 @@ To see what an edit to a document would affect, before making it: downstream(<so
 After documents change: status, then compile (a preview by default), then compile(apply=true) to build.
 explain tells you why an artifact is stale and what it depends on.
 conflicts lists statements in different documents that cannot both be true (with the sentence and line of \
-each); mention an open conflict when your answer relies on one of its claims. DAKC never picks a side."""
+each); mention an open conflict when your answer relies on one of its claims. DAKC never picks a side.
+links lists links between documents that point at a missing document or heading, with the fix when DAKC saw \
+the rename; links(path, to=true) lists every document linking to path: check it before renaming a document \
+or a heading."""
 
 READ_ONLY = ToolAnnotations(readOnlyHint=True, openWorldHint=False)
 STALE_NOTE = ("an upper bound: everything downstream of a changed document. Many of these may not change at all (an edit that touches no extracted fact changes nothing); compile() without apply previews exactly what would be rebuilt")
@@ -210,6 +213,24 @@ def create_server(workspace: str | Path = ".", *, read_only: bool = False, max_l
             found = kb.conflicts(scoped=include_scoped)
         return {"open": sum(1 for c in found if c.kind in ("conflict", "possible") and c.accepted is None), "total": len(found),
                 "conflicts": [c.to_dict() for c in _cap(found, limit)]}
+
+    @server.tool(annotations=READ_ONLY)
+    def links(
+        path: Annotated[str | None, Field(description="A document path: only links in it or pointing at it.")] = None,
+        to: Annotated[bool, Field(description="List every link pointing at `path`, working or not (who a rename affects).")] = False,
+        limit: Limit = 50,
+    ) -> dict[str, Any]:
+        """Links between documents that point at a document or heading that no longer exists,
+        each with its file and line and, when DAKC saw the rename that broke it, the new target.
+        With to=true and a path: every link in another document that points at that path."""
+        with session() as kb:
+            if to:
+                if not path:
+                    raise ValueError("to=true needs a document path")
+                into = kb.linked_from(path)
+                return {"path": path, "total": len(into), "linked_from": into[:limit]}
+            found = kb.links(path)
+        return {"broken": len(found), "links": [b.to_dict() for b in found[:limit]]}
 
     @server.tool(annotations=READ_ONLY)
     def downstream(artifact: ArtifactRef, limit: Limit = 30) -> dict[str, Any]:

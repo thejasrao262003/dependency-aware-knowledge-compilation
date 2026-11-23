@@ -320,7 +320,7 @@ the change does to the knowledge base: facts added and retracted, pages
 affected, and the LLM calls and cost of applying it. It never calls a model.
 
 ```yaml
-- uses: thejasrao262003/dependency-aware-knowledge-compilation@v0.6.1
+- uses: thejasrao262003/dependency-aware-knowledge-compilation@v0.7.0
   with:
     workspace: .
 ```
@@ -478,6 +478,45 @@ resolves (rules only, since review uses the free provider), and agents see
 them through the MCP `conflicts` tool. The taxonomy, design and evaluation
 are in [docs/rfcs/0002-conflicts.md](docs/rfcs/0002-conflicts.md).
 
+## Links between documents
+
+Rename a heading, or move a file, and the links other documents make to it break
+silently. DAKC reads the links in every document at each compile and reports the ones
+that point at a document or heading that no longer exists. When it saw the rename that
+broke a link, it names the new target:
+
+```text
+$ dakc compile
+...
+Links:                      1 broken   (new 1, fixed 0)   `dakc links` lists them
+
+$ dakc links
+broken  gateway.md:3  [Redis setup](caching.md#redis-setup)
+        caching.md has no heading #redis-setup: "Redis setup" is now "Rate-limit store"
+        fix: caching.md#rate-limit-store
+```
+
+- **It costs nothing to keep current.** Renaming a heading re-extracts nothing, makes no
+  LLM call and regenerates no page. Every link is checked again in a few milliseconds.
+- **Before merging.** The `dakc review` PR comment says a change would "break 1 link
+  between documents", with the fix.
+- **Before renaming.** `dakc links PATH --to` lists every document that links to `PATH`,
+  and the web UI shows them on the document's Impact tab.
+- **Elsewhere:** `dakc links --check` exits 1 for CI, `status` counts broken links, and
+  there is an MCP `links` tool and `GET /links`.
+- **What counts.** Anchors are a heading's explicit id (`{ #id }`, `<a id>`) or, without
+  one, both GitHub's and MkDocs' slug of its text. Directory-style links (`../page/`) are
+  read as MkDocs reads them.
+- **What doesn't.** External URLs are not checked; a link checker such as lychee does
+  that. A link outside the knowledge base, or a directory-style link that never resolved,
+  is left alone rather than reported.
+- **Measured** on FastAPI's docs by `examples/fastapi-docs/links_eval.py`:
+  - **No false alarms:** 0 broken among 166 internal links, checked in 5 ms.
+  - **Planted renames:** renaming the heading each of 42 cross-document links points at
+    was reported 42 times, every time with the right fix. Moving the linked document:
+    42 of 42.
+  - **Real history:** none of the last 50 real commits broke a link.
+
 ## Guarantees, and how each is checked
 
 | Concern | What DAKC does | Checked by |
@@ -513,13 +552,62 @@ including deletion semantics and dry-run precision, is in
 
 ## Providers
 
-| `provider =` | Use | LLM calls |
-|---|---|---|
-| `heuristic` (default) | Deterministic sentence-level extraction and template writers; no network | 0 |
-| `mock` | Same outputs, but every call is *accounted* as an LLM call with estimated tokens (benchmarking) | simulated |
-| `openai` | Any OpenAI-compatible endpoint: OpenAI, **Ollama**, vLLM, LM Studio (`[provider.openai] base_url, model`) | real |
-| `anthropic` | Claude via the official SDK (`pip install 'dakc[anthropic]'`, default model `claude-opus-5-5`) | real |
-| `custom` | Bring your own client: `[provider.custom] factory = "module:callable"`, which returns an object with `.fingerprint` and `.complete(system, user, json_schema=None)` | real |
+Pick one with `provider = "..."` in `dakc.toml` (or `dakc init --provider ...`). Hosted
+APIs read their key from an environment variable, and each provider has a default
+model, so a name and a key are usually all it takes:
+
+```toml
+[dakc]
+provider = "gemini"            # and export GEMINI_API_KEY=...
+```
+
+| `provider =` | Model calls go to | Key | Default model |
+|---|---|---|---|
+| `heuristic` (default) | nowhere: deterministic extraction and template writers, free, offline | none | none |
+| `mock` | nowhere, but each call is *counted* as an LLM call with estimated tokens (benchmarks) | none | none |
+| `claude-code` | Claude, through your [Claude Code](https://code.claude.com) login: **no API key** ([below](#claude-without-an-api-key)) | none | `haiku` |
+| `anthropic` (or `claude`) | Claude API, official SDK (`pip install 'dakc[anthropic]'`) | `ANTHROPIC_API_KEY` | `claude-opus-5-5` |
+| `openai` | OpenAI; with `base_url`, any OpenAI-compatible server (vLLM, a gateway) | `OPENAI_API_KEY` | `gpt-5.4-mini` |
+| `gemini` (or `google`) | Google Gemini | `GEMINI_API_KEY` | `gemini-flash-latest` |
+| `grok` (or `xai`) | xAI Grok | `XAI_API_KEY` | `grok-4.3` |
+| `deepseek` | DeepSeek | `DEEPSEEK_API_KEY` | `deepseek-flash` |
+| `mistral` | Mistral | `MISTRAL_API_KEY` | `mistral-small-latest` |
+| `groq`, `openrouter`, `together` | many vendors' models | `GROQ_API_KEY`, `OPENROUTER_API_KEY`, `TOGETHER_API_KEY` | set `model` |
+| `ollama`, `lmstudio` | models on your machine | none | `llama3.1` (Ollama); set `model` (LM Studio) |
+| `custom` | your own client: `factory = "module:callable"` returning an object with `.fingerprint` and `.complete(system, user, json_schema=None)` | yours | yours |
+
+Anything in `[provider.<name>]` overrides the defaults: `model`, `base_url`,
+`api_key_env`, `json_mode` (`none`, `json_object` or `json_schema`), `max_tokens`,
+`temperature`. Default models come from each provider's documentation (November
+2026), and providers retire models: if one is gone, set `model`. DAKC's requests to
+each provider are tested against a fake server; `claude-code` was also run against the
+real CLI. A changed model or provider rebuilds what it produced, and nothing else (see
+*Guarantees*).
+
+### Claude without an API key
+
+`provider = "claude-code"` sends DAKC's model calls through the Claude Code CLI, with
+whatever login it has, including a Claude subscription:
+
+```toml
+[dakc]
+provider = "claude-code"
+
+[provider.claude-code]
+model = "haiku"                # or sonnet, opus, a full model id
+```
+
+- **What runs.** One `claude -p` per model call, in an empty scratch directory, with
+  tools, MCP servers and settings turned off, so no project's CLAUDE.md, hooks or
+  servers load. DAKC never reads or stores credentials. Set `binary = "/path/to/claude"`
+  if it is not on `PATH`.
+- **Measured** (Claude Code 2.1.312, `haiku`): a first build of two documents made 7
+  calls in 14 seconds; an edit to one sentence, 3 calls in 13 seconds. Each call takes
+  about 4 seconds, and Claude Code adds about 950 tokens of its own to each request.
+- **Use it for incremental work.** A compile runs its layers one after another, so even
+  a small edit takes a few calls' time, and a first build of a large corpus makes
+  thousands of calls. Claude subscription limits assume ordinary individual use, so DAKC
+  notes when a compile plans more than 200 calls and suggests an API-key provider.
 
 The heuristic extractor is a baseline: it treats capitalized and camel-case
 terms as entities and each such sentence as a claim. Use an LLM provider for
@@ -650,7 +738,7 @@ src/dakc/      kb (the Python API) · errors · cli · api (REST) · mcp_server
                sources (connectors) · publishers (ledger, jsonl feed)
                hashing · parsing · ingestion · claims · artifacts · graph · invalidation
                compiler (+ projection) · transactions · provenance (explain, trace, compare, verify)
-               providers (heuristic, mock, openai-compatible, anthropic, custom) · storage
+               providers (heuristic, mock, claude-code, anthropic, OpenAI-compatible presets, custom) · storage
 research/      competitive analysis, technical gap, architecture decisions, per-repo audits
 docs/          architecture, dependency model, Python API, MCP, benchmark (design + generated results), implementation log
 benchmarks/    seeded corpus generator + scenarios, runner, report generator, equivalence evaluation, results/

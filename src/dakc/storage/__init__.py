@@ -19,7 +19,7 @@ from typing import Any
 from dakc.artifacts import Artifact, from_payload
 from dakc.ingestion import SourceRecord
 
-SCHEMA_VERSION = 3  # 2: sources.key and sources.revision (RFC 0001); the published ledger. 3: conflicts (RFC 0002)
+SCHEMA_VERSION = 4  # 2: sources.key and sources.revision (RFC 0001); the published ledger. 3: conflicts (RFC 0002). 4: links
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS meta(key TEXT PRIMARY KEY, value TEXT NOT NULL);
@@ -77,6 +77,15 @@ CREATE TABLE IF NOT EXISTS conflict_index(
 );
 CREATE INDEX IF NOT EXISTS conflict_index_key ON conflict_index(key);
 CREATE INDEX IF NOT EXISTS conflict_index_claim ON conflict_index(claim_id);
+CREATE TABLE IF NOT EXISTS link_index(
+    source_id TEXT PRIMARY KEY, links TEXT NOT NULL, anchors TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS links(
+    id TEXT NOT NULL, payload TEXT NOT NULL, from_build INTEGER NOT NULL, to_build INTEGER
+);
+CREATE INDEX IF NOT EXISTS links_cur ON links(id) WHERE to_build IS NULL;
+CREATE INDEX IF NOT EXISTS links_from ON links(from_build);
+CREATE INDEX IF NOT EXISTS links_to ON links(to_build);
 CREATE TABLE IF NOT EXISTS published(
     publisher TEXT NOT NULL, id TEXT NOT NULL, kind TEXT NOT NULL, state_hash TEXT NOT NULL,
     build INTEGER NOT NULL, published_at TEXT NOT NULL, PRIMARY KEY(publisher, id)

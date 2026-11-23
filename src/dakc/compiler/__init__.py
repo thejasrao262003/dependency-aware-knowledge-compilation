@@ -1068,11 +1068,19 @@ class Compiler:
                 f = judge(key, members.get(key, []))
                 if f is not None:
                     new[f.id] = (key, f.kind, json.dumps(f.payload(), sort_keys=True, ensure_ascii=False))
-            cs.conflict_index_reset = reindex_all
-            cs.conflict_index_claims = [] if reindex_all else sorted(affected)
-            cs.conflict_index_rows = new_rows
             if reindex_all:
-                cs.meta["conflicts_fp"] = self.conflicts_fp
+                # A full rebuild recomputes the index; it is rewritten only if it differs, so a
+                # build with nothing to do stays a no-op.
+                stored = sorted(tuple(r) for r in conn.execute(
+                    "SELECT key, claim_id, passage_id, value, polarity, scope, path, heading, sentence FROM conflict_index"))
+                if stored != sorted(new_rows):
+                    cs.conflict_index_reset = True
+                    cs.conflict_index_rows = new_rows
+                if self.store.get_meta("conflicts_fp") != self.conflicts_fp:
+                    cs.meta["conflicts_fp"] = self.conflicts_fp
+            else:
+                cs.conflict_index_claims = sorted(affected)
+                cs.conflict_index_rows = new_rows
 
         # Findings made from verifier verdicts are recomputed in full: there are few of them,
         # and they follow from the current claims and the verdicts on record.

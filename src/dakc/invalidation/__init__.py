@@ -46,6 +46,16 @@ def render(report: BuildReport) -> str:
         + (f"   (sections: regenerate {n('regenerate_section')}, reused {n('cutoff_section')})"
            if n("regenerate_section") or n("cutoff_section") else ""),
         f"Index:                      {'re-render' if n('rerender_index') else 'unchanged'}",
+        f"Conflicts:                  {c.get('conflicts_open', 0)} open"
+        + (f"   (new {n('conflict_found')}, resolved {n('conflict_resolved')})" if n("conflict_found") or n("conflict_resolved") else "")
+        + ("   `dakc conflicts` lists them" if c.get("conflicts_open") else ""),
+    ]
+    if "conflict_candidates" in c:  # the conflict verifier is on (RFC 0002, phase 2)
+        judged = (f"{report.planned_llm_calls.get('verify', 0)} call(s) planned" if report.dry_run and "verify" in report.planned_llm_calls
+                  else f"{c.get('conflict_pairs_checked', 0)} pair(s) judged")
+        lines.append(f"Conflict verifier:          {judged}, {c.get('possible_conflicts_open', 0)} possible conflict(s) open"
+                     + (f", {c['conflict_pairs_unchecked']} pair(s) left for the next compile" if c.get("conflict_pairs_unchecked") else ""))
+    lines += [
         "",
         "Planned Operations:" if report.dry_run else "Operations:",
         f"- Re-extract {n('reextract')} passage(s)",

@@ -21,7 +21,7 @@ import json
 import re
 import time
 from collections import Counter, defaultdict
-from collections.abc import Callable, Iterable
+from collections.abc import Callable, Iterable, Iterator
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field, replace
 from pathlib import Path
@@ -39,6 +39,11 @@ from dakc.artifacts import (
     Usage,
 )
 from dakc.errors import SourceError
+from dakc.conflicts import Occurrence, ScopeRule
+from dakc.conflicts import fingerprint as conflicts_fingerprint
+from dakc.conflicts import index_rows, judge
+from dakc.conflicts import verifier as cverify
+from dakc.conflicts.verifier import Settings as VerifierSettings
 from dakc.claims import ExtractedClaim, match_revisions, plan_reuse, segment, sentence_key, split_sentences
 from dakc.hashing import claim_id, entity_key, h, h_obj, normalize_claim, normalize_text, slugify
 from dakc.ingestion import FileInfo, ScanResult, SourceRecord, new_source_id
@@ -53,6 +58,7 @@ from dakc.transactions.lock import workspace_lock
 from dakc import versions
 
 STRATEGIES = ("dakc", "file", "full")
+OPEN_KINDS = ("conflict", "possible")  # findings that ask for an edit (scoped ones do not)
 RELATED_LIMIT = 10
 T = TypeVar("T")
 R = TypeVar("R")
@@ -219,6 +225,9 @@ class Compiler:
         acquire_lock: bool = True,
         lock_timeout: float = 0.0,
         provenance: str = "report",
+        conflict_rules: list[ScopeRule] | None = None,
+        conflicts_accepted: set[str] | None = None,
+        conflict_verifier: VerifierSettings | None = None,
     ):
         if strategy not in STRATEGIES:
             raise ValueError(f"strategy must be one of {STRATEGIES}")
@@ -242,6 +251,10 @@ class Compiler:
         self.sentence_reuse = sentence_reuse
         self.acquire_lock = acquire_lock
         self.lock_timeout = lock_timeout
+        self.conflict_rules = list(conflict_rules or [])
+        self.conflicts_fp = conflicts_fingerprint(self.conflict_rules, self.alias_map)
+        self.conflicts_accepted = set(conflicts_accepted or ())  # reporting only: findings are stored either way
+        self.verifier_settings = conflict_verifier  # None: the verifier is off (RFC 0002, phase 2)
 
     # ================================================================== run
     def run(self) -> tuple[BuildReport, KBState | None]:
@@ -926,6 +939,9 @@ class Compiler:
         diff("summary", summaries, all_or("summary", summaries, {summary_id_for(t) for t in topics}))
         diff("index", {INDEX_ID: index} if index else {}, {INDEX_ID})
 
+        self._conflicts(cs, report, claims, passages, sources, entities, touched_claims, reheaded, renamed_sources,
+                        passages_by_source, claims_by_passage, full)
+
         report.counts.update({
             "passages_added": len(added),
             "passages_removed": len(removed_pids),
@@ -948,19 +964,257 @@ class Compiler:
         return cs, new_state
 
     # ============================================================== helpers
-    def _map(self, fn: Callable[[T], R], items: list[T], concurrent: bool, point: str) -> list[tuple[T, R]]:
-        """Run provider calls, concurrently when they are LLM calls. Results in input order."""
-        out: list[tuple[T, R]] = []
-        if concurrent and self.jobs > 1 and len(items) > 1:
-            with ThreadPoolExecutor(max_workers=self.jobs) as pool:
-                futures = [pool.submit(fn, it) for it in items]
-                for it, fut in zip(items, futures):
-                    self.fault.tick(point)
-                    out.append((it, fut.result()))
-        else:
+    def _map(self, fn: Callable[[T], R], items: list[T], concurrent: bool, point: str) -> Iterator[tuple[T, R]]:
+        """Run provider calls, concurrently when they are LLM calls, yielding (item, result) in input
+        order as each completes, so callers can keep paid work (the extraction cache) as they go.
+
+        If a call fails, calls that have not started are cancelled, the result of every call that
+        did complete is still yielded, and then the first error is raised. A retry therefore never
+        pays twice for work that succeeded, and a failed build does not keep spending."""
+        if not (concurrent and self.jobs > 1 and len(items) > 1):
             for it in items:
                 self.fault.tick(point)
-                out.append((it, fn(it)))
+                yield it, fn(it)
+            return
+        with ThreadPoolExecutor(max_workers=self.jobs) as pool:
+            futures = [pool.submit(fn, it) for it in items]
+            error: BaseException | None = None
+            try:
+                for it, fut in zip(items, futures):
+                    if error is None:
+                        try:
+                            self.fault.tick(point)
+                        except BaseException as exc:
+                            error = exc
+                    try:
+                        res = fut.result()
+                    except BaseException as exc:  # includes CancelledError for calls cancelled below
+                        if error is None:
+                            error = exc
+                        for f in futures:
+                            f.cancel()
+                        continue
+                    if error is not None:
+                        for f in futures:
+                            f.cancel()
+                    yield it, res
+            finally:
+                for f in futures:  # an early exit by the caller: do not start more paid calls
+                    f.cancel()
+            if error is not None:
+                raise error
+
+    # ============================================================ conflicts
+    def _conflicts(self, cs: ChangeSet, report: BuildReport, claims, passages, sources, entities, touched_claims, reheaded,
+                   renamed_sources, passages_by_source, claims_by_passage, full: bool) -> None:
+        """Keep the conflict findings current (RFC 0002). Advisory: nothing here changes a claim or a page.
+
+        Each claim occurrence is indexed by its comparable keys (its property frame, its
+        negation form). Only claims whose occurrences changed are re-parsed, and only the
+        properties they touch are judged again; everything is rebuilt when the detector,
+        the scope rules or the aliases change. With the verifier on, pairs of claims the
+        rules cannot compare are judged by a model (:meth:`_verified`)."""
+        conn = self.store.conn
+        reindex_all = full or self.store.get_meta("conflicts_fp") != self.conflicts_fp
+        if reindex_all:
+            affected = set(claims)
+        else:
+            affected = set(touched_claims)
+            for pid in reheaded:
+                affected |= claims_by_passage.get(pid, set())
+            for sid in renamed_sources:
+                for pid in passages_by_source.get(sid, ()):
+                    affected |= claims_by_passage.get(pid, set())
+
+        def chunks(items: list[str], n: int = 500):
+            for i in range(0, len(items), n):
+                yield items[i:i + n]
+
+        current: dict[str, tuple[str, str, str]] = {}
+        new: dict[str, tuple[str, str, str]] = {}
+        new_rows: list = []
+        if affected or reindex_all:
+            old_keys: set[str] = set()
+            if reindex_all:
+                old_keys = {k for (k,) in conn.execute("SELECT DISTINCT key FROM conflict_index")}
+            else:
+                for ch in chunks(sorted(affected)):
+                    old_keys |= {k for (k,) in conn.execute(
+                        f"SELECT DISTINCT key FROM conflict_index WHERE claim_id IN ({','.join('?' * len(ch))})", ch)}
+            new_rows = index_rows(self._occurrences(sorted(affected), claims, passages, sources), self.conflict_rules,
+                                  self.alias_map)
+            touched_keys = old_keys | {r[0] for r in new_rows}
+
+            members: dict[str, list] = defaultdict(list)
+            for r in new_rows:
+                members[r[0]].append(r)
+            if not reindex_all:
+                for ch in chunks(sorted(touched_keys)):
+                    for row in conn.execute(
+                            f"SELECT key, claim_id, passage_id, value, polarity, scope, path, heading, sentence FROM conflict_index "
+                            f"WHERE key IN ({','.join('?' * len(ch))})", ch):
+                        if row[1] not in affected:
+                            members[row[0]].append(tuple(row))
+            if reindex_all:
+                rows = conn.execute("SELECT id, key, kind, payload FROM conflicts WHERE to_build IS NULL AND key NOT LIKE ?",
+                                    (cverify.PAIR_PREFIX + "%",))
+                current = {i: (k, kind, pl) for i, k, kind, pl in rows}
+            else:
+                for ch in chunks(sorted(touched_keys)):
+                    for i, k, kind, pl in conn.execute(
+                            f"SELECT id, key, kind, payload FROM conflicts WHERE to_build IS NULL AND key IN ({','.join('?' * len(ch))})", ch):
+                        current[i] = (k, kind, pl)
+            for key in sorted(touched_keys):
+                f = judge(key, members.get(key, []))
+                if f is not None:
+                    new[f.id] = (key, f.kind, json.dumps(f.payload(), sort_keys=True, ensure_ascii=False))
+            cs.conflict_index_reset = reindex_all
+            cs.conflict_index_claims = [] if reindex_all else sorted(affected)
+            cs.conflict_index_rows = new_rows
+            if reindex_all:
+                cs.meta["conflicts_fp"] = self.conflicts_fp
+
+        # Findings made from verifier verdicts are recomputed in full: there are few of them,
+        # and they follow from the current claims and the verdicts on record.
+        current.update({i: (k, kind, pl) for i, k, kind, pl in conn.execute(
+            "SELECT id, key, kind, payload FROM conflicts WHERE to_build IS NULL AND key LIKE ?", (cverify.PAIR_PREFIX + "%",))})
+        new.update(self._verified(cs, report, claims, passages, sources, entities, touched_claims, affected, new_rows))
+
+        open_kinds = {i: k for i, k in conn.execute(
+            "SELECT id, kind FROM conflicts WHERE to_build IS NULL AND kind IN ('conflict', 'possible')")}
+        for fid in sorted(set(current) | set(new)):
+            before, after = current.get(fid), new.get(fid)
+            was, now = bool(before and before[1] in OPEN_KINDS), bool(after and after[1] in OPEN_KINDS)
+            if after is None:
+                cs.conflict_deletes.append(fid)
+            elif before != after:
+                cs.conflict_upserts.append((fid, *after))
+            if now:
+                open_kinds[fid] = after[1]  # type: ignore[index]
+            else:
+                open_kinds.pop(fid, None)
+            if fid in self.conflicts_accepted:
+                continue
+            if now and not was:
+                report.op("conflict_found", fid)
+            elif was and not now:
+                report.op("conflict_resolved", fid)
+        unaccepted = {i: k for i, k in open_kinds.items() if i not in self.conflicts_accepted}
+        report.counts["conflicts_open"] = len(unaccepted)
+        if self.verifier_settings is not None:
+            report.counts["possible_conflicts_open"] = sum(1 for k in unaccepted.values() if k == "possible")
+
+    @staticmethod
+    def _occurrences(ids, claims, passages, sources) -> list[tuple[Occurrence, tuple[str, ...], str]]:
+        out = []
+        for cid in ids:
+            c = claims.get(cid)
+            if c is None:
+                continue
+            for pid, surface, mentions, _ev in c.supports:
+                p = passages[pid]
+                out.append((Occurrence(cid, pid, sources[p.source_id].path, p.heading, surface), tuple(mentions), c.text))
+        return out
+
+    def _verified(self, cs: ChangeSet, report: BuildReport, claims, passages, sources, entities, touched_claims,
+                  affected, new_rows) -> dict[str, tuple[str, str, str]]:
+        """Findings from the conflict verifier: {id: (key, kind, payload)}. Judges candidate
+        pairs that involve new claims (all claims when the verifier was just turned on or
+        changed, or when an earlier build left pairs unchecked), at most ``max_checks`` per
+        build, and caches every verdict as it arrives."""
+        st, V = self.verifier_settings, self.provider.verifier
+        stored_fp = self.store.get_meta("verifier_fp") or ""
+        if st is None or V is None:
+            if st is not None:
+                report.notes.append("the conflict verifier is on, but this provider has none: no pairs checked")
+            if stored_fp:
+                cs.meta["verifier_fp"] = ""
+            return {}
+        vf = V.fingerprint
+        if stored_fp != vf:
+            cs.meta["verifier_fp"] = vf
+        backfill = self.store.get_meta("verifier_complete") != vf
+        new_claims = set(claims) if backfill else {c for c in touched_claims if c in claims}
+
+        # what each claim is compared by
+        keys: dict[str, set[str]] = defaultdict(set)
+        for r in new_rows:
+            keys[r[1]].add(r[0])
+
+        subjects = cverify.Subjects.of(entities, self.alias_map)
+
+        def subjects_of(cid: str) -> tuple[str, ...]:
+            return tuple(sorted(subjects.of_claim.get(cid, ())))
+
+        wanted = set(new_claims)
+        for c in new_claims:
+            for g in subjects_of(c):
+                wanted.update(subjects.members[g])
+        stale = sorted(c for c in wanted if c not in affected and c in claims)
+        for i in range(0, len(stale), 500):
+            ch = stale[i:i + 500]
+            for cid, key in self.store.conn.execute(
+                    f"SELECT claim_id, key FROM conflict_index WHERE claim_id IN ({','.join('?' * len(ch))})", ch):
+                keys[cid].add(key)
+        info: dict[str, cverify.ClaimInfo] = {}
+        for c in wanted:
+            if c not in claims or not keys.get(c):  # instructions and fragments: nothing to compare
+                continue
+            claim = claims[c]
+            info[c] = cverify.ClaimInfo(claim.text, frozenset(sources[passages[p].source_id].path for p in claim.passage_ids),
+                                        subjects_of(c), cverify.words(claim.text), frozenset(keys[c]))
+        members = {g: subjects.members[g] for c in new_claims if c in info for g in info[c].entities}
+        cands = cverify.candidates(new_claims, info, members, st.per_entity)
+        report.counts["conflict_candidates"] = len(cands)
+
+        cached = self.store.cache_get_many([cverify.cache_key(vf, a, b) for _, a, b in cands])
+        todo = [(a, b) for _, a, b in cands if cverify.cache_key(vf, a, b) not in cached]
+        to_check, left = todo[:st.max_checks], len(todo) - min(len(todo), st.max_checks)
+        batches = [to_check[i:i + st.pairs_per_call] for i in range(0, len(to_check), st.pairs_per_call)]
+        fresh: list[dict[str, Any]] = []
+        if self.dry_run and not V.free:
+            report.exact = False
+            report.planned_llm_calls["verify"] = len(batches)
+        else:
+            pending: list[tuple[str, Any]] = []
+            try:
+                for batch, res in self._map(lambda b: V.judge([(claims[a].text, claims[x].text) for a, x in b]),
+                                            batches, V.is_llm, "verify"):
+                    report.usage.add("verify", llm=V.is_llm, input_tokens=res.input_tokens,
+                                     output_tokens=res.output_tokens, calls=getattr(res, "calls", 1))
+                    for (a, b), (verdict, reason) in zip(batch, res.verdicts):
+                        if not verdict:
+                            left += 1  # the model gave no verdict: asked again next build
+                            continue
+                        v = {"a": a, "b": b, "verdict": verdict, "reason": reason}
+                        fresh.append(v)
+                        if not self.dry_run:
+                            pending.append((cverify.cache_key(vf, a, b), v))
+            finally:
+                if pending:
+                    self.store.cache_put_many(pending, vf)
+            report.counts["conflict_pairs_checked"] = len(fresh)
+        report.counts["conflict_pairs_unchecked"] = left
+        if left:
+            report.notes.append(f"conflict verifier: {left} candidate pair(s) left unchecked "
+                                f"([conflicts] max_checks = {st.max_checks}); the next compile checks them")
+        if not self.dry_run:
+            # A progress marker, like the cache, so it is written now, whatever happens to the build:
+            # every candidate pair has a verdict (or the next build looks at every claim again).
+            done = vf if left == 0 else ""
+            if self.store.get_meta("verifier_complete") != done:
+                self.store.set_meta("verifier_complete", done)
+
+        verdicts = {(v["a"], v["b"]): v for v in cverify.load_verdicts(self.store.conn, vf)}
+        verdicts.update({(v["a"], v["b"]): v for v in fresh})
+
+        def occurrences(cid: str):
+            return self._occurrences([cid], claims, passages, sources)
+
+        out = {}
+        for fid, (key, f) in cverify.findings(verdicts.values(), occurrences, subjects.shared, self.conflict_rules,
+                                               self.alias_map).items():
+            out[fid] = (key, f.kind, json.dumps(f.payload(), sort_keys=True, ensure_ascii=False))
         return out
 
     def _canonical(self, mention: str) -> str:

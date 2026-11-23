@@ -1,0 +1,231 @@
+{
+ "generated": "2026-11-23T13:44:37+00:00",
+ "dakc_version": "0.5.0",
+ "source": {
+  "repo": "fastapi/fastapi",
+  "commit": "05e6df7e906c3decba377c37548019973f40bf15"
+ },
+ "precision": {
+  "sources": 159,
+  "claims": 11067,
+  "occurrences": 11704,
+  "keys": 7742,
+  "keys_with_several_claims": 10,
+  "findings": {
+   "conflict": 0,
+   "scoped": 0
+  },
+  "shared_keys": [
+   {
+    "key": "neg|but if you have custom header that you want a client in a browser to be able to see you need to add them to your cor configuration using the parameter expose _ header documented in starlette cor doc",
+    "values": [
+     "is stated"
+    ],
+    "statements": [
+     {
+      "path": "tutorial/middleware.md",
+      "sentence": "But if you have custom headers that you want a client in a browser to be able to see, you need to add them to your CORS configurations (CORS (Cross-Origin Resource Sharing)) using the parameter expose_headers documented in Starlette's CORS docs."
+     },
+     {
+      "path": "advanced/response-headers.md",
+      "sentence": "But if you have custom headers that you want a client in a browser to be able to see, you need to add them to your CORS configurations (read more in CORS (Cross-Origin Resource Sharing)), using the parameter expose_headers documented in Starlette's CORS docs."
+     }
+    ]
+   },
+   {
+    "key": "neg|data conversion",
+    "values": [
+     "is stated"
+    ],
+    "statements": [
+     {
+      "path": "tutorial/body-nested-models.md",
+      "sentence": "Data conversion (a.k.a. parsing / serialization)"
+     },
+     {
+      "path": "tutorial/body-nested-models.md",
+      "sentence": "Data conversion"
+     }
+    ]
+   },
+   {
+    "key": "neg|editor support",
+    "values": [
+     "is stated"
+    ],
+    "statements": [
+     {
+      "path": "tutorial/body-nested-models.md",
+      "sentence": "Editor support (completion everywhere!)"
+     },
+     {
+      "path": "tutorial/query-params.md",
+      "sentence": "Editor support (obviously)"
+     },
+     {
+      "path": "python-types.md",
+      "sentence": "Editor support."
+     }
+    ]
+   },
+   {
+    "key": "neg|handled internally by a cloud provider as part of their service",
+    "values": [
+     "is stated"
+    ],
+    "statements": [
+     {
+      "path": "deployment/concepts.md",
+      "sentence": "Handled internally by a cloud provider as part of their services (read below 👇)"
+     },
+     {
+      "path": "deployment/concepts.md",
+      "sentence": "Handled internally by a cloud provider as part of their services"
+     },
+     {
+      "path": "deployment/concepts.md",
+      "sentence": "Handled internally by a cloud provider as part of their services"
+     }
+    ]
+   },
+   {
+    "key": "neg|hashing mean converting some content into a sequence of byte that look like gibberish",
+    "values": [
+     "is stated"
+    ],
+    "statements": [
+     {
+      "path": "tutorial/security/simple-oauth2.md",
+      "sentence": "\"Hashing\" means: converting some content (a password in this case) into a sequence of bytes (just a string) that looks like gibberish."
+     },
+     {
+      "path": "tutorial/security/oauth2-jwt.md",
+      "sentence": "\"Hashing\" means converting some content (a password in this case) into a sequence of bytes (just a string) that looks like gibberish."
+     }
+    ]
+   },
+   {
+    "key": "neg|in this case fastapi will expect a body like",
+    "values": [
+     "is stated"
+    ],
+    "statements": [
+     {
+      "path": "tutorial/body-multiple-params.md",
+      "sentence": "In this case FastAPI will expect a body like:"
+     },
+     {
+      "path": "tutorial/body-multiple-params.md",
+      "sentence": "In this case, FastAPI will expect a body like:"
+     }
+    ]
+   },
+   {
+    "key": "neg|starting in the same package that this module live in",
+    "values": [
+     "is stated"
+    ],
+    "statements": [
+     {
+      "path": "tutorial/bigger-applications.md",
+      "sentence": "Starting in the same package that this module (the file app/routers/items.py) lives in (the directory app/routers/)..."
+     },
+     {
+      "path": "tutorial/bigger-applications.md",
+      "sentence": "Starting in the same package that this module (the file app/routers/items.py) lives in (the directory app/routers/)..."
+     },
+     {
+      "path": "tutorial/bigger-applications.md",
+      "sentence": "Starting in the same package that this module (the file app/routers/items.py) lives in (the directory app/routers/)..."
+     },
+     {
+      "path": "tutorial/bigger-applications.md",
+      "sentence": "Starting in the same package that this module (the file app/main.py) lives in (the directory app/)..."
+     }
+    ]
+   },
+   {
+    "key": "neg|you can create a pydantic model to declare them",
+    "values": [
+     "is stated"
+    ],
+    "statements": [
+     {
+      "path": "tutorial/query-param-models.md",
+      "sentence": "If you have a group of query parameters that are related, you can create a Pydantic model to declare them."
+     },
+     {
+      "path": "tutorial/cookie-param-models.md",
+      "sentence": "If you have a group of cookies that are related, you can create a Pydantic model to declare them. 🍪"
+     },
+     {
+      "path": "tutorial/header-param-models.md",
+      "sentence": "If you have a group of related header parameters, you can create a Pydantic model to declare them."
+     }
+    ]
+   },
+   {
+    "key": "neg|you can declare a parameter of type response in your path operation function",
+    "values": [
+     "is stated"
+    ],
+    "statements": [
+     {
+      "path": "advanced/response-headers.md",
+      "sentence": "You can declare a parameter of type Response in your path operation function (as you can do for cookies)."
+     },
+     {
+      "path": "advanced/response-change-status-code.md",
+      "sentence": "You can declare a parameter of type Response in your path operation function (as you can do for cookies and headers)."
+     },
+     {
+      "path": "advanced/response-cookies.md",
+      "sentence": "You can declare a parameter of type Response in your path operation function."
+     }
+    ]
+   },
+   {
+    "key": "neg|you can use pydantic model to declare form field in fastapi",
+    "values": [
+     "is stated"
+    ],
+    "statements": [
+     {
+      "path": "tutorial/request-form-models.md",
+      "sentence": "You can use Pydantic models to declare form fields in FastAPI. 😎"
+     },
+     {
+      "path": "tutorial/request-form-models.md",
+      "sentence": "You can use Pydantic models to declare form fields in FastAPI."
+     }
+    ]
+   }
+  ]
+ },
+ "cost_seconds": {
+  "one_file_edit": 0.00033,
+  "rejudge_everything": 0.677
+ },
+ "recall": {
+  "negation": {
+   "all": [
+    150,
+    107
+   ],
+   "plain": [
+    100,
+    90
+   ]
+  },
+  "changed value": {
+   "all": [
+    127,
+    70
+   ],
+   "plain": [
+    80,
+    62
+   ]
+  }
+ }
+}

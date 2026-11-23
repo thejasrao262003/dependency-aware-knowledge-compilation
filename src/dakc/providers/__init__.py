@@ -37,21 +37,24 @@ PROVIDERS = ("heuristic", "mock", "openai", "anthropic", "custom")
 
 def make_provider(name: str, options: dict[str, Any] | None = None) -> ProviderBundle:
     options = dict(options or {})
+    from dakc.conflicts.verifier import HeuristicVerifier, LLMVerifier
+
     if name in ("heuristic", "mock"):
         as_llm = name == "mock"
-        return ProviderBundle(name, HeuristicExtractor(as_llm), TemplatePageWriter(as_llm), TemplateSummarizer(as_llm))
+        return ProviderBundle(name, HeuristicExtractor(as_llm), TemplatePageWriter(as_llm), TemplateSummarizer(as_llm),
+                              verifier=HeuristicVerifier(as_llm))
     if name == "openai":
         client = OpenAICompatibleClient(**options)
-        return ProviderBundle(name, LLMExtractor(client), LLMPageWriter(client), LLMSummarizer(client))
-    if name == "anthropic":
+    elif name == "anthropic":
         from dakc.providers.anthropic_provider import AnthropicClient
 
         client = AnthropicClient(**options)
-        return ProviderBundle(name, LLMExtractor(client), LLMPageWriter(client), LLMSummarizer(client))
-    if name == "custom":
+    elif name == "custom":
         client = load_custom_client(options)
-        return ProviderBundle(name, LLMExtractor(client), LLMPageWriter(client), LLMSummarizer(client))
-    raise ProviderError(f"unknown provider {name!r}; choose one of {', '.join(PROVIDERS)}")
+    else:
+        raise ProviderError(f"unknown provider {name!r}; choose one of {', '.join(PROVIDERS)}")
+    return ProviderBundle(name, LLMExtractor(client), LLMPageWriter(client), LLMSummarizer(client),
+                          verifier=LLMVerifier(client))
 
 
 def load_custom_client(options: dict[str, Any]):

@@ -1,0 +1,354 @@
+{
+ "llm-verifier/1:hosted-agent:gpt-5-mini:t0.0:d2c7836c6e|A common myth is that Gateway caches every response in Redis.|Gateway does not cache responses.": [
+  "compatible",
+  ""
+ ],
+ "llm-verifier/1:hosted-agent:gpt-5-mini:t0.0:d2c7836c6e|Admin Console logins require two-factor authentication.|Two-factor authentication is optional when signing in to the Admin Console.": [
+  "contradiction",
+  "A states Admin Console logins require two-factor authentication whereas B states two-factor authentication is optional for signing in."
+ ],
+ "llm-verifier/1:hosted-agent:gpt-5-mini:t0.0:d2c7836c6e|All calls from Checkout to the Pricing service are synchronous.|Checkout invokes the Pricing service asynchronously.": [
+  "contradiction",
+  "A asserts all Checkout-to-Pricing calls are synchronous while B states Checkout invokes the Pricing service asynchronously."
+ ],
+ "llm-verifier/1:hosted-agent:gpt-5-mini:t0.0:d2c7836c6e|Argo CD performs all deployments to the production Kubernetes cluster.|Every change to the production Kubernetes cluster is rolled out by Argo CD.": [
+  "compatible",
+  ""
+ ],
+ "llm-verifier/1:hosted-agent:gpt-5-mini:t0.0:d2c7836c6e|Atlas is deployed to the AWS us-east-1 region.|All Atlas infrastructure lives in the eu-west-1 region of AWS.": [
+  "contradiction",
+  "They disagree about the AWS region hosting Atlas: us-east-1 vs eu-west-1."
+ ],
+ "llm-verifier/1:hosted-agent:gpt-5-mini:t0.0:d2c7836c6e|Atlas runs on Kubernetes.|Atlas schedules its batch jobs as Kubernetes CronJobs.": [
+  "compatible",
+  ""
+ ],
+ "llm-verifier/1:hosted-agent:gpt-5-mini:t0.0:d2c7836c6e|Backups of the Orders database are encrypted at rest with AWS KMS.|Orders database backups are written to S3 unencrypted.": [
+  "contradiction",
+  "A says Orders database backups are encrypted at rest with AWS KMS while B says Orders database backups are written to S3 unencrypted."
+ ],
+ "llm-verifier/1:hosted-agent:gpt-5-mini:t0.0:d2c7836c6e|Balance reads in Ledger are strongly consistent.|Ledger serves balance reads with eventual consistency.": [
+  "contradiction",
+  "A asserts balance reads in Ledger are strongly consistent while B asserts Ledger serves balance reads with eventual consistency."
+ ],
+ "llm-verifier/1:hosted-agent:gpt-5-mini:t0.0:d2c7836c6e|Billing accepts SOAP requests from legacy clients.|Billing no longer accepts SOAP requests.": [
+  "contradiction",
+  "They conflict on whether Billing accepts SOAP requests from legacy clients (accepts SOAP vs no longer accepts SOAP)."
+ ],
+ "llm-verifier/1:hosted-agent:gpt-5-mini:t0.0:d2c7836c6e|Billing is written in Go.|Billing is a Java application built with Spring Boot.": [
+  "contradiction",
+  "They disagree about Billing's implementation language/framework: Go vs Java with Spring Boot."
+ ],
+ "llm-verifier/1:hosted-agent:gpt-5-mini:t0.0:d2c7836c6e|Caching is not disabled in the Catalog service.|The Catalog service has caching enabled.": [
+  "compatible",
+  ""
+ ],
+ "llm-verifier/1:hosted-agent:gpt-5-mini:t0.0:d2c7836c6e|Catalog runs on Python 3.11.|The Catalog service's runtime is Python 3.9.": [
+  "contradiction",
+  "They disagree about the Catalog service Python runtime version: 3.11 vs 3.9."
+ ],
+ "llm-verifier/1:hosted-agent:gpt-5-mini:t0.0:d2c7836c6e|Checkout never calls the Fraud service directly.|Checkout makes a direct HTTP call to the Fraud service for every payment.": [
+  "contradiction",
+  "They disagree on whether Checkout ever calls the Fraud service directly (never calls vs direct HTTP call for every payment)."
+ ],
+ "llm-verifier/1:hosted-agent:gpt-5-mini:t0.0:d2c7836c6e|ES is not part of the Search service stack.|Search is backed by Elasticsearch.": [
+  "contradiction",
+  "Disagrees on whether Elasticsearch (ES) is part of the Search stack."
+ ],
+ "llm-verifier/1:hosted-agent:gpt-5-mini:t0.0:d2c7836c6e|Engineers from Team Orion are on the Gateway on-call rotation.|Team Vega engineers take shifts on the Gateway on-call rotation.": [
+  "compatible",
+  ""
+ ],
+ "llm-verifier/1:hosted-agent:gpt-5-mini:t0.0:d2c7836c6e|Every service in the Platform monorepo is written in Go.|Reporting, which lives in the Platform monorepo, is written in Python.": [
+  "contradiction",
+  "They disagree about Reporting's implementation language (claiming every service is Go versus Reporting being written in Python)."
+ ],
+ "llm-verifier/1:hosted-agent:gpt-5-mini:t0.0:d2c7836c6e|Failover of the Orders PostgreSQL cluster is automatic.|Failing over the Orders PostgreSQL cluster is a manual step performed by the on-call engineer.": [
+  "contradiction",
+  "One statement says failover is automatic while the other says failover is a manual step performed by the on-call engineer."
+ ],
+ "llm-verifier/1:hosted-agent:gpt-5-mini:t0.0:d2c7836c6e|Force-pushing to the main branch of the Monorepo is allowed.|The Monorepo forbids force-pushes to main.": [
+  "contradiction",
+  "A allows force-pushing to the main branch of the Monorepo while B forbids force-pushes to main."
+ ],
+ "llm-verifier/1:hosted-agent:gpt-5-mini:t0.0:d2c7836c6e|Gateway emits metrics to Prometheus.|Gateway exports per-route latency histograms to Prometheus.": [
+  "compatible",
+  ""
+ ],
+ "llm-verifier/1:hosted-agent:gpt-5-mini:t0.0:d2c7836c6e|Gateway is the only component that talks to the Auth service.|Billing validates tokens by calling the Auth service directly.": [
+  "contradiction",
+  "They disagree on which components talk to Auth (Gateway being the only component vs Billing calling Auth directly)."
+ ],
+ "llm-verifier/1:hosted-agent:gpt-5-mini:t0.0:d2c7836c6e|Gateway terminates TLS for all inbound traffic.|TLS termination has been removed from Gateway.": [
+  "contradiction",
+  "They disagree on whether Gateway performs TLS termination for inbound traffic (terminates TLS vs TLS termination removed)."
+ ],
+ "llm-verifier/1:hosted-agent:gpt-5-mini:t0.0:d2c7836c6e|Gateway's connect timeout to upstream services is two seconds.|Gateway waits up to 60 seconds for an upstream response.": [
+  "compatible",
+  ""
+ ],
+ "llm-verifier/1:hosted-agent:gpt-5-mini:t0.0:d2c7836c6e|In staging, the Orders database is a single PostgreSQL instance.|In production, the Orders database is a three-node PostgreSQL cluster.": [
+  "different_scope",
+  "They apply to different environments: staging uses a single PostgreSQL instance while production uses a three-node PostgreSQL cluster."
+ ],
+ "llm-verifier/1:hosted-agent:gpt-5-mini:t0.0:d2c7836c6e|In the QA environment, Payments uses Stripe test-mode API keys.|Payments uses live Stripe API keys in Production.": [
+  "different_scope",
+  "A refers to the QA environment using Stripe test-mode keys while B refers to Production using live Stripe keys — they apply to different environments."
+ ],
+ "llm-verifier/1:hosted-agent:gpt-5-mini:t0.0:d2c7836c6e|Internal services authenticate to each other with OAuth2.|Billing uses the OAuth2 client credentials flow when calling Ledger.": [
+  "compatible",
+  ""
+ ],
+ "llm-verifier/1:hosted-agent:gpt-5-mini:t0.0:d2c7836c6e|Inventory pushes stock updates to clients over WebSockets.|Inventory lacks WebSocket support.": [
+  "contradiction",
+  "They disagree on whether Inventory supports WebSockets for pushing stock updates (supports WebSockets vs lacks WebSocket support)."
+ ],
+ "llm-verifier/1:hosted-agent:gpt-5-mini:t0.0:d2c7836c6e|Kafka retains events on the Clickstream topic for seven days.|The Payments topic in Kafka keeps messages for 30 days.": [
+  "compatible",
+  ""
+ ],
+ "llm-verifier/1:hosted-agent:gpt-5-mini:t0.0:d2c7836c6e|Kafka retains events on the Orders topic for seven days.|The Orders topic in Kafka has a retention period of 30 days.": [
+  "contradiction",
+  "They disagree about the Orders Kafka topic retention period: seven days vs 30 days."
+ ],
+ "llm-verifier/1:hosted-agent:gpt-5-mini:t0.0:d2c7836c6e|Ledger 2.0 uses PostgreSQL as its primary database.|Ledger 3.0 moves the primary database to CockroachDB.": [
+  "different_scope",
+  "They specify different versions: Ledger 2.0 uses PostgreSQL while Ledger 3.0 uses CockroachDB."
+ ],
+ "llm-verifier/1:hosted-agent:gpt-5-mini:t0.0:d2c7836c6e|Ledger accepts requests over REST.|Ledger exposes a gRPC interface.": [
+  "compatible",
+  ""
+ ],
+ "llm-verifier/1:hosted-agent:gpt-5-mini:t0.0:d2c7836c6e|Ledger entries are immutable once written.|Entries in Ledger are mutable and can be corrected in place.": [
+  "contradiction",
+  "A states Ledger entries are immutable once written whereas B states entries in Ledger are mutable and can be corrected in place."
+ ],
+ "llm-verifier/1:hosted-agent:gpt-5-mini:t0.0:d2c7836c6e|Ledger has been fully migrated off Oracle.|Ledger's nightly reconciliation job still reads from Oracle.": [
+  "contradiction",
+  "They disagree on whether Ledger has been fully migrated off Oracle versus a job still reading from Oracle."
+ ],
+ "llm-verifier/1:hosted-agent:gpt-5-mini:t0.0:d2c7836c6e|Ledger infrastructure is provisioned with TF.|Ledger infrastructure is managed with Pulumi rather than Terraform.": [
+  "contradiction",
+  "Disagrees on infrastructure provisioning tool: Terraform vs Pulumi."
+ ],
+ "llm-verifier/1:hosted-agent:gpt-5-mini:t0.0:d2c7836c6e|Ledger is not a stateless service.|Ledger is a stateful service.": [
+  "compatible",
+  ""
+ ],
+ "llm-verifier/1:hosted-agent:gpt-5-mini:t0.0:d2c7836c6e|Ledger persists its data in PostgreSQL.|Ledger archives audit logs to S3 after 90 days.": [
+  "compatible",
+  ""
+ ],
+ "llm-verifier/1:hosted-agent:gpt-5-mini:t0.0:d2c7836c6e|Ledger retains audit logs for seven years.|Ledger keeps application logs in Loki for 14 days.": [
+  "compatible",
+  ""
+ ],
+ "llm-verifier/1:hosted-agent:gpt-5-mini:t0.0:d2c7836c6e|Ledger shards its PostgreSQL database by tenant.|Ledger runs on a single unsharded PostgreSQL database.": [
+  "contradiction",
+  "They disagree on the database topology: Ledger shards PostgreSQL by tenant versus running on a single unsharded PostgreSQL database."
+ ],
+ "llm-verifier/1:hosted-agent:gpt-5-mini:t0.0:d2c7836c6e|Ledger supports Webhooks for event delivery.|Ledger supports Kafka as an event delivery channel.": [
+  "compatible",
+  ""
+ ],
+ "llm-verifier/1:hosted-agent:gpt-5-mini:t0.0:d2c7836c6e|Ledger supports idempotency keys on every POST endpoint.|Idempotency keys are not supported by Ledger.": [
+  "contradiction",
+  "One statement says Ledger supports idempotency keys on every POST endpoint while the other says idempotency keys are not supported by Ledger."
+ ],
+ "llm-verifier/1:hosted-agent:gpt-5-mini:t0.0:d2c7836c6e|Ledger uses only PostgreSQL for persistence.|Ledger also writes settlement snapshots to MongoDB.": [
+  "contradiction",
+  "Disagrees on persistence: only PostgreSQL vs also writing settlement snapshots to MongoDB."
+ ],
+ "llm-verifier/1:hosted-agent:gpt-5-mini:t0.0:d2c7836c6e|Ledger writes audit records with blocking calls.|Audit writes in Ledger are non-blocking.": [
+  "contradiction",
+  "A states Ledger writes audit records with blocking calls while B states audit writes in Ledger are non-blocking."
+ ],
+ "llm-verifier/1:hosted-agent:gpt-5-mini:t0.0:d2c7836c6e|Ledger's API rate limit is 100 requests per second per tenant.|Each tenant may send up to 500 requests per second to the Ledger API.": [
+  "contradiction",
+  "Disagrees on per-tenant rate limit: 100 requests/sec vs 500 requests/sec."
+ ],
+ "llm-verifier/1:hosted-agent:gpt-5-mini:t0.0:d2c7836c6e|Ledger's database is Postgres 15.|Ledger runs on PostgreSQL 13.": [
+  "contradiction",
+  "Disagrees on PostgreSQL major version: Postgres 15 vs PostgreSQL 13."
+ ],
+ "llm-verifier/1:hosted-agent:gpt-5-mini:t0.0:d2c7836c6e|No endpoint in the Billing API is unauthenticated.|Every Billing API endpoint requires authentication.": [
+  "compatible",
+  ""
+ ],
+ "llm-verifier/1:hosted-agent:gpt-5-mini:t0.0:d2c7836c6e|Notifications sends email to customers.|Notifications delivers transactional email through SendGrid.": [
+  "compatible",
+  ""
+ ],
+ "llm-verifier/1:hosted-agent:gpt-5-mini:t0.0:d2c7836c6e|Notifications sends every email through SendGrid.|Password reset emails from Notifications go out through Amazon SES.": [
+  "contradiction",
+  "They disagree on the email delivery provider for Notifications (all emails via SendGrid vs password resets sent via Amazon SES)."
+ ],
+ "llm-verifier/1:hosted-agent:gpt-5-mini:t0.0:d2c7836c6e|Our infrastructure is managed with Terraform.|The Kafka clusters are provisioned by a Terraform module that Team Orion maintains.": [
+  "compatible",
+  ""
+ ],
+ "llm-verifier/1:hosted-agent:gpt-5-mini:t0.0:d2c7836c6e|Payments has no external dependencies.|Payments calls the Stripe API to capture charges.": [
+  "contradiction",
+  "They disagree on Payments' external dependencies (having none vs calling the Stripe API)."
+ ],
+ "llm-verifier/1:hosted-agent:gpt-5-mini:t0.0:d2c7836c6e|Payments integrates with Stripe.|Payments integrates with Adyen.": [
+  "compatible",
+  ""
+ ],
+ "llm-verifier/1:hosted-agent:gpt-5-mini:t0.0:d2c7836c6e|Payments is written in Java.|The Payments reconciliation worker relies on Java 21 virtual threads.": [
+  "compatible",
+  ""
+ ],
+ "llm-verifier/1:hosted-agent:gpt-5-mini:t0.0:d2c7836c6e|Payments publishes its audit events to Kafka.|Payments has no Kafka integration.": [
+  "contradiction",
+  "One says Payments publishes its audit events to Kafka, the other says Payments has no Kafka integration."
+ ],
+ "llm-verifier/1:hosted-agent:gpt-5-mini:t0.0:d2c7836c6e|PostgreSQL is the system of record for Ledger.|Ledger keeps its authoritative data in MongoDB.": [
+  "contradiction",
+  "They disagree about which database is the system of record for Ledger: PostgreSQL vs MongoDB."
+ ],
+ "llm-verifier/1:hosted-agent:gpt-5-mini:t0.0:d2c7836c6e|Requests from Gateway to Ledger time out after 30 seconds.|Gateway gives up on a Ledger call after 5 seconds.": [
+  "compatible",
+  ""
+ ],
+ "llm-verifier/1:hosted-agent:gpt-5-mini:t0.0:d2c7836c6e|Services exchange domain events through RabbitMQ.|Services exchange domain events through Kafka.": [
+  "contradiction",
+  "One statement says domain events are exchanged through RabbitMQ while the other says they are exchanged through Kafka — they assert different messaging systems."
+ ],
+ "llm-verifier/1:hosted-agent:gpt-5-mini:t0.0:d2c7836c6e|Single sign-on through Okta is available for the Admin Console.|The Admin Console dropped its Okta single sign-on integration.": [
+  "contradiction",
+  "They disagree on whether Okta single sign-on is available for the Admin Console (available vs dropped)."
+ ],
+ "llm-verifier/1:hosted-agent:gpt-5-mini:t0.0:d2c7836c6e|Starting with version 4.2, the Search API paginates results with cursors.|Search API versions before 4.2 paginate results with offset and limit parameters.": [
+  "different_scope",
+  "They cover different API versions: pre-4.2 uses offset/limit, 4.2 and later use cursor pagination."
+ ],
+ "llm-verifier/1:hosted-agent:gpt-5-mini:t0.0:d2c7836c6e|Team Orion is responsible for the Payments service.|Payments is owned by Team Orion.": [
+  "compatible",
+  ""
+ ],
+ "llm-verifier/1:hosted-agent:gpt-5-mini:t0.0:d2c7836c6e|The Analytics pipeline runs on GCP.|The Analytics pipeline is hosted entirely on AWS and does not use Google Cloud.": [
+  "contradiction",
+  "Disagrees on hosting cloud: Google Cloud Platform vs entirely on AWS."
+ ],
+ "llm-verifier/1:hosted-agent:gpt-5-mini:t0.0:d2c7836c6e|The Artifacts bucket in S3 is publicly readable.|The S3 bucket named Artifacts is private.": [
+  "contradiction",
+  "A claims the Artifacts S3 bucket is publicly readable while B claims the S3 bucket named Artifacts is private."
+ ],
+ "llm-verifier/1:hosted-agent:gpt-5-mini:t0.0:d2c7836c6e|The Atlas cluster runs Kubernetes 1.29.|The Atlas cluster runs Kubernetes 1.27.": [
+  "contradiction",
+  "They specify different Kubernetes versions (Atlas runs Kubernetes 1.29 vs 1.27)."
+ ],
+ "llm-verifier/1:hosted-agent:gpt-5-mini:t0.0:d2c7836c6e|The Auth service stores refresh tokens in Memcached.|The Auth service stores refresh tokens in Redis.": [
+  "contradiction",
+  "They disagree on the storage backend for refresh tokens: Memcached versus Redis."
+ ],
+ "llm-verifier/1:hosted-agent:gpt-5-mini:t0.0:d2c7836c6e|The Auth service supports OAuth2.|Auth supports SAML for enterprise single sign-on.": [
+  "compatible",
+  ""
+ ],
+ "llm-verifier/1:hosted-agent:gpt-5-mini:t0.0:d2c7836c6e|The AuthN service signs JWTs with RS256.|The Auth service signs its JWTs with HS256.": [
+  "contradiction",
+  "Disagrees on JWT signing algorithm: RS256 vs HS256."
+ ],
+ "llm-verifier/1:hosted-agent:gpt-5-mini:t0.0:d2c7836c6e|The Billing database runs PostgreSQL 15.|Billing connects to PostgreSQL using version 5 of the pgx driver.": [
+  "compatible",
+  ""
+ ],
+ "llm-verifier/1:hosted-agent:gpt-5-mini:t0.0:d2c7836c6e|The Catalog datastore is DynamoDB.|Catalog's database is MongoDB.": [
+  "contradiction",
+  "Disagrees on datastore technology: DynamoDB vs MongoDB."
+ ],
+ "llm-verifier/1:hosted-agent:gpt-5-mini:t0.0:d2c7836c6e|The Inventory service does not allow anonymous reads.|Anonymous read access to Inventory is forbidden.": [
+  "compatible",
+  ""
+ ],
+ "llm-verifier/1:hosted-agent:gpt-5-mini:t0.0:d2c7836c6e|The Inventory service runs on Java 11.|The Inventory service runs on Java 21.": [
+  "contradiction",
+  "They state conflicting Java runtime versions for the same service (Java 11 vs Java 21)."
+ ],
+ "llm-verifier/1:hosted-agent:gpt-5-mini:t0.0:d2c7836c6e|The Ledger CLI is published as a Homebrew package.|There is no Homebrew package for the Ledger CLI.": [
+  "contradiction",
+  "One states the Ledger CLI is published as a Homebrew package while the other states there is no Homebrew package for the Ledger CLI."
+ ],
+ "llm-verifier/1:hosted-agent:gpt-5-mini:t0.0:d2c7836c6e|The Ledger SDK is distributed under the MIT License.|The Ledger SDK is an Apache-2.0 licensed project.": [
+  "contradiction",
+  "They disagree about the Ledger SDK license: MIT vs Apache-2.0."
+ ],
+ "llm-verifier/1:hosted-agent:gpt-5-mini:t0.0:d2c7836c6e|The Ledger database is reachable only from inside the VPC.|Analysts query the Ledger database from their laptops over the public internet.": [
+  "contradiction",
+  "They disagree on Ledger database accessibility (reachable only inside the VPC vs queried over the public internet)."
+ ],
+ "llm-verifier/1:hosted-agent:gpt-5-mini:t0.0:d2c7836c6e|The Ledger event log runs on Pulsar.|The Ledger event log runs on Kafka.": [
+  "contradiction",
+  "They disagree on the Ledger event log technology: Pulsar versus Kafka."
+ ],
+ "llm-verifier/1:hosted-agent:gpt-5-mini:t0.0:d2c7836c6e|The Mobile app is available on iOS.|An Android build of the Mobile app is published to Google Play.": [
+  "compatible",
+  ""
+ ],
+ "llm-verifier/1:hosted-agent:gpt-5-mini:t0.0:d2c7836c6e|The Notifications service is deployed on AWS Lambda.|Notifications runs as a long-lived container on ECS Fargate.": [
+  "contradiction",
+  "Disagrees on deployment platform: AWS Lambda vs ECS Fargate long-lived container."
+ ],
+ "llm-verifier/1:hosted-agent:gpt-5-mini:t0.0:d2c7836c6e|The Orders service is deployed on k8s.|Orders does not run on Kubernetes; it is deployed to plain EC2 instances.": [
+  "contradiction",
+  "Disagrees on deployment environment: Kubernetes vs plain EC2 instances."
+ ],
+ "llm-verifier/1:hosted-agent:gpt-5-mini:t0.0:d2c7836c6e|The Platform team publishes base images for Python.|Base images for Node.js are maintained by the Platform team.": [
+  "compatible",
+  ""
+ ],
+ "llm-verifier/1:hosted-agent:gpt-5-mini:t0.0:d2c7836c6e|The Pricing deployment never scales below two replicas in Kubernetes.|Kubernetes can scale Pricing up to ten replicas.": [
+  "compatible",
+  ""
+ ],
+ "llm-verifier/1:hosted-agent:gpt-5-mini:t0.0:d2c7836c6e|The Pricing deployment runs three replicas in Kubernetes.|Pricing is scaled to a fixed count of five pods on Kubernetes.": [
+  "contradiction",
+  "They disagree about the number of Kubernetes replicas for Pricing: three vs five pods."
+ ],
+ "llm-verifier/1:hosted-agent:gpt-5-mini:t0.0:d2c7836c6e|The Recommendations service runs as a single replica.|Recommendations runs three replicas behind the load balancer.": [
+  "contradiction",
+  "They disagree on the number of replicas for Recommendations (single replica vs three replicas behind the load balancer)."
+ ],
+ "llm-verifier/1:hosted-agent:gpt-5-mini:t0.0:d2c7836c6e|The Reporting service can export data to Snowflake.|Snowflake export is unavailable in the Reporting service.": [
+  "contradiction",
+  "They conflict on whether the Reporting service can export data to Snowflake (available vs unavailable)."
+ ],
+ "llm-verifier/1:hosted-agent:gpt-5-mini:t0.0:d2c7836c6e|The Reporting service exports data as CSV.|Reporting can produce Parquet exports.": [
+  "compatible",
+  ""
+ ],
+ "llm-verifier/1:hosted-agent:gpt-5-mini:t0.0:d2c7836c6e|The Reporting service used to read directly from the Ledger database.|Reporting reads Ledger data only through the Ledger API.": [
+  "different_scope",
+  "A describes past behavior (reporting used to read directly from the Ledger DB) while B states current behavior (reporting reads Ledger data only through the Ledger API)."
+ ],
+ "llm-verifier/1:hosted-agent:gpt-5-mini:t0.0:d2c7836c6e|The Search service is owned by Team Orion.|Team Vega is the owning team for Search.": [
+  "contradiction",
+  "They disagree about the owning team for the Search service: Team Orion vs Team Vega."
+ ],
+ "llm-verifier/1:hosted-agent:gpt-5-mini:t0.0:d2c7836c6e|The Search service runs against Elasticsearch 8 clusters.|Elasticsearch 8 is not compatible with the Search service.": [
+  "contradiction",
+  "They conflict on whether Elasticsearch 8 is compatible with the Search service (runs against ES8 vs ES8 not compatible)."
+ ],
+ "llm-verifier/1:hosted-agent:gpt-5-mini:t0.0:d2c7836c6e|The Session service is stateless.|The Session service is stateful and pins each user to a single pod.": [
+  "contradiction",
+  "A describes the Session service as stateless while B describes it as stateful and pinning each user to a single pod."
+ ],
+ "llm-verifier/1:hosted-agent:gpt-5-mini:t0.0:d2c7836c6e|The Sessions service stores session data in Redis.|Redis is where Sessions keeps per-user session state.": [
+  "compatible",
+  ""
+ ],
+ "llm-verifier/1:hosted-agent:gpt-5-mini:t0.0:d2c7836c6e|The public API would be served through an Apollo GraphQL gateway.|The public API is served as REST through Gateway.": [
+  "different_scope",
+  "A describes a plan/possible future serving via an Apollo GraphQL gateway while B states the API is served as REST through Gateway currently."
+ ],
+ "llm-verifier/1:hosted-agent:gpt-5-mini:t0.0:d2c7836c6e|The v1 Orders API was deprecated.|The v1 Orders API is the recommended entry point for new integrations.": [
+  "contradiction",
+  "They disagree about whether the v1 Orders API is deprecated versus being the recommended entry point for new integrations."
+ ],
+ "llm-verifier/1:hosted-agent:gpt-5-mini:t0.0:d2c7836c6e|Vault issues dynamic database credentials to the Orders service.|Dynamic credentials from Vault are not used by the Orders service.": [
+  "contradiction",
+  "A says the Orders service uses dynamic database credentials issued by Vault while B says the Orders service does not use dynamic credentials from Vault."
+ ]
+}

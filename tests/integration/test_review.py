@@ -85,3 +85,21 @@ def test_bad_inputs(repo, tmp_path):
         run(repo, "main", prices=["cheap"])
     with pytest.raises(WorkspaceNotFound):
         review(tmp_path / "nowhere", "main")
+
+
+def test_a_change_that_contradicts_another_document_is_flagged_and_its_fix_reported(repo):
+    write_files(repo / "knowledge", {"architecture.md": "# Architecture\n\nPostgreSQL does not support JSONB.\n"})
+    r = review(repo, "main")
+    assert r.conflicts_open == 1 and not r.conflicts_resolved
+    (c,) = r.conflicts_introduced
+    assert {v["value"]: v["paths"] for v in c["values"]} == {"is negated": ["architecture.md"],
+                                                            "is stated": ["databases/postgres.md"]}
+    md = render_markdown(r)
+    assert "introduce 1 conflict between documents" in md and "<details open><summary>Conflicts introduced (1)" in md
+
+    git(repo, "add", "-A")
+    git(repo, "commit", "-q", "-m", "contradiction lands on main")
+    (repo / "knowledge" / "architecture.md").write_text("# Architecture\n\nPostgreSQL supports JSONB.\n")
+    fixed = review(repo, "main")
+    assert [x["id"] for x in fixed.conflicts_resolved] == [c["id"]] and fixed.conflicts_open == 0
+    assert "resolve 1 conflict between documents" in render_markdown(fixed)

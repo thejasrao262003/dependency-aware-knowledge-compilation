@@ -23,7 +23,7 @@ Instances are cheap to open.
 
 | Method | Returns | Notes |
 |---|---|---|
-| `status()` | `Status` | `head`, `counts`, `up_to_date`, `source_changes`, `stale` (artifacts per kind downstream of changed sources), and `outdated`: reasons a compile has work besides source changes (DAKC's logic, the configuration or the provider changed since HEAD). `up_to_date` is true only when there are neither. |
+| `status()` | `Status` | `head`, `counts`, `up_to_date`, `source_changes`, `stale` (artifacts per kind downstream of changed sources), `conflicts_open`, and `outdated`: reasons a compile has work besides source changes (DAKC's logic, the configuration, the conflict scope rules or the provider changed since HEAD, or the conflict verifier has pairs left to judge). `up_to_date` is true only when there are neither. |
 | `check(root=None)` | `SourceChanges` | new / modified / deleted / renamed / unchanged, by content hash |
 | `plan(full=False)` | `BuildReport` | Dry run. Nothing is written or spent. `has_work()` and `llm_calls()` tell you whether a compile is needed and what it costs. Exact for free providers. For LLM providers, extraction calls are exact and page and summary counts are an estimate (`report.exact` is false). |
 | `compile(full=False, wait=0.0)` | `BuildReport` | Takes the build lock, commits atomically, updates the wiki files, then runs the configured publishers. `report.publications` has one result per publisher; a failing publisher does not fail the build. Raises `BuildLocked` or `CompileFailed`. |
@@ -37,6 +37,8 @@ Instances are cheap to open.
 | `builds(limit=20)` | `list[BuildRecord]` | Newest first: committed, noop, failed, rolled_back |
 | `diff(a, b=None)` | `BuildDiff` | Artifacts created / updated / deleted between two builds (`b` defaults to HEAD) |
 | `duplicates(limit=None)` | `list[DuplicatePair]` | Advisory. Claims are never merged. |
+| `conflicts(scoped=False, accepted=False)` | `list[Conflict]` | Open conflicts between sources at HEAD (RFC 0002): `kind` is `conflict` (found by the rules) or `possible` (judged by the optional verifier). `scoped=True` adds differences explained by time, release, environment or status. `accepted=True` adds those accepted in `dakc.toml`. Advisory: nothing is changed. |
+| `conflict(id)` | `Conflict` | One finding: each value with its `locations` (path, `line` in the source on disk, heading, scope, claim and the source's own `evidence` sentence), and `affected` pages and summaries. `id` is `cfl:…`, a unique prefix, or `conflict:…`. |
 | `verify(against_full=False, allow_cost=False)` | `VerifyReport` | Invariants. `against_full` also compares with a full rebuild; with an LLM provider it needs `allow_cost=True` (`CostNotAllowed` otherwise). |
 | `rollback(to=None, wait=0.0)` | `RollbackResult` | Takes the build lock. Destructive: later artifact versions are discarded, though their build records remain. Publishers are brought back too (`.publications`). |
 | `sources()` | `list[SourceInfo]` | The configured sources: name, type, path prefix, location, capabilities, documents at HEAD |

@@ -75,10 +75,18 @@ class ChangeSet:
     source_upserts: list[SourceRecord] = field(default_factory=list)
     source_deletes: list[str] = field(default_factory=list)
     meta: dict[str, str] = field(default_factory=dict)
+    # conflicts (RFC 0002): advisory findings and the index they are found by
+    conflict_upserts: list[tuple[str, str, str, str]] = field(default_factory=list)  # (id, key, kind, payload)
+    conflict_deletes: list[str] = field(default_factory=list)
+    conflict_index_reset: bool = False
+    conflict_index_claims: list[str] = field(default_factory=list)  # claims whose index rows are replaced
+    conflict_index_rows: list[tuple] = field(default_factory=list)
 
     @property
     def empty(self) -> bool:
-        return not (self.upserts or self.deletes or self.edges or self.source_upserts or self.source_deletes)
+        return not (self.upserts or self.deletes or self.edges or self.source_upserts or self.source_deletes
+                    or self.conflict_upserts or self.conflict_deletes or self.conflict_index_reset
+                    or self.conflict_index_claims or self.meta)
 
     def counts(self) -> dict[str, int]:
         by_kind: dict[str, int] = {}
@@ -152,6 +160,20 @@ def commit(
             c.executemany("INSERT INTO edges(dependent,dependency,kind,from_build) VALUES(?,?,?,?)", rows)
             tick(len(chunk))
 
+        # conflicts: versioned findings, and the derived index (replaced, not versioned)
+        if cs.conflict_index_reset:
+            c.execute("DELETE FROM conflict_index")
+        for i in range(0, len(cs.conflict_index_claims), 500):
+            chunk = cs.conflict_index_claims[i:i + 500]
+            c.execute(f"DELETE FROM conflict_index WHERE claim_id IN ({','.join('?' * len(chunk))})", chunk)
+        if cs.conflict_index_rows:
+            c.executemany("INSERT INTO conflict_index(key, claim_id, passage_id, value, polarity, scope, path, heading, sentence) "
+                          "VALUES(?,?,?,?,?,?,?,?,?)", cs.conflict_index_rows)
+        closed = [fid for fid, *_ in cs.conflict_upserts] + cs.conflict_deletes
+        c.executemany("UPDATE conflicts SET to_build=? WHERE id=? AND to_build IS NULL", [(build_id, i) for i in closed])
+        c.executemany("INSERT INTO conflicts(id, key, kind, payload, from_build) VALUES(?,?,?,?,?)",
+                      [(fid, key, kind, payload, build_id) for fid, key, kind, payload in cs.conflict_upserts])
+
         for k, v in cs.meta.items():
             store.set_meta(k, v)
         store.set_meta("head", str(build_id))
@@ -169,9 +191,11 @@ def rollback(store: Store, to_build: int) -> int:
     if to_build == store.head:
         raise RollbackError(f"build {to_build} is already HEAD")
     with store.transaction() as c:
-        for table in ("artifacts", "edges", "sources"):
+        for table in ("artifacts", "edges", "sources", "conflicts"):
             c.execute(f"DELETE FROM {table} WHERE from_build > ?", (to_build,))
             c.execute(f"UPDATE {table} SET to_build=NULL WHERE to_build > ?", (to_build,))
+        c.execute("DELETE FROM conflict_index")  # derived: rebuilt by the next build
+        store.set_meta("conflicts_fp", "")
         c.execute("UPDATE builds SET status='rolled_back' WHERE id > ? AND status='committed'", (to_build,))
         cur = c.execute(
             "INSERT INTO builds(parent,strategy,mode,status,started_at,finished_at,stats) VALUES(?,?,?,?,?,?,?)",

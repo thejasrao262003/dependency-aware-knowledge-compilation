@@ -1,0 +1,1348 @@
+{
+ "test": {
+  "pairs": 110,
+  "verifier": "llm-verifier/1:hosted-agent:gpt-5-mini:t0.0:d2c7836c6e",
+  "recall": [
+   50,
+   55
+  ],
+  "false_flags": [
+   0,
+   55
+  ],
+  "precision": [
+   50,
+   50
+  ],
+  "contradictions_rules_or_verifier_can_see": [
+   53,
+   55
+  ],
+  "by_category": [
+   {
+    "label": "compatible",
+    "category": "different property",
+    "n": 7,
+    "flagged": 0
+   },
+   {
+    "label": "compatible",
+    "category": "different subject",
+    "n": 6,
+    "flagged": 0
+   },
+   {
+    "label": "compatible",
+    "category": "general and specific",
+    "n": 7,
+    "flagged": 0
+   },
+   {
+    "label": "compatible",
+    "category": "multi-valued",
+    "n": 8,
+    "flagged": 0
+   },
+   {
+    "label": "compatible",
+    "category": "paraphrase agreement",
+    "n": 7,
+    "flagged": 0
+   },
+   {
+    "label": "contradiction",
+    "category": "antonym",
+    "n": 10,
+    "flagged": 10
+   },
+   {
+    "label": "contradiction",
+    "category": "implied",
+    "n": 10,
+    "flagged": 9
+   },
+   {
+    "label": "contradiction",
+    "category": "negation in other words",
+    "n": 10,
+    "flagged": 10
+   },
+   {
+    "label": "contradiction",
+    "category": "same wording",
+    "n": 5,
+    "flagged": 5
+   },
+   {
+    "label": "contradiction",
+    "category": "synonym or alias",
+    "n": 8,
+    "flagged": 7
+   },
+   {
+    "label": "contradiction",
+    "category": "value in other words",
+    "n": 12,
+    "flagged": 9
+   },
+   {
+    "label": "scoped",
+    "category": "environment",
+    "n": 5,
+    "flagged": 0
+   },
+   {
+    "label": "scoped",
+    "category": "past or superseded",
+    "n": 5,
+    "flagged": 0
+   },
+   {
+    "label": "scoped",
+    "category": "proposal or FAQ",
+    "n": 4,
+    "flagged": 0
+   },
+   {
+    "label": "scoped",
+    "category": "release or version",
+    "n": 6,
+    "flagged": 0
+   }
+  ],
+  "rows": [
+   {
+    "id": "t001",
+    "label": "contradiction",
+    "category": "same wording",
+    "verdict": "conflict",
+    "extracted": true,
+    "reaches_verifier": false
+   },
+   {
+    "id": "t002",
+    "label": "contradiction",
+    "category": "same wording",
+    "verdict": "conflict",
+    "extracted": true,
+    "reaches_verifier": false
+   },
+   {
+    "id": "t003",
+    "label": "contradiction",
+    "category": "same wording",
+    "verdict": "conflict",
+    "extracted": true,
+    "reaches_verifier": false
+   },
+   {
+    "id": "t004",
+    "label": "contradiction",
+    "category": "same wording",
+    "verdict": "conflict",
+    "extracted": true,
+    "reaches_verifier": true,
+    "model": [
+     "contradiction",
+     "They specify different Kubernetes versions (Atlas runs Kubernetes 1.29 vs 1.27)."
+    ]
+   },
+   {
+    "id": "t005",
+    "label": "contradiction",
+    "category": "same wording",
+    "verdict": "conflict",
+    "extracted": true,
+    "reaches_verifier": false
+   },
+   {
+    "id": "t006",
+    "label": "contradiction",
+    "category": "negation in other words",
+    "verdict": "conflict",
+    "extracted": true,
+    "reaches_verifier": true,
+    "model": [
+     "contradiction",
+     "One statement says Ledger supports idempotency keys on every POST endpoint while the other says idempotency keys are not supported by Ledger."
+    ]
+   },
+   {
+    "id": "t007",
+    "label": "contradiction",
+    "category": "negation in other words",
+    "verdict": "conflict",
+    "extracted": true,
+    "reaches_verifier": true,
+    "model": [
+     "contradiction",
+     "They conflict on whether the Reporting service can export data to Snowflake (available vs unavailable)."
+    ]
+   },
+   {
+    "id": "t008",
+    "label": "contradiction",
+    "category": "negation in other words",
+    "verdict": "conflict",
+    "extracted": true,
+    "reaches_verifier": true,
+    "model": [
+     "contradiction",
+     "One says Payments publishes its audit events to Kafka, the other says Payments has no Kafka integration."
+    ]
+   },
+   {
+    "id": "t009",
+    "label": "contradiction",
+    "category": "negation in other words",
+    "verdict": "conflict",
+    "extracted": true,
+    "reaches_verifier": true,
+    "model": [
+     "contradiction",
+     "They disagree on whether Gateway performs TLS termination for inbound traffic (terminates TLS vs TLS termination removed)."
+    ]
+   },
+   {
+    "id": "t010",
+    "label": "contradiction",
+    "category": "negation in other words",
+    "verdict": "conflict",
+    "extracted": true,
+    "reaches_verifier": true,
+    "model": [
+     "contradiction",
+     "They conflict on whether Elasticsearch 8 is compatible with the Search service (runs against ES8 vs ES8 not compatible)."
+    ]
+   },
+   {
+    "id": "t011",
+    "label": "contradiction",
+    "category": "negation in other words",
+    "verdict": "conflict",
+    "extracted": true,
+    "reaches_verifier": true,
+    "model": [
+     "contradiction",
+     "They disagree on whether Inventory supports WebSockets for pushing stock updates (supports WebSockets vs lacks WebSocket support)."
+    ]
+   },
+   {
+    "id": "t012",
+    "label": "contradiction",
+    "category": "negation in other words",
+    "verdict": "conflict",
+    "extracted": true,
+    "reaches_verifier": true,
+    "model": [
+     "contradiction",
+     "One states the Ledger CLI is published as a Homebrew package while the other states there is no Homebrew package for the Ledger CLI."
+    ]
+   },
+   {
+    "id": "t013",
+    "label": "contradiction",
+    "category": "negation in other words",
+    "verdict": "conflict",
+    "extracted": true,
+    "reaches_verifier": true,
+    "model": [
+     "contradiction",
+     "They conflict on whether Billing accepts SOAP requests from legacy clients (accepts SOAP vs no longer accepts SOAP)."
+    ]
+   },
+   {
+    "id": "t014",
+    "label": "contradiction",
+    "category": "negation in other words",
+    "verdict": "conflict",
+    "extracted": true,
+    "reaches_verifier": true,
+    "model": [
+     "contradiction",
+     "They disagree on whether Okta single sign-on is available for the Admin Console (available vs dropped)."
+    ]
+   },
+   {
+    "id": "t015",
+    "label": "contradiction",
+    "category": "negation in other words",
+    "verdict": "conflict",
+    "extracted": true,
+    "reaches_verifier": true,
+    "model": [
+     "contradiction",
+     "A says the Orders service uses dynamic database credentials issued by Vault while B says the Orders service does not use dynamic credentials from Vault."
+    ]
+   },
+   {
+    "id": "t016",
+    "label": "contradiction",
+    "category": "antonym",
+    "verdict": "conflict",
+    "extracted": true,
+    "reaches_verifier": true,
+    "model": [
+     "contradiction",
+     "A states Admin Console logins require two-factor authentication whereas B states two-factor authentication is optional for signing in."
+    ]
+   },
+   {
+    "id": "t017",
+    "label": "contradiction",
+    "category": "antonym",
+    "verdict": "conflict",
+    "extracted": true,
+    "reaches_verifier": true,
+    "model": [
+     "contradiction",
+     "A asserts all Checkout-to-Pricing calls are synchronous while B states Checkout invokes the Pricing service asynchronously."
+    ]
+   },
+   {
+    "id": "t018",
+    "label": "contradiction",
+    "category": "antonym",
+    "verdict": "conflict",
+    "extracted": true,
+    "reaches_verifier": true,
+    "model": [
+     "contradiction",
+     "A claims the Artifacts S3 bucket is publicly readable while B claims the S3 bucket named Artifacts is private."
+    ]
+   },
+   {
+    "id": "t019",
+    "label": "contradiction",
+    "category": "antonym",
+    "verdict": "conflict",
+    "extracted": true,
+    "reaches_verifier": true,
+    "model": [
+     "contradiction",
+     "A states Ledger entries are immutable once written whereas B states entries in Ledger are mutable and can be corrected in place."
+    ]
+   },
+   {
+    "id": "t020",
+    "label": "contradiction",
+    "category": "antonym",
+    "verdict": "conflict",
+    "extracted": true,
+    "reaches_verifier": true,
+    "model": [
+     "contradiction",
+     "A describes the Session service as stateless while B describes it as stateful and pinning each user to a single pod."
+    ]
+   },
+   {
+    "id": "t021",
+    "label": "contradiction",
+    "category": "antonym",
+    "verdict": "conflict",
+    "extracted": true,
+    "reaches_verifier": true,
+    "model": [
+     "contradiction",
+     "A says Orders database backups are encrypted at rest with AWS KMS while B says Orders database backups are written to S3 unencrypted."
+    ]
+   },
+   {
+    "id": "t022",
+    "label": "contradiction",
+    "category": "antonym",
+    "verdict": "conflict",
+    "extracted": true,
+    "reaches_verifier": true,
+    "model": [
+     "contradiction",
+     "A states Ledger writes audit records with blocking calls while B states audit writes in Ledger are non-blocking."
+    ]
+   },
+   {
+    "id": "t023",
+    "label": "contradiction",
+    "category": "antonym",
+    "verdict": "conflict",
+    "extracted": true,
+    "reaches_verifier": true,
+    "model": [
+     "contradiction",
+     "A allows force-pushing to the main branch of the Monorepo while B forbids force-pushes to main."
+    ]
+   },
+   {
+    "id": "t024",
+    "label": "contradiction",
+    "category": "antonym",
+    "verdict": "conflict",
+    "extracted": true,
+    "reaches_verifier": true,
+    "model": [
+     "contradiction",
+     "A asserts balance reads in Ledger are strongly consistent while B asserts Ledger serves balance reads with eventual consistency."
+    ]
+   },
+   {
+    "id": "t025",
+    "label": "contradiction",
+    "category": "antonym",
+    "verdict": "conflict",
+    "extracted": true,
+    "reaches_verifier": true,
+    "model": [
+     "contradiction",
+     "One statement says failover is automatic while the other says failover is a manual step performed by the on-call engineer."
+    ]
+   },
+   {
+    "id": "t026",
+    "label": "contradiction",
+    "category": "value in other words",
+    "verdict": "conflict",
+    "extracted": true,
+    "reaches_verifier": true,
+    "model": [
+     "contradiction",
+     "They disagree about which database is the system of record for Ledger: PostgreSQL vs MongoDB."
+    ]
+   },
+   {
+    "id": "t027",
+    "label": "contradiction",
+    "category": "value in other words",
+    "verdict": "conflict",
+    "extracted": true,
+    "reaches_verifier": true,
+    "model": [
+     "contradiction",
+     "They disagree about Billing's implementation language/framework: Go vs Java with Spring Boot."
+    ]
+   },
+   {
+    "id": "t028",
+    "label": "contradiction",
+    "category": "value in other words",
+    "verdict": "conflict",
+    "extracted": true,
+    "reaches_verifier": true,
+    "model": [
+     "contradiction",
+     "They disagree about the AWS region hosting Atlas: us-east-1 vs eu-west-1."
+    ]
+   },
+   {
+    "id": "t029",
+    "label": "contradiction",
+    "category": "value in other words",
+    "verdict": "none",
+    "extracted": true,
+    "reaches_verifier": false
+   },
+   {
+    "id": "t030",
+    "label": "contradiction",
+    "category": "value in other words",
+    "verdict": "conflict",
+    "extracted": true,
+    "reaches_verifier": true,
+    "model": [
+     "contradiction",
+     "They disagree about the owning team for the Search service: Team Orion vs Team Vega."
+    ]
+   },
+   {
+    "id": "t031",
+    "label": "contradiction",
+    "category": "value in other words",
+    "verdict": "none",
+    "extracted": true,
+    "reaches_verifier": true,
+    "model": [
+     "compatible",
+     ""
+    ]
+   },
+   {
+    "id": "t032",
+    "label": "contradiction",
+    "category": "value in other words",
+    "verdict": "conflict",
+    "extracted": true,
+    "reaches_verifier": true,
+    "model": [
+     "contradiction",
+     "They disagree about the Orders Kafka topic retention period: seven days vs 30 days."
+    ]
+   },
+   {
+    "id": "t033",
+    "label": "contradiction",
+    "category": "value in other words",
+    "verdict": "conflict",
+    "extracted": true,
+    "reaches_verifier": true,
+    "model": [
+     "contradiction",
+     "They disagree about the Catalog service Python runtime version: 3.11 vs 3.9."
+    ]
+   },
+   {
+    "id": "t034",
+    "label": "contradiction",
+    "category": "value in other words",
+    "verdict": "conflict",
+    "extracted": true,
+    "reaches_verifier": true,
+    "model": [
+     "contradiction",
+     "They disagree about the Ledger SDK license: MIT vs Apache-2.0."
+    ]
+   },
+   {
+    "id": "t035",
+    "label": "contradiction",
+    "category": "value in other words",
+    "verdict": "conflict",
+    "extracted": true,
+    "reaches_verifier": true,
+    "model": [
+     "contradiction",
+     "They disagree about the number of Kubernetes replicas for Pricing: three vs five pods."
+    ]
+   },
+   {
+    "id": "t036",
+    "label": "contradiction",
+    "category": "value in other words",
+    "verdict": "conflict",
+    "extracted": true,
+    "reaches_verifier": true,
+    "model": [
+     "contradiction",
+     "Disagrees on deployment platform: AWS Lambda vs ECS Fargate long-lived container."
+    ]
+   },
+   {
+    "id": "t037",
+    "label": "contradiction",
+    "category": "value in other words",
+    "verdict": "scoped",
+    "extracted": true,
+    "reaches_verifier": true,
+    "model": [
+     "contradiction",
+     "Disagrees on per-tenant rate limit: 100 requests/sec vs 500 requests/sec."
+    ]
+   },
+   {
+    "id": "t038",
+    "label": "contradiction",
+    "category": "synonym or alias",
+    "verdict": "conflict",
+    "extracted": true,
+    "reaches_verifier": true,
+    "model": [
+     "contradiction",
+     "Disagrees on PostgreSQL major version: Postgres 15 vs PostgreSQL 13."
+    ]
+   },
+   {
+    "id": "t039",
+    "label": "contradiction",
+    "category": "synonym or alias",
+    "verdict": "conflict",
+    "extracted": true,
+    "reaches_verifier": true,
+    "model": [
+     "contradiction",
+     "Disagrees on deployment environment: Kubernetes vs plain EC2 instances."
+    ]
+   },
+   {
+    "id": "t040",
+    "label": "contradiction",
+    "category": "synonym or alias",
+    "verdict": "none",
+    "extracted": true,
+    "reaches_verifier": false
+   },
+   {
+    "id": "t041",
+    "label": "contradiction",
+    "category": "synonym or alias",
+    "verdict": "conflict",
+    "extracted": true,
+    "reaches_verifier": true,
+    "model": [
+     "contradiction",
+     "Disagrees on datastore technology: DynamoDB vs MongoDB."
+    ]
+   },
+   {
+    "id": "t042",
+    "label": "contradiction",
+    "category": "synonym or alias",
+    "verdict": "conflict",
+    "extracted": true,
+    "reaches_verifier": true,
+    "model": [
+     "contradiction",
+     "Disagrees on JWT signing algorithm: RS256 vs HS256."
+    ]
+   },
+   {
+    "id": "t043",
+    "label": "contradiction",
+    "category": "synonym or alias",
+    "verdict": "conflict",
+    "extracted": true,
+    "reaches_verifier": true,
+    "model": [
+     "contradiction",
+     "Disagrees on whether Elasticsearch (ES) is part of the Search stack."
+    ]
+   },
+   {
+    "id": "t044",
+    "label": "contradiction",
+    "category": "synonym or alias",
+    "verdict": "conflict",
+    "extracted": true,
+    "reaches_verifier": true,
+    "model": [
+     "contradiction",
+     "Disagrees on hosting cloud: Google Cloud Platform vs entirely on AWS."
+    ]
+   },
+   {
+    "id": "t045",
+    "label": "contradiction",
+    "category": "synonym or alias",
+    "verdict": "conflict",
+    "extracted": true,
+    "reaches_verifier": true,
+    "model": [
+     "contradiction",
+     "Disagrees on infrastructure provisioning tool: Terraform vs Pulumi."
+    ]
+   },
+   {
+    "id": "t046",
+    "label": "contradiction",
+    "category": "implied",
+    "verdict": "conflict",
+    "extracted": true,
+    "reaches_verifier": true,
+    "model": [
+     "contradiction",
+     "Disagrees on persistence: only PostgreSQL vs also writing settlement snapshots to MongoDB."
+    ]
+   },
+   {
+    "id": "t047",
+    "label": "contradiction",
+    "category": "implied",
+    "verdict": "conflict",
+    "extracted": true,
+    "reaches_verifier": true,
+    "model": [
+     "contradiction",
+     "They disagree on the number of replicas for Recommendations (single replica vs three replicas behind the load balancer)."
+    ]
+   },
+   {
+    "id": "t048",
+    "label": "contradiction",
+    "category": "implied",
+    "verdict": "scoped",
+    "extracted": true,
+    "reaches_verifier": true,
+    "model": [
+     "contradiction",
+     "They disagree about whether the v1 Orders API is deprecated versus being the recommended entry point for new integrations."
+    ]
+   },
+   {
+    "id": "t049",
+    "label": "contradiction",
+    "category": "implied",
+    "verdict": "conflict",
+    "extracted": true,
+    "reaches_verifier": true,
+    "model": [
+     "contradiction",
+     "They disagree about Reporting's implementation language (claiming every service is Go versus Reporting being written in Python)."
+    ]
+   },
+   {
+    "id": "t050",
+    "label": "contradiction",
+    "category": "implied",
+    "verdict": "conflict",
+    "extracted": true,
+    "reaches_verifier": true,
+    "model": [
+     "contradiction",
+     "They disagree on whether Checkout ever calls the Fraud service directly (never calls vs direct HTTP call for every payment)."
+    ]
+   },
+   {
+    "id": "t051",
+    "label": "contradiction",
+    "category": "implied",
+    "verdict": "conflict",
+    "extracted": true,
+    "reaches_verifier": true,
+    "model": [
+     "contradiction",
+     "They disagree on Ledger database accessibility (reachable only inside the VPC vs queried over the public internet)."
+    ]
+   },
+   {
+    "id": "t052",
+    "label": "contradiction",
+    "category": "implied",
+    "verdict": "conflict",
+    "extracted": true,
+    "reaches_verifier": true,
+    "model": [
+     "contradiction",
+     "They disagree on which components talk to Auth (Gateway being the only component vs Billing calling Auth directly)."
+    ]
+   },
+   {
+    "id": "t053",
+    "label": "contradiction",
+    "category": "implied",
+    "verdict": "conflict",
+    "extracted": true,
+    "reaches_verifier": true,
+    "model": [
+     "contradiction",
+     "They disagree on Payments' external dependencies (having none vs calling the Stripe API)."
+    ]
+   },
+   {
+    "id": "t054",
+    "label": "contradiction",
+    "category": "implied",
+    "verdict": "conflict",
+    "extracted": true,
+    "reaches_verifier": true,
+    "model": [
+     "contradiction",
+     "They disagree on whether Ledger has been fully migrated off Oracle versus a job still reading from Oracle."
+    ]
+   },
+   {
+    "id": "t055",
+    "label": "contradiction",
+    "category": "implied",
+    "verdict": "conflict",
+    "extracted": true,
+    "reaches_verifier": true,
+    "model": [
+     "contradiction",
+     "They disagree on the email delivery provider for Notifications (all emails via SendGrid vs password resets sent via Amazon SES)."
+    ]
+   },
+   {
+    "id": "t056",
+    "label": "compatible",
+    "category": "multi-valued",
+    "verdict": "none",
+    "extracted": true,
+    "reaches_verifier": true,
+    "model": [
+     "compatible",
+     ""
+    ]
+   },
+   {
+    "id": "t057",
+    "label": "compatible",
+    "category": "multi-valued",
+    "verdict": "none",
+    "extracted": true,
+    "reaches_verifier": true,
+    "model": [
+     "compatible",
+     ""
+    ]
+   },
+   {
+    "id": "t058",
+    "label": "compatible",
+    "category": "multi-valued",
+    "verdict": "none",
+    "extracted": true,
+    "reaches_verifier": true,
+    "model": [
+     "compatible",
+     ""
+    ]
+   },
+   {
+    "id": "t059",
+    "label": "compatible",
+    "category": "multi-valued",
+    "verdict": "none",
+    "extracted": true,
+    "reaches_verifier": true,
+    "model": [
+     "compatible",
+     ""
+    ]
+   },
+   {
+    "id": "t060",
+    "label": "compatible",
+    "category": "multi-valued",
+    "verdict": "none",
+    "extracted": true,
+    "reaches_verifier": true,
+    "model": [
+     "compatible",
+     ""
+    ]
+   },
+   {
+    "id": "t061",
+    "label": "compatible",
+    "category": "multi-valued",
+    "verdict": "none",
+    "extracted": true,
+    "reaches_verifier": true,
+    "model": [
+     "compatible",
+     ""
+    ]
+   },
+   {
+    "id": "t062",
+    "label": "compatible",
+    "category": "multi-valued",
+    "verdict": "none",
+    "extracted": true,
+    "reaches_verifier": true,
+    "model": [
+     "compatible",
+     ""
+    ]
+   },
+   {
+    "id": "t063",
+    "label": "compatible",
+    "category": "multi-valued",
+    "verdict": "none",
+    "extracted": true,
+    "reaches_verifier": true,
+    "model": [
+     "compatible",
+     ""
+    ]
+   },
+   {
+    "id": "t064",
+    "label": "compatible",
+    "category": "paraphrase agreement",
+    "verdict": "none",
+    "extracted": true,
+    "reaches_verifier": true,
+    "model": [
+     "compatible",
+     ""
+    ]
+   },
+   {
+    "id": "t065",
+    "label": "compatible",
+    "category": "paraphrase agreement",
+    "verdict": "none",
+    "extracted": true,
+    "reaches_verifier": true,
+    "model": [
+     "compatible",
+     ""
+    ]
+   },
+   {
+    "id": "t066",
+    "label": "compatible",
+    "category": "paraphrase agreement",
+    "verdict": "none",
+    "extracted": true,
+    "reaches_verifier": true,
+    "model": [
+     "compatible",
+     ""
+    ]
+   },
+   {
+    "id": "t067",
+    "label": "compatible",
+    "category": "paraphrase agreement",
+    "verdict": "none",
+    "extracted": true,
+    "reaches_verifier": true,
+    "model": [
+     "compatible",
+     ""
+    ]
+   },
+   {
+    "id": "t068",
+    "label": "compatible",
+    "category": "paraphrase agreement",
+    "verdict": "none",
+    "extracted": true,
+    "reaches_verifier": true,
+    "model": [
+     "compatible",
+     ""
+    ]
+   },
+   {
+    "id": "t069",
+    "label": "compatible",
+    "category": "paraphrase agreement",
+    "verdict": "none",
+    "extracted": true,
+    "reaches_verifier": true,
+    "model": [
+     "compatible",
+     ""
+    ]
+   },
+   {
+    "id": "t070",
+    "label": "compatible",
+    "category": "paraphrase agreement",
+    "verdict": "none",
+    "extracted": true,
+    "reaches_verifier": true,
+    "model": [
+     "compatible",
+     ""
+    ]
+   },
+   {
+    "id": "t071",
+    "label": "compatible",
+    "category": "different subject",
+    "verdict": "none",
+    "extracted": true,
+    "reaches_verifier": false
+   },
+   {
+    "id": "t072",
+    "label": "compatible",
+    "category": "different subject",
+    "verdict": "none",
+    "extracted": true,
+    "reaches_verifier": false
+   },
+   {
+    "id": "t073",
+    "label": "compatible",
+    "category": "different subject",
+    "verdict": "none",
+    "extracted": true,
+    "reaches_verifier": false
+   },
+   {
+    "id": "t074",
+    "label": "compatible",
+    "category": "different subject",
+    "verdict": "none",
+    "extracted": true,
+    "reaches_verifier": false
+   },
+   {
+    "id": "t075",
+    "label": "compatible",
+    "category": "different subject",
+    "verdict": "none",
+    "extracted": true,
+    "reaches_verifier": false
+   },
+   {
+    "id": "t076",
+    "label": "compatible",
+    "category": "different subject",
+    "verdict": "none",
+    "extracted": true,
+    "reaches_verifier": true,
+    "model": [
+     "compatible",
+     ""
+    ]
+   },
+   {
+    "id": "t077",
+    "label": "compatible",
+    "category": "different property",
+    "verdict": "none",
+    "extracted": true,
+    "reaches_verifier": false
+   },
+   {
+    "id": "t078",
+    "label": "compatible",
+    "category": "different property",
+    "verdict": "none",
+    "extracted": true,
+    "reaches_verifier": true,
+    "model": [
+     "compatible",
+     ""
+    ]
+   },
+   {
+    "id": "t079",
+    "label": "compatible",
+    "category": "different property",
+    "verdict": "none",
+    "extracted": true,
+    "reaches_verifier": false
+   },
+   {
+    "id": "t080",
+    "label": "compatible",
+    "category": "different property",
+    "verdict": "none",
+    "extracted": true,
+    "reaches_verifier": false
+   },
+   {
+    "id": "t081",
+    "label": "compatible",
+    "category": "different property",
+    "verdict": "none",
+    "extracted": true,
+    "reaches_verifier": true,
+    "model": [
+     "compatible",
+     ""
+    ]
+   },
+   {
+    "id": "t082",
+    "label": "compatible",
+    "category": "different property",
+    "verdict": "none",
+    "extracted": true,
+    "reaches_verifier": true,
+    "model": [
+     "compatible",
+     ""
+    ]
+   },
+   {
+    "id": "t083",
+    "label": "compatible",
+    "category": "different property",
+    "verdict": "none",
+    "extracted": true,
+    "reaches_verifier": true,
+    "model": [
+     "compatible",
+     ""
+    ]
+   },
+   {
+    "id": "t084",
+    "label": "compatible",
+    "category": "general and specific",
+    "verdict": "none",
+    "extracted": true,
+    "reaches_verifier": true,
+    "model": [
+     "compatible",
+     ""
+    ]
+   },
+   {
+    "id": "t085",
+    "label": "compatible",
+    "category": "general and specific",
+    "verdict": "none",
+    "extracted": true,
+    "reaches_verifier": true,
+    "model": [
+     "compatible",
+     ""
+    ]
+   },
+   {
+    "id": "t086",
+    "label": "compatible",
+    "category": "general and specific",
+    "verdict": "none",
+    "extracted": true,
+    "reaches_verifier": true,
+    "model": [
+     "compatible",
+     ""
+    ]
+   },
+   {
+    "id": "t087",
+    "label": "compatible",
+    "category": "general and specific",
+    "verdict": "none",
+    "extracted": true,
+    "reaches_verifier": true,
+    "model": [
+     "compatible",
+     ""
+    ]
+   },
+   {
+    "id": "t088",
+    "label": "compatible",
+    "category": "general and specific",
+    "verdict": "none",
+    "extracted": true,
+    "reaches_verifier": true,
+    "model": [
+     "compatible",
+     ""
+    ]
+   },
+   {
+    "id": "t089",
+    "label": "compatible",
+    "category": "general and specific",
+    "verdict": "none",
+    "extracted": true,
+    "reaches_verifier": true,
+    "model": [
+     "compatible",
+     ""
+    ]
+   },
+   {
+    "id": "t090",
+    "label": "compatible",
+    "category": "general and specific",
+    "verdict": "none",
+    "extracted": true,
+    "reaches_verifier": true,
+    "model": [
+     "compatible",
+     ""
+    ]
+   },
+   {
+    "id": "t091",
+    "label": "scoped",
+    "category": "release or version",
+    "verdict": "scoped",
+    "extracted": true,
+    "reaches_verifier": true,
+    "model": [
+     "different_scope",
+     "They specify different versions: Ledger 2.0 uses PostgreSQL while Ledger 3.0 uses CockroachDB."
+    ]
+   },
+   {
+    "id": "t092",
+    "label": "scoped",
+    "category": "release or version",
+    "verdict": "none",
+    "extracted": true,
+    "reaches_verifier": false
+   },
+   {
+    "id": "t093",
+    "label": "scoped",
+    "category": "release or version",
+    "verdict": "scoped",
+    "extracted": true,
+    "reaches_verifier": false
+   },
+   {
+    "id": "t094",
+    "label": "scoped",
+    "category": "release or version",
+    "verdict": "scoped",
+    "extracted": true,
+    "reaches_verifier": true,
+    "model": [
+     "different_scope",
+     "They cover different API versions: pre-4.2 uses offset/limit, 4.2 and later use cursor pagination."
+    ]
+   },
+   {
+    "id": "t095",
+    "label": "scoped",
+    "category": "release or version",
+    "verdict": "none",
+    "extracted": true,
+    "reaches_verifier": false
+   },
+   {
+    "id": "t096",
+    "label": "scoped",
+    "category": "release or version",
+    "verdict": "scoped",
+    "extracted": true,
+    "reaches_verifier": true,
+    "model": [
+     "contradiction",
+     "They state conflicting Java runtime versions for the same service (Java 11 vs Java 21)."
+    ]
+   },
+   {
+    "id": "t097",
+    "label": "scoped",
+    "category": "environment",
+    "verdict": "scoped",
+    "extracted": true,
+    "reaches_verifier": true,
+    "model": [
+     "different_scope",
+     "They apply to different environments: staging uses a single PostgreSQL instance while production uses a three-node PostgreSQL cluster."
+    ]
+   },
+   {
+    "id": "t098",
+    "label": "scoped",
+    "category": "environment",
+    "verdict": "scoped",
+    "extracted": true,
+    "reaches_verifier": false
+   },
+   {
+    "id": "t099",
+    "label": "scoped",
+    "category": "environment",
+    "verdict": "none",
+    "extracted": true,
+    "reaches_verifier": false
+   },
+   {
+    "id": "t100",
+    "label": "scoped",
+    "category": "environment",
+    "verdict": "scoped",
+    "extracted": true,
+    "reaches_verifier": true,
+    "model": [
+     "different_scope",
+     "A refers to the QA environment using Stripe test-mode keys while B refers to Production using live Stripe keys \u2014 they apply to different environments."
+    ]
+   },
+   {
+    "id": "t101",
+    "label": "scoped",
+    "category": "environment",
+    "verdict": "none",
+    "extracted": true,
+    "reaches_verifier": false
+   },
+   {
+    "id": "t102",
+    "label": "scoped",
+    "category": "past or superseded",
+    "verdict": "scoped",
+    "extracted": true,
+    "reaches_verifier": false
+   },
+   {
+    "id": "t103",
+    "label": "scoped",
+    "category": "past or superseded",
+    "verdict": "none",
+    "extracted": true,
+    "reaches_verifier": false
+   },
+   {
+    "id": "t104",
+    "label": "scoped",
+    "category": "past or superseded",
+    "verdict": "scoped",
+    "extracted": true,
+    "reaches_verifier": true,
+    "model": [
+     "contradiction",
+     "One statement says domain events are exchanged through RabbitMQ while the other says they are exchanged through Kafka \u2014 they assert different messaging systems."
+    ]
+   },
+   {
+    "id": "t105",
+    "label": "scoped",
+    "category": "past or superseded",
+    "verdict": "scoped",
+    "extracted": true,
+    "reaches_verifier": true,
+    "model": [
+     "different_scope",
+     "A describes past behavior (reporting used to read directly from the Ledger DB) while B states current behavior (reporting reads Ledger data only through the Ledger API)."
+    ]
+   },
+   {
+    "id": "t106",
+    "label": "scoped",
+    "category": "past or superseded",
+    "verdict": "scoped",
+    "extracted": true,
+    "reaches_verifier": true,
+    "model": [
+     "contradiction",
+     "They disagree on the storage backend for refresh tokens: Memcached versus Redis."
+    ]
+   },
+   {
+    "id": "t107",
+    "label": "scoped",
+    "category": "proposal or FAQ",
+    "verdict": "scoped",
+    "extracted": true,
+    "reaches_verifier": true,
+    "model": [
+     "contradiction",
+     "They disagree on the Ledger event log technology: Pulsar versus Kafka."
+    ]
+   },
+   {
+    "id": "t108",
+    "label": "scoped",
+    "category": "proposal or FAQ",
+    "verdict": "none",
+    "extracted": true,
+    "reaches_verifier": true,
+    "model": [
+     "compatible",
+     ""
+    ]
+   },
+   {
+    "id": "t109",
+    "label": "scoped",
+    "category": "proposal or FAQ",
+    "verdict": "scoped",
+    "extracted": true,
+    "reaches_verifier": true,
+    "model": [
+     "different_scope",
+     "A describes a plan/possible future serving via an Apollo GraphQL gateway while B states the API is served as REST through Gateway currently."
+    ]
+   },
+   {
+    "id": "t110",
+    "label": "scoped",
+    "category": "proposal or FAQ",
+    "verdict": "scoped",
+    "extracted": true,
+    "reaches_verifier": true,
+    "model": [
+     "contradiction",
+     "They disagree on the database topology: Ledger shards PostgreSQL by tenant versus running on a single unsharded PostgreSQL database."
+    ]
+   }
+  ]
+ }
+}

@@ -1,0 +1,1758 @@
+{
+ "dev": {
+  "pairs": 81,
+  "verifier": null,
+  "recall": [
+   19,
+   41
+  ],
+  "false_flags": [
+   0,
+   40
+  ],
+  "precision": [
+   19,
+   19
+  ],
+  "contradictions_rules_or_verifier_can_see": [
+   40,
+   41
+  ],
+  "by_category": [
+   {
+    "label": "compatible",
+    "category": "different property",
+    "n": 4,
+    "flagged": 0
+   },
+   {
+    "label": "compatible",
+    "category": "different subject",
+    "n": 5,
+    "flagged": 0
+   },
+   {
+    "label": "compatible",
+    "category": "general and specific",
+    "n": 5,
+    "flagged": 0
+   },
+   {
+    "label": "compatible",
+    "category": "multi-valued",
+    "n": 5,
+    "flagged": 0
+   },
+   {
+    "label": "compatible",
+    "category": "paraphrase agreement",
+    "n": 6,
+    "flagged": 0
+   },
+   {
+    "label": "contradiction",
+    "category": "antonym",
+    "n": 5,
+    "flagged": 5
+   },
+   {
+    "label": "contradiction",
+    "category": "implied",
+    "n": 8,
+    "flagged": 0
+   },
+   {
+    "label": "contradiction",
+    "category": "negation in other words",
+    "n": 8,
+    "flagged": 7
+   },
+   {
+    "label": "contradiction",
+    "category": "same wording",
+    "n": 4,
+    "flagged": 4
+   },
+   {
+    "label": "contradiction",
+    "category": "synonym or alias",
+    "n": 4,
+    "flagged": 3
+   },
+   {
+    "label": "contradiction",
+    "category": "value in other words",
+    "n": 12,
+    "flagged": 0
+   },
+   {
+    "label": "scoped",
+    "category": "environment",
+    "n": 3,
+    "flagged": 0
+   },
+   {
+    "label": "scoped",
+    "category": "past or superseded",
+    "n": 3,
+    "flagged": 0
+   },
+   {
+    "label": "scoped",
+    "category": "proposal or FAQ",
+    "n": 4,
+    "flagged": 0
+   },
+   {
+    "label": "scoped",
+    "category": "release or version",
+    "n": 5,
+    "flagged": 0
+   }
+  ],
+  "rows": [
+   {
+    "id": "d001",
+    "label": "contradiction",
+    "category": "same wording",
+    "verdict": "conflict",
+    "extracted": true,
+    "reaches_verifier": false
+   },
+   {
+    "id": "d002",
+    "label": "contradiction",
+    "category": "same wording",
+    "verdict": "conflict",
+    "extracted": true,
+    "reaches_verifier": false
+   },
+   {
+    "id": "d003",
+    "label": "contradiction",
+    "category": "same wording",
+    "verdict": "conflict",
+    "extracted": true,
+    "reaches_verifier": false
+   },
+   {
+    "id": "d004",
+    "label": "contradiction",
+    "category": "same wording",
+    "verdict": "conflict",
+    "extracted": true,
+    "reaches_verifier": false
+   },
+   {
+    "id": "d005",
+    "label": "contradiction",
+    "category": "negation in other words",
+    "verdict": "conflict",
+    "extracted": true,
+    "reaches_verifier": false
+   },
+   {
+    "id": "d006",
+    "label": "contradiction",
+    "category": "negation in other words",
+    "verdict": "conflict",
+    "extracted": true,
+    "reaches_verifier": false
+   },
+   {
+    "id": "d007",
+    "label": "contradiction",
+    "category": "negation in other words",
+    "verdict": "conflict",
+    "extracted": true,
+    "reaches_verifier": false
+   },
+   {
+    "id": "d008",
+    "label": "contradiction",
+    "category": "negation in other words",
+    "verdict": "conflict",
+    "extracted": true,
+    "reaches_verifier": false
+   },
+   {
+    "id": "d009",
+    "label": "contradiction",
+    "category": "negation in other words",
+    "verdict": "conflict",
+    "extracted": true,
+    "reaches_verifier": false
+   },
+   {
+    "id": "d010",
+    "label": "contradiction",
+    "category": "negation in other words",
+    "verdict": "conflict",
+    "extracted": true,
+    "reaches_verifier": false
+   },
+   {
+    "id": "d011",
+    "label": "contradiction",
+    "category": "negation in other words",
+    "verdict": "conflict",
+    "extracted": true,
+    "reaches_verifier": false
+   },
+   {
+    "id": "d012",
+    "label": "contradiction",
+    "category": "negation in other words",
+    "verdict": "none",
+    "extracted": true,
+    "reaches_verifier": true
+   },
+   {
+    "id": "d013",
+    "label": "contradiction",
+    "category": "antonym",
+    "verdict": "conflict",
+    "extracted": true,
+    "reaches_verifier": false
+   },
+   {
+    "id": "d014",
+    "label": "contradiction",
+    "category": "antonym",
+    "verdict": "conflict",
+    "extracted": true,
+    "reaches_verifier": false
+   },
+   {
+    "id": "d015",
+    "label": "contradiction",
+    "category": "antonym",
+    "verdict": "conflict",
+    "extracted": true,
+    "reaches_verifier": false
+   },
+   {
+    "id": "d016",
+    "label": "contradiction",
+    "category": "antonym",
+    "verdict": "conflict",
+    "extracted": true,
+    "reaches_verifier": false
+   },
+   {
+    "id": "d017",
+    "label": "contradiction",
+    "category": "antonym",
+    "verdict": "conflict",
+    "extracted": true,
+    "reaches_verifier": false
+   },
+   {
+    "id": "d018",
+    "label": "contradiction",
+    "category": "value in other words",
+    "verdict": "none",
+    "extracted": true,
+    "reaches_verifier": true
+   },
+   {
+    "id": "d019",
+    "label": "contradiction",
+    "category": "value in other words",
+    "verdict": "none",
+    "extracted": true,
+    "reaches_verifier": true
+   },
+   {
+    "id": "d020",
+    "label": "contradiction",
+    "category": "value in other words",
+    "verdict": "none",
+    "extracted": true,
+    "reaches_verifier": true
+   },
+   {
+    "id": "d021",
+    "label": "contradiction",
+    "category": "value in other words",
+    "verdict": "none",
+    "extracted": true,
+    "reaches_verifier": true
+   },
+   {
+    "id": "d022",
+    "label": "contradiction",
+    "category": "value in other words",
+    "verdict": "none",
+    "extracted": true,
+    "reaches_verifier": true
+   },
+   {
+    "id": "d023",
+    "label": "contradiction",
+    "category": "value in other words",
+    "verdict": "none",
+    "extracted": true,
+    "reaches_verifier": true
+   },
+   {
+    "id": "d024",
+    "label": "contradiction",
+    "category": "value in other words",
+    "verdict": "none",
+    "extracted": true,
+    "reaches_verifier": true
+   },
+   {
+    "id": "d025",
+    "label": "contradiction",
+    "category": "value in other words",
+    "verdict": "none",
+    "extracted": true,
+    "reaches_verifier": true
+   },
+   {
+    "id": "d026",
+    "label": "contradiction",
+    "category": "value in other words",
+    "verdict": "none",
+    "extracted": true,
+    "reaches_verifier": true
+   },
+   {
+    "id": "d027",
+    "label": "contradiction",
+    "category": "value in other words",
+    "verdict": "none",
+    "extracted": true,
+    "reaches_verifier": true
+   },
+   {
+    "id": "d028",
+    "label": "contradiction",
+    "category": "value in other words",
+    "verdict": "none",
+    "extracted": true,
+    "reaches_verifier": true
+   },
+   {
+    "id": "d029",
+    "label": "contradiction",
+    "category": "value in other words",
+    "verdict": "none",
+    "extracted": true,
+    "reaches_verifier": true
+   },
+   {
+    "id": "d030",
+    "label": "contradiction",
+    "category": "synonym or alias",
+    "verdict": "conflict",
+    "extracted": true,
+    "reaches_verifier": false
+   },
+   {
+    "id": "d031",
+    "label": "contradiction",
+    "category": "synonym or alias",
+    "verdict": "conflict",
+    "extracted": true,
+    "reaches_verifier": false
+   },
+   {
+    "id": "d032",
+    "label": "contradiction",
+    "category": "synonym or alias",
+    "verdict": "conflict",
+    "extracted": true,
+    "reaches_verifier": false
+   },
+   {
+    "id": "d033",
+    "label": "contradiction",
+    "category": "synonym or alias",
+    "verdict": "none",
+    "extracted": true,
+    "reaches_verifier": true
+   },
+   {
+    "id": "d034",
+    "label": "contradiction",
+    "category": "implied",
+    "verdict": "none",
+    "extracted": true,
+    "reaches_verifier": true
+   },
+   {
+    "id": "d035",
+    "label": "contradiction",
+    "category": "implied",
+    "verdict": "none",
+    "extracted": true,
+    "reaches_verifier": false
+   },
+   {
+    "id": "d036",
+    "label": "contradiction",
+    "category": "implied",
+    "verdict": "none",
+    "extracted": true,
+    "reaches_verifier": true
+   },
+   {
+    "id": "d037",
+    "label": "contradiction",
+    "category": "implied",
+    "verdict": "none",
+    "extracted": true,
+    "reaches_verifier": true
+   },
+   {
+    "id": "d038",
+    "label": "contradiction",
+    "category": "implied",
+    "verdict": "none",
+    "extracted": true,
+    "reaches_verifier": true
+   },
+   {
+    "id": "d039",
+    "label": "contradiction",
+    "category": "implied",
+    "verdict": "none",
+    "extracted": true,
+    "reaches_verifier": true
+   },
+   {
+    "id": "d040",
+    "label": "contradiction",
+    "category": "implied",
+    "verdict": "none",
+    "extracted": true,
+    "reaches_verifier": true
+   },
+   {
+    "id": "d041",
+    "label": "contradiction",
+    "category": "implied",
+    "verdict": "none",
+    "extracted": true,
+    "reaches_verifier": true
+   },
+   {
+    "id": "d042",
+    "label": "compatible",
+    "category": "multi-valued",
+    "verdict": "none",
+    "extracted": true,
+    "reaches_verifier": true
+   },
+   {
+    "id": "d043",
+    "label": "compatible",
+    "category": "multi-valued",
+    "verdict": "none",
+    "extracted": true,
+    "reaches_verifier": true
+   },
+   {
+    "id": "d044",
+    "label": "compatible",
+    "category": "multi-valued",
+    "verdict": "none",
+    "extracted": true,
+    "reaches_verifier": true
+   },
+   {
+    "id": "d045",
+    "label": "compatible",
+    "category": "multi-valued",
+    "verdict": "none",
+    "extracted": true,
+    "reaches_verifier": true
+   },
+   {
+    "id": "d046",
+    "label": "compatible",
+    "category": "multi-valued",
+    "verdict": "none",
+    "extracted": true,
+    "reaches_verifier": true
+   },
+   {
+    "id": "d047",
+    "label": "compatible",
+    "category": "paraphrase agreement",
+    "verdict": "none",
+    "extracted": true,
+    "reaches_verifier": false
+   },
+   {
+    "id": "d048",
+    "label": "compatible",
+    "category": "paraphrase agreement",
+    "verdict": "none",
+    "extracted": true,
+    "reaches_verifier": true
+   },
+   {
+    "id": "d049",
+    "label": "compatible",
+    "category": "paraphrase agreement",
+    "verdict": "none",
+    "extracted": true,
+    "reaches_verifier": true
+   },
+   {
+    "id": "d050",
+    "label": "compatible",
+    "category": "paraphrase agreement",
+    "verdict": "none",
+    "extracted": true,
+    "reaches_verifier": true
+   },
+   {
+    "id": "d051",
+    "label": "compatible",
+    "category": "paraphrase agreement",
+    "verdict": "none",
+    "extracted": true,
+    "reaches_verifier": true
+   },
+   {
+    "id": "d052",
+    "label": "compatible",
+    "category": "paraphrase agreement",
+    "verdict": "none",
+    "extracted": true,
+    "reaches_verifier": true
+   },
+   {
+    "id": "d053",
+    "label": "compatible",
+    "category": "different subject",
+    "verdict": "none",
+    "extracted": true,
+    "reaches_verifier": false
+   },
+   {
+    "id": "d054",
+    "label": "compatible",
+    "category": "different subject",
+    "verdict": "none",
+    "extracted": true,
+    "reaches_verifier": false
+   },
+   {
+    "id": "d055",
+    "label": "compatible",
+    "category": "different subject",
+    "verdict": "none",
+    "extracted": true,
+    "reaches_verifier": false
+   },
+   {
+    "id": "d056",
+    "label": "compatible",
+    "category": "different subject",
+    "verdict": "none",
+    "extracted": true,
+    "reaches_verifier": false
+   },
+   {
+    "id": "d057",
+    "label": "compatible",
+    "category": "different subject",
+    "verdict": "none",
+    "extracted": true,
+    "reaches_verifier": false
+   },
+   {
+    "id": "d058",
+    "label": "compatible",
+    "category": "different property",
+    "verdict": "none",
+    "extracted": true,
+    "reaches_verifier": true
+   },
+   {
+    "id": "d059",
+    "label": "compatible",
+    "category": "different property",
+    "verdict": "none",
+    "extracted": true,
+    "reaches_verifier": true
+   },
+   {
+    "id": "d060",
+    "label": "compatible",
+    "category": "different property",
+    "verdict": "none",
+    "extracted": true,
+    "reaches_verifier": true
+   },
+   {
+    "id": "d061",
+    "label": "compatible",
+    "category": "different property",
+    "verdict": "none",
+    "extracted": true,
+    "reaches_verifier": true
+   },
+   {
+    "id": "d062",
+    "label": "compatible",
+    "category": "general and specific",
+    "verdict": "none",
+    "extracted": true,
+    "reaches_verifier": true
+   },
+   {
+    "id": "d063",
+    "label": "compatible",
+    "category": "general and specific",
+    "verdict": "none",
+    "extracted": true,
+    "reaches_verifier": true
+   },
+   {
+    "id": "d064",
+    "label": "compatible",
+    "category": "general and specific",
+    "verdict": "none",
+    "extracted": true,
+    "reaches_verifier": true
+   },
+   {
+    "id": "d065",
+    "label": "compatible",
+    "category": "general and specific",
+    "verdict": "none",
+    "extracted": true,
+    "reaches_verifier": true
+   },
+   {
+    "id": "d066",
+    "label": "compatible",
+    "category": "general and specific",
+    "verdict": "none",
+    "extracted": true,
+    "reaches_verifier": true
+   },
+   {
+    "id": "d067",
+    "label": "scoped",
+    "category": "release or version",
+    "verdict": "scoped",
+    "extracted": true,
+    "reaches_verifier": false
+   },
+   {
+    "id": "d068",
+    "label": "scoped",
+    "category": "release or version",
+    "verdict": "scoped",
+    "extracted": true,
+    "reaches_verifier": false
+   },
+   {
+    "id": "d069",
+    "label": "scoped",
+    "category": "release or version",
+    "verdict": "scoped",
+    "extracted": true,
+    "reaches_verifier": false
+   },
+   {
+    "id": "d070",
+    "label": "scoped",
+    "category": "release or version",
+    "verdict": "none",
+    "extracted": true,
+    "reaches_verifier": true
+   },
+   {
+    "id": "d071",
+    "label": "scoped",
+    "category": "release or version",
+    "verdict": "scoped",
+    "extracted": true,
+    "reaches_verifier": false
+   },
+   {
+    "id": "d072",
+    "label": "scoped",
+    "category": "environment",
+    "verdict": "scoped",
+    "extracted": true,
+    "reaches_verifier": false
+   },
+   {
+    "id": "d073",
+    "label": "scoped",
+    "category": "environment",
+    "verdict": "scoped",
+    "extracted": true,
+    "reaches_verifier": false
+   },
+   {
+    "id": "d074",
+    "label": "scoped",
+    "category": "environment",
+    "verdict": "none",
+    "extracted": true,
+    "reaches_verifier": false
+   },
+   {
+    "id": "d075",
+    "label": "scoped",
+    "category": "past or superseded",
+    "verdict": "scoped",
+    "extracted": true,
+    "reaches_verifier": false
+   },
+   {
+    "id": "d076",
+    "label": "scoped",
+    "category": "past or superseded",
+    "verdict": "none",
+    "extracted": true,
+    "reaches_verifier": true
+   },
+   {
+    "id": "d077",
+    "label": "scoped",
+    "category": "past or superseded",
+    "verdict": "none",
+    "extracted": true,
+    "reaches_verifier": true
+   },
+   {
+    "id": "d078",
+    "label": "scoped",
+    "category": "proposal or FAQ",
+    "verdict": "none",
+    "extracted": true,
+    "reaches_verifier": true
+   },
+   {
+    "id": "d079",
+    "label": "scoped",
+    "category": "proposal or FAQ",
+    "verdict": "scoped",
+    "extracted": true,
+    "reaches_verifier": false
+   },
+   {
+    "id": "d080",
+    "label": "scoped",
+    "category": "proposal or FAQ",
+    "verdict": "none",
+    "extracted": true,
+    "reaches_verifier": true
+   },
+   {
+    "id": "d081",
+    "label": "scoped",
+    "category": "proposal or FAQ",
+    "verdict": "none",
+    "extracted": true,
+    "reaches_verifier": true
+   }
+  ]
+ },
+ "test": {
+  "pairs": 110,
+  "verifier": null,
+  "recall": [
+   4,
+   55
+  ],
+  "false_flags": [
+   0,
+   55
+  ],
+  "precision": [
+   4,
+   4
+  ],
+  "contradictions_rules_or_verifier_can_see": [
+   53,
+   55
+  ],
+  "by_category": [
+   {
+    "label": "compatible",
+    "category": "different property",
+    "n": 7,
+    "flagged": 0
+   },
+   {
+    "label": "compatible",
+    "category": "different subject",
+    "n": 6,
+    "flagged": 0
+   },
+   {
+    "label": "compatible",
+    "category": "general and specific",
+    "n": 7,
+    "flagged": 0
+   },
+   {
+    "label": "compatible",
+    "category": "multi-valued",
+    "n": 8,
+    "flagged": 0
+   },
+   {
+    "label": "compatible",
+    "category": "paraphrase agreement",
+    "n": 7,
+    "flagged": 0
+   },
+   {
+    "label": "contradiction",
+    "category": "antonym",
+    "n": 10,
+    "flagged": 0
+   },
+   {
+    "label": "contradiction",
+    "category": "implied",
+    "n": 10,
+    "flagged": 0
+   },
+   {
+    "label": "contradiction",
+    "category": "negation in other words",
+    "n": 10,
+    "flagged": 0
+   },
+   {
+    "label": "contradiction",
+    "category": "same wording",
+    "n": 5,
+    "flagged": 4
+   },
+   {
+    "label": "contradiction",
+    "category": "synonym or alias",
+    "n": 8,
+    "flagged": 0
+   },
+   {
+    "label": "contradiction",
+    "category": "value in other words",
+    "n": 12,
+    "flagged": 0
+   },
+   {
+    "label": "scoped",
+    "category": "environment",
+    "n": 5,
+    "flagged": 0
+   },
+   {
+    "label": "scoped",
+    "category": "past or superseded",
+    "n": 5,
+    "flagged": 0
+   },
+   {
+    "label": "scoped",
+    "category": "proposal or FAQ",
+    "n": 4,
+    "flagged": 0
+   },
+   {
+    "label": "scoped",
+    "category": "release or version",
+    "n": 6,
+    "flagged": 0
+   }
+  ],
+  "rows": [
+   {
+    "id": "t001",
+    "label": "contradiction",
+    "category": "same wording",
+    "verdict": "conflict",
+    "extracted": true,
+    "reaches_verifier": false
+   },
+   {
+    "id": "t002",
+    "label": "contradiction",
+    "category": "same wording",
+    "verdict": "conflict",
+    "extracted": true,
+    "reaches_verifier": false
+   },
+   {
+    "id": "t003",
+    "label": "contradiction",
+    "category": "same wording",
+    "verdict": "conflict",
+    "extracted": true,
+    "reaches_verifier": false
+   },
+   {
+    "id": "t004",
+    "label": "contradiction",
+    "category": "same wording",
+    "verdict": "none",
+    "extracted": true,
+    "reaches_verifier": true
+   },
+   {
+    "id": "t005",
+    "label": "contradiction",
+    "category": "same wording",
+    "verdict": "conflict",
+    "extracted": true,
+    "reaches_verifier": false
+   },
+   {
+    "id": "t006",
+    "label": "contradiction",
+    "category": "negation in other words",
+    "verdict": "none",
+    "extracted": true,
+    "reaches_verifier": true
+   },
+   {
+    "id": "t007",
+    "label": "contradiction",
+    "category": "negation in other words",
+    "verdict": "none",
+    "extracted": true,
+    "reaches_verifier": true
+   },
+   {
+    "id": "t008",
+    "label": "contradiction",
+    "category": "negation in other words",
+    "verdict": "none",
+    "extracted": true,
+    "reaches_verifier": true
+   },
+   {
+    "id": "t009",
+    "label": "contradiction",
+    "category": "negation in other words",
+    "verdict": "none",
+    "extracted": true,
+    "reaches_verifier": true
+   },
+   {
+    "id": "t010",
+    "label": "contradiction",
+    "category": "negation in other words",
+    "verdict": "none",
+    "extracted": true,
+    "reaches_verifier": true
+   },
+   {
+    "id": "t011",
+    "label": "contradiction",
+    "category": "negation in other words",
+    "verdict": "none",
+    "extracted": true,
+    "reaches_verifier": true
+   },
+   {
+    "id": "t012",
+    "label": "contradiction",
+    "category": "negation in other words",
+    "verdict": "none",
+    "extracted": true,
+    "reaches_verifier": true
+   },
+   {
+    "id": "t013",
+    "label": "contradiction",
+    "category": "negation in other words",
+    "verdict": "none",
+    "extracted": true,
+    "reaches_verifier": true
+   },
+   {
+    "id": "t014",
+    "label": "contradiction",
+    "category": "negation in other words",
+    "verdict": "none",
+    "extracted": true,
+    "reaches_verifier": true
+   },
+   {
+    "id": "t015",
+    "label": "contradiction",
+    "category": "negation in other words",
+    "verdict": "none",
+    "extracted": true,
+    "reaches_verifier": true
+   },
+   {
+    "id": "t016",
+    "label": "contradiction",
+    "category": "antonym",
+    "verdict": "none",
+    "extracted": true,
+    "reaches_verifier": true
+   },
+   {
+    "id": "t017",
+    "label": "contradiction",
+    "category": "antonym",
+    "verdict": "none",
+    "extracted": true,
+    "reaches_verifier": true
+   },
+   {
+    "id": "t018",
+    "label": "contradiction",
+    "category": "antonym",
+    "verdict": "none",
+    "extracted": true,
+    "reaches_verifier": true
+   },
+   {
+    "id": "t019",
+    "label": "contradiction",
+    "category": "antonym",
+    "verdict": "none",
+    "extracted": true,
+    "reaches_verifier": true
+   },
+   {
+    "id": "t020",
+    "label": "contradiction",
+    "category": "antonym",
+    "verdict": "none",
+    "extracted": true,
+    "reaches_verifier": true
+   },
+   {
+    "id": "t021",
+    "label": "contradiction",
+    "category": "antonym",
+    "verdict": "none",
+    "extracted": true,
+    "reaches_verifier": true
+   },
+   {
+    "id": "t022",
+    "label": "contradiction",
+    "category": "antonym",
+    "verdict": "none",
+    "extracted": true,
+    "reaches_verifier": true
+   },
+   {
+    "id": "t023",
+    "label": "contradiction",
+    "category": "antonym",
+    "verdict": "none",
+    "extracted": true,
+    "reaches_verifier": true
+   },
+   {
+    "id": "t024",
+    "label": "contradiction",
+    "category": "antonym",
+    "verdict": "none",
+    "extracted": true,
+    "reaches_verifier": true
+   },
+   {
+    "id": "t025",
+    "label": "contradiction",
+    "category": "antonym",
+    "verdict": "none",
+    "extracted": true,
+    "reaches_verifier": true
+   },
+   {
+    "id": "t026",
+    "label": "contradiction",
+    "category": "value in other words",
+    "verdict": "none",
+    "extracted": true,
+    "reaches_verifier": true
+   },
+   {
+    "id": "t027",
+    "label": "contradiction",
+    "category": "value in other words",
+    "verdict": "none",
+    "extracted": true,
+    "reaches_verifier": true
+   },
+   {
+    "id": "t028",
+    "label": "contradiction",
+    "category": "value in other words",
+    "verdict": "none",
+    "extracted": true,
+    "reaches_verifier": true
+   },
+   {
+    "id": "t029",
+    "label": "contradiction",
+    "category": "value in other words",
+    "verdict": "none",
+    "extracted": true,
+    "reaches_verifier": false
+   },
+   {
+    "id": "t030",
+    "label": "contradiction",
+    "category": "value in other words",
+    "verdict": "none",
+    "extracted": true,
+    "reaches_verifier": true
+   },
+   {
+    "id": "t031",
+    "label": "contradiction",
+    "category": "value in other words",
+    "verdict": "none",
+    "extracted": true,
+    "reaches_verifier": true
+   },
+   {
+    "id": "t032",
+    "label": "contradiction",
+    "category": "value in other words",
+    "verdict": "none",
+    "extracted": true,
+    "reaches_verifier": true
+   },
+   {
+    "id": "t033",
+    "label": "contradiction",
+    "category": "value in other words",
+    "verdict": "none",
+    "extracted": true,
+    "reaches_verifier": true
+   },
+   {
+    "id": "t034",
+    "label": "contradiction",
+    "category": "value in other words",
+    "verdict": "none",
+    "extracted": true,
+    "reaches_verifier": true
+   },
+   {
+    "id": "t035",
+    "label": "contradiction",
+    "category": "value in other words",
+    "verdict": "none",
+    "extracted": true,
+    "reaches_verifier": true
+   },
+   {
+    "id": "t036",
+    "label": "contradiction",
+    "category": "value in other words",
+    "verdict": "none",
+    "extracted": true,
+    "reaches_verifier": true
+   },
+   {
+    "id": "t037",
+    "label": "contradiction",
+    "category": "value in other words",
+    "verdict": "none",
+    "extracted": true,
+    "reaches_verifier": true
+   },
+   {
+    "id": "t038",
+    "label": "contradiction",
+    "category": "synonym or alias",
+    "verdict": "none",
+    "extracted": true,
+    "reaches_verifier": true
+   },
+   {
+    "id": "t039",
+    "label": "contradiction",
+    "category": "synonym or alias",
+    "verdict": "none",
+    "extracted": true,
+    "reaches_verifier": true
+   },
+   {
+    "id": "t040",
+    "label": "contradiction",
+    "category": "synonym or alias",
+    "verdict": "none",
+    "extracted": true,
+    "reaches_verifier": false
+   },
+   {
+    "id": "t041",
+    "label": "contradiction",
+    "category": "synonym or alias",
+    "verdict": "none",
+    "extracted": true,
+    "reaches_verifier": true
+   },
+   {
+    "id": "t042",
+    "label": "contradiction",
+    "category": "synonym or alias",
+    "verdict": "none",
+    "extracted": true,
+    "reaches_verifier": true
+   },
+   {
+    "id": "t043",
+    "label": "contradiction",
+    "category": "synonym or alias",
+    "verdict": "none",
+    "extracted": true,
+    "reaches_verifier": true
+   },
+   {
+    "id": "t044",
+    "label": "contradiction",
+    "category": "synonym or alias",
+    "verdict": "none",
+    "extracted": true,
+    "reaches_verifier": true
+   },
+   {
+    "id": "t045",
+    "label": "contradiction",
+    "category": "synonym or alias",
+    "verdict": "none",
+    "extracted": true,
+    "reaches_verifier": true
+   },
+   {
+    "id": "t046",
+    "label": "contradiction",
+    "category": "implied",
+    "verdict": "none",
+    "extracted": true,
+    "reaches_verifier": true
+   },
+   {
+    "id": "t047",
+    "label": "contradiction",
+    "category": "implied",
+    "verdict": "none",
+    "extracted": true,
+    "reaches_verifier": true
+   },
+   {
+    "id": "t048",
+    "label": "contradiction",
+    "category": "implied",
+    "verdict": "none",
+    "extracted": true,
+    "reaches_verifier": true
+   },
+   {
+    "id": "t049",
+    "label": "contradiction",
+    "category": "implied",
+    "verdict": "none",
+    "extracted": true,
+    "reaches_verifier": true
+   },
+   {
+    "id": "t050",
+    "label": "contradiction",
+    "category": "implied",
+    "verdict": "none",
+    "extracted": true,
+    "reaches_verifier": true
+   },
+   {
+    "id": "t051",
+    "label": "contradiction",
+    "category": "implied",
+    "verdict": "none",
+    "extracted": true,
+    "reaches_verifier": true
+   },
+   {
+    "id": "t052",
+    "label": "contradiction",
+    "category": "implied",
+    "verdict": "none",
+    "extracted": true,
+    "reaches_verifier": true
+   },
+   {
+    "id": "t053",
+    "label": "contradiction",
+    "category": "implied",
+    "verdict": "none",
+    "extracted": true,
+    "reaches_verifier": true
+   },
+   {
+    "id": "t054",
+    "label": "contradiction",
+    "category": "implied",
+    "verdict": "none",
+    "extracted": true,
+    "reaches_verifier": true
+   },
+   {
+    "id": "t055",
+    "label": "contradiction",
+    "category": "implied",
+    "verdict": "none",
+    "extracted": true,
+    "reaches_verifier": true
+   },
+   {
+    "id": "t056",
+    "label": "compatible",
+    "category": "multi-valued",
+    "verdict": "none",
+    "extracted": true,
+    "reaches_verifier": true
+   },
+   {
+    "id": "t057",
+    "label": "compatible",
+    "category": "multi-valued",
+    "verdict": "none",
+    "extracted": true,
+    "reaches_verifier": true
+   },
+   {
+    "id": "t058",
+    "label": "compatible",
+    "category": "multi-valued",
+    "verdict": "none",
+    "extracted": true,
+    "reaches_verifier": true
+   },
+   {
+    "id": "t059",
+    "label": "compatible",
+    "category": "multi-valued",
+    "verdict": "none",
+    "extracted": true,
+    "reaches_verifier": true
+   },
+   {
+    "id": "t060",
+    "label": "compatible",
+    "category": "multi-valued",
+    "verdict": "none",
+    "extracted": true,
+    "reaches_verifier": true
+   },
+   {
+    "id": "t061",
+    "label": "compatible",
+    "category": "multi-valued",
+    "verdict": "none",
+    "extracted": true,
+    "reaches_verifier": true
+   },
+   {
+    "id": "t062",
+    "label": "compatible",
+    "category": "multi-valued",
+    "verdict": "none",
+    "extracted": true,
+    "reaches_verifier": true
+   },
+   {
+    "id": "t063",
+    "label": "compatible",
+    "category": "multi-valued",
+    "verdict": "none",
+    "extracted": true,
+    "reaches_verifier": true
+   },
+   {
+    "id": "t064",
+    "label": "compatible",
+    "category": "paraphrase agreement",
+    "verdict": "none",
+    "extracted": true,
+    "reaches_verifier": true
+   },
+   {
+    "id": "t065",
+    "label": "compatible",
+    "category": "paraphrase agreement",
+    "verdict": "none",
+    "extracted": true,
+    "reaches_verifier": true
+   },
+   {
+    "id": "t066",
+    "label": "compatible",
+    "category": "paraphrase agreement",
+    "verdict": "none",
+    "extracted": true,
+    "reaches_verifier": true
+   },
+   {
+    "id": "t067",
+    "label": "compatible",
+    "category": "paraphrase agreement",
+    "verdict": "none",
+    "extracted": true,
+    "reaches_verifier": true
+   },
+   {
+    "id": "t068",
+    "label": "compatible",
+    "category": "paraphrase agreement",
+    "verdict": "none",
+    "extracted": true,
+    "reaches_verifier": true
+   },
+   {
+    "id": "t069",
+    "label": "compatible",
+    "category": "paraphrase agreement",
+    "verdict": "none",
+    "extracted": true,
+    "reaches_verifier": true
+   },
+   {
+    "id": "t070",
+    "label": "compatible",
+    "category": "paraphrase agreement",
+    "verdict": "none",
+    "extracted": true,
+    "reaches_verifier": true
+   },
+   {
+    "id": "t071",
+    "label": "compatible",
+    "category": "different subject",
+    "verdict": "none",
+    "extracted": true,
+    "reaches_verifier": false
+   },
+   {
+    "id": "t072",
+    "label": "compatible",
+    "category": "different subject",
+    "verdict": "none",
+    "extracted": true,
+    "reaches_verifier": false
+   },
+   {
+    "id": "t073",
+    "label": "compatible",
+    "category": "different subject",
+    "verdict": "none",
+    "extracted": true,
+    "reaches_verifier": false
+   },
+   {
+    "id": "t074",
+    "label": "compatible",
+    "category": "different subject",
+    "verdict": "none",
+    "extracted": true,
+    "reaches_verifier": false
+   },
+   {
+    "id": "t075",
+    "label": "compatible",
+    "category": "different subject",
+    "verdict": "none",
+    "extracted": true,
+    "reaches_verifier": false
+   },
+   {
+    "id": "t076",
+    "label": "compatible",
+    "category": "different subject",
+    "verdict": "none",
+    "extracted": true,
+    "reaches_verifier": true
+   },
+   {
+    "id": "t077",
+    "label": "compatible",
+    "category": "different property",
+    "verdict": "none",
+    "extracted": true,
+    "reaches_verifier": false
+   },
+   {
+    "id": "t078",
+    "label": "compatible",
+    "category": "different property",
+    "verdict": "none",
+    "extracted": true,
+    "reaches_verifier": true
+   },
+   {
+    "id": "t079",
+    "label": "compatible",
+    "category": "different property",
+    "verdict": "none",
+    "extracted": true,
+    "reaches_verifier": false
+   },
+   {
+    "id": "t080",
+    "label": "compatible",
+    "category": "different property",
+    "verdict": "none",
+    "extracted": true,
+    "reaches_verifier": false
+   },
+   {
+    "id": "t081",
+    "label": "compatible",
+    "category": "different property",
+    "verdict": "none",
+    "extracted": true,
+    "reaches_verifier": true
+   },
+   {
+    "id": "t082",
+    "label": "compatible",
+    "category": "different property",
+    "verdict": "none",
+    "extracted": true,
+    "reaches_verifier": true
+   },
+   {
+    "id": "t083",
+    "label": "compatible",
+    "category": "different property",
+    "verdict": "none",
+    "extracted": true,
+    "reaches_verifier": true
+   },
+   {
+    "id": "t084",
+    "label": "compatible",
+    "category": "general and specific",
+    "verdict": "none",
+    "extracted": true,
+    "reaches_verifier": true
+   },
+   {
+    "id": "t085",
+    "label": "compatible",
+    "category": "general and specific",
+    "verdict": "none",
+    "extracted": true,
+    "reaches_verifier": true
+   },
+   {
+    "id": "t086",
+    "label": "compatible",
+    "category": "general and specific",
+    "verdict": "none",
+    "extracted": true,
+    "reaches_verifier": true
+   },
+   {
+    "id": "t087",
+    "label": "compatible",
+    "category": "general and specific",
+    "verdict": "none",
+    "extracted": true,
+    "reaches_verifier": true
+   },
+   {
+    "id": "t088",
+    "label": "compatible",
+    "category": "general and specific",
+    "verdict": "none",
+    "extracted": true,
+    "reaches_verifier": true
+   },
+   {
+    "id": "t089",
+    "label": "compatible",
+    "category": "general and specific",
+    "verdict": "none",
+    "extracted": true,
+    "reaches_verifier": true
+   },
+   {
+    "id": "t090",
+    "label": "compatible",
+    "category": "general and specific",
+    "verdict": "none",
+    "extracted": true,
+    "reaches_verifier": true
+   },
+   {
+    "id": "t091",
+    "label": "scoped",
+    "category": "release or version",
+    "verdict": "none",
+    "extracted": true,
+    "reaches_verifier": true
+   },
+   {
+    "id": "t092",
+    "label": "scoped",
+    "category": "release or version",
+    "verdict": "none",
+    "extracted": true,
+    "reaches_verifier": false
+   },
+   {
+    "id": "t093",
+    "label": "scoped",
+    "category": "release or version",
+    "verdict": "scoped",
+    "extracted": true,
+    "reaches_verifier": false
+   },
+   {
+    "id": "t094",
+    "label": "scoped",
+    "category": "release or version",
+    "verdict": "none",
+    "extracted": true,
+    "reaches_verifier": true
+   },
+   {
+    "id": "t095",
+    "label": "scoped",
+    "category": "release or version",
+    "verdict": "none",
+    "extracted": true,
+    "reaches_verifier": false
+   },
+   {
+    "id": "t096",
+    "label": "scoped",
+    "category": "release or version",
+    "verdict": "none",
+    "extracted": true,
+    "reaches_verifier": true
+   },
+   {
+    "id": "t097",
+    "label": "scoped",
+    "category": "environment",
+    "verdict": "none",
+    "extracted": true,
+    "reaches_verifier": true
+   },
+   {
+    "id": "t098",
+    "label": "scoped",
+    "category": "environment",
+    "verdict": "scoped",
+    "extracted": true,
+    "reaches_verifier": false
+   },
+   {
+    "id": "t099",
+    "label": "scoped",
+    "category": "environment",
+    "verdict": "none",
+    "extracted": true,
+    "reaches_verifier": false
+   },
+   {
+    "id": "t100",
+    "label": "scoped",
+    "category": "environment",
+    "verdict": "none",
+    "extracted": true,
+    "reaches_verifier": true
+   },
+   {
+    "id": "t101",
+    "label": "scoped",
+    "category": "environment",
+    "verdict": "none",
+    "extracted": true,
+    "reaches_verifier": false
+   },
+   {
+    "id": "t102",
+    "label": "scoped",
+    "category": "past or superseded",
+    "verdict": "scoped",
+    "extracted": true,
+    "reaches_verifier": false
+   },
+   {
+    "id": "t103",
+    "label": "scoped",
+    "category": "past or superseded",
+    "verdict": "none",
+    "extracted": true,
+    "reaches_verifier": false
+   },
+   {
+    "id": "t104",
+    "label": "scoped",
+    "category": "past or superseded",
+    "verdict": "none",
+    "extracted": true,
+    "reaches_verifier": true
+   },
+   {
+    "id": "t105",
+    "label": "scoped",
+    "category": "past or superseded",
+    "verdict": "none",
+    "extracted": true,
+    "reaches_verifier": true
+   },
+   {
+    "id": "t106",
+    "label": "scoped",
+    "category": "past or superseded",
+    "verdict": "none",
+    "extracted": true,
+    "reaches_verifier": true
+   },
+   {
+    "id": "t107",
+    "label": "scoped",
+    "category": "proposal or FAQ",
+    "verdict": "none",
+    "extracted": true,
+    "reaches_verifier": true
+   },
+   {
+    "id": "t108",
+    "label": "scoped",
+    "category": "proposal or FAQ",
+    "verdict": "none",
+    "extracted": true,
+    "reaches_verifier": true
+   },
+   {
+    "id": "t109",
+    "label": "scoped",
+    "category": "proposal or FAQ",
+    "verdict": "none",
+    "extracted": true,
+    "reaches_verifier": true
+   },
+   {
+    "id": "t110",
+    "label": "scoped",
+    "category": "proposal or FAQ",
+    "verdict": "none",
+    "extracted": true,
+    "reaches_verifier": true
+   }
+  ]
+ }
+}

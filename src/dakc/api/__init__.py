@@ -125,6 +125,14 @@ def create_app(root: Path) -> FastAPI:
         names = title_map(kb.store, [i for items in d.changes.values() for i, c in items if c != "deleted"])
         return {k: [{"id": i, "change": c, "title": names.get(i, i)} for i, c in items] for k, items in d.changes.items()}
 
+    @app.get("/conflicts")
+    def conflicts(kb: KB, scoped: bool = False, accepted: bool = False):
+        return [c.to_dict() for c in kb.conflicts(scoped=scoped, accepted=accepted)]
+
+    @app.get("/conflicts/{conflict_id:path}")
+    def conflict(conflict_id: str, kb: KB):
+        return kb.conflict(conflict_id).to_dict()
+
     @app.get("/duplicates")
     def duplicates(kb: KB, limit: int = Query(100, ge=1)):
         return [p.to_dict() for p in kb.duplicates(limit)]

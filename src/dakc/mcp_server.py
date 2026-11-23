@@ -49,7 +49,9 @@ Use trace on a page or claim to see which source sentences support each statemen
 read_artifact on a source path returns the document as it is on disk now.
 To see what an edit to a document would affect, before making it: downstream(<source path>).
 After documents change: status, then compile (a preview by default), then compile(apply=true) to build.
-explain tells you why an artifact is stale and what it depends on."""
+explain tells you why an artifact is stale and what it depends on.
+conflicts lists statements in different documents that cannot both be true (with the sentence and line of \
+each); mention an open conflict when your answer relies on one of its claims. DAKC never picks a side."""
 
 READ_ONLY = ToolAnnotations(readOnlyHint=True, openWorldHint=False)
 STALE_NOTE = ("an upper bound: everything downstream of a changed document. Many of these may not change at all (an edit that touches no extracted fact changes nothing); compile() without apply previews exactly what would be rebuilt")
@@ -188,6 +190,26 @@ def create_server(workspace: str | Path = ".", *, read_only: bool = False, max_l
             d["sentences_total"], d["claims_total"] = len(d["sentences"]), len(d["claims"])
             d["sentences"], d["claims"] = _cap(d["sentences"], limit), _cap(d["claims"], limit)
         return d
+
+    @server.tool(annotations=READ_ONLY)
+    def conflicts(
+        conflict: Annotated[str | None, Field(description="One finding's id (cfl:...) for its lines and affected pages; omit to list.")] = None,
+        include_scoped: Annotated[bool, Field(description="Also list differences explained by time, release, environment or status.")] = False,
+        limit: Limit = 30,
+    ) -> dict[str, Any]:
+        """Statements in different documents that cannot both be true at the same scope: a
+        negation ("supports" / "does not support") or two values for a single-valued property
+        (the primary database, a default port, a node count). Values that differ only by
+        release, time, environment or status are 'scoped', not conflicts. With the optional
+        verifier on, a model also judges related statements worded differently; its findings
+        are 'possible'. Advisory: claims and pages are never changed; a conflict closes when
+        the documents agree."""
+        with session() as kb:
+            if conflict:
+                return kb.conflict(conflict).to_dict()
+            found = kb.conflicts(scoped=include_scoped)
+        return {"open": sum(1 for c in found if c.kind in ("conflict", "possible") and c.accepted is None), "total": len(found),
+                "conflicts": [c.to_dict() for c in _cap(found, limit)]}
 
     @server.tool(annotations=READ_ONLY)
     def downstream(artifact: ArtifactRef, limit: Limit = 30) -> dict[str, Any]:

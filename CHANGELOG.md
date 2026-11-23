@@ -1,5 +1,115 @@
 # Changelog
 
+## v0.6.0: conflicts between sources
+
+### Added
+
+- **Conflicts between sources** (RFC 0002, `docs/rfcs/0002-conflicts.md`).
+  - What it does: every compile reports statements in different documents
+    that cannot both be true. That means a negation ("supports" / "does not
+    support"), or two values for a single-valued property (the primary
+    database, a default port, a node count, a license).
+  - Where to see them: `dakc conflicts` lists them. `dakc conflicts ID` or
+    `dakc explain cfl:…` shows each sentence with its file and line, and the
+    pages and summaries built from it.
+  - It is advisory: no claim or page changes, and no model is called.
+- **Scope decides what is a conflict.** It is read from the sentence, the
+  heading and the path. Release markers, past tense, environments,
+  `archive/`, revision-numbered files (`techstack001.md`), decision records,
+  proposals, FAQs and conditionals all count. So an MVP on MongoDB and
+  production on PostgreSQL is reported as *scoped* (`--all`), not as a
+  conflict.
+- **`[conflicts]` in `dakc.toml`.**
+  - `[[conflicts.scope]]` marks what a path describes.
+  - `[[conflicts.accept]]` keeps a reviewed conflict, with a reason.
+- **Everywhere you already look.**
+  - The compile report and `status` count open conflicts.
+  - `--check` exits 1 when one is open, for CI.
+  - Python: `kb.conflicts()` and `kb.conflict(id)`. REST: `/conflicts` and
+    `/conflicts/{id}`. MCP: a `conflicts` tool.
+  - The `dakc review` PR comment lists conflicts a change introduces and
+    resolves.
+- **Kept current incrementally, and checked.**
+  - A build re-judges only the properties whose claims changed: 0.3 ms for
+    a one-file edit of FastAPI's docs.
+  - `dakc verify` requires the stored findings to equal a detection from
+    scratch.
+  - `rollback` restores the findings of the build it returns to.
+  - Measured on FastAPI's docs by `examples/fastapi-docs/conflicts_eval.py`:
+    0 findings over 11,067 claims; 90% of planted negations and 78% of
+    planted value changes caught in plain statements.
+- **Scope readings fixed**, found by the verifier's evaluation:
+  - a word starting with a scope marker ("from **Ga**teway") was read as
+    the GA release;
+  - "used" or "legacy" in a sentence marked it as past;
+  - a product's version or a region after the verb ("runs on Python 3.11",
+    "lives in the eu-west-1 region") was read as a scope; it is now a value
+    of the statement. In a leading phrase ("In eu-west-1, …") it is still
+    a scope.
+- **The same statement worded differently.**
+  - "lacks", "has no support for", "dropped support for", "is unavailable
+    in" and "is not supported by" read as negations of "supports".
+  - Antonyms used as the predicate ("is disabled", "is optional", "is
+    asynchronous" and about twenty more) read as negations of their
+    counterpart.
+  - A few synonyms (DB and datastore for database, Postgres for
+    PostgreSQL) and the workspace's `[aliases]` apply before statements are
+    compared.
+- **An optional conflict verifier**, off by default:
+  `[conflicts] verifier = "llm"`.
+  - What it does: the workspace's model judges pairs of related claims that
+    the rules cannot compare, such as "written in Go" against "a Python
+    service". For each new claim, the pairs are the few most similar claims
+    about the same entity in other documents.
+  - Its findings are marked **possible**, and scope still applies to them.
+  - It compares entities by name without a possessive, so "Ledger's" and
+    "Ledger" are one subject.
+  - Cost: verdicts are cached by the pair of claims, so each pair is paid
+    for once. `max_checks` (default 500) caps the pairs judged per compile;
+    the rest wait for the next one. `--dry-run` and the MCP call cap count
+    its calls.
+  - Checked: its findings are recomputed from the verdicts on record, and
+    `dakc verify` requires them to equal that computation.
+  - Quality: with gpt-5-mini, rules plus verifier flag 50 of 55 held-out
+    contradictions, with no false alarm in 55 other pairs (rules alone: 4
+    of 55, no false alarm).
+  - On FastAPI's docs, at gpt-5-mini's measured token use: turning it on
+    judges about 23,000 pairs (about $6, once); 50 real commits then judged
+    291 pairs (about 8 cents). `examples/fastapi-docs/verifier_volume.py`
+    measures this.
+- **A labelled evaluation set** in `benchmarks/conflicts/`: 81 development
+  pairs and 110 held-out pairs written without access to the detector.
+  `evaluate.py` reports precision, recall, and how many contradictions the
+  verifier would be shown. On the held-out set, the rules catch 4 of 55
+  contradictions with no false alarm in 55 other pairs, and 53 of 55 reach
+  the verifier. `--verdicts` keeps a model's verdicts, so evaluating again
+  costs nothing.
+
+### Upgrading from 0.5
+
+- **The store schema moves to version 3** (the `conflicts` and
+  `conflict_index` tables). This happens automatically when the store is
+  opened.
+- **The first compile after upgrading runs detection over every claim.** It
+  commits a build even if no document changed. On FastAPI's docs that takes
+  under a second.
+
+### Fixed
+
+- **A failed provider call during extraction threw away the calls that had
+  succeeded.**
+  - What happened: results were collected for the whole extraction stage
+    before any was cached. One call failing, after the client's own retries,
+    lost every paid extraction in that build, and the next attempt paid for
+    all of them again.
+  - The fix: results are now cached as they complete. When a call fails,
+    calls that have not started are cancelled, every completed result is
+    still cached, and then the build fails.
+  - Effect: a retry pays only for what never succeeded, and a failing build
+    stops spending.
+  - Found while measuring a 14,000-call real-model build; covered by
+    `tests/integration/test_paid_work_survives.py`.
+
 ## v0.5.0: bounded fan-in, sources and publishers, and a knowledge diff for pull requests
 
 ### Upgrading from 0.4

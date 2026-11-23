@@ -170,11 +170,12 @@ free heuristic extractor, so its page and summary counts are labelled an
 | `dakc explain ID` | Dependencies, dependents, upstream sources, signatures, history, VALID/STALE |
 | `dakc trace PAGE` | Each displayed sentence → cited claims → passage → source version → exact evidence sentence |
 | `dakc duplicates` | Advisory list of claims that are likely the same fact in other words (nothing is merged) |
+| `dakc conflicts [ID] [--all] [--check]` | Statements in different documents that cannot both be true, with the file and line of each ([below](#conflicts-between-sources)) |
 | `dakc status` | HEAD, counts, and what is stale against the current sources |
 | `dakc builds` / `dakc diff A [B]` | Audit log; artifact-level diff between builds |
 | `dakc rollback [--to N]` | Restore an earlier committed build (later builds' artifact versions are discarded; their records stay in `builds`) |
 | `dakc verify [--against-full]` | Invariant and provenance checks, citation coverage, equality with a full rebuild |
-| `dakc serve` | Local web UI and read-only REST API (`/status /check /plan /graph /artifacts /artifacts/{id}[/content\|/trace\|/downstream] /builds /diff /duplicates`) |
+| `dakc serve` | Local web UI and read-only REST API (`/status /check /plan /graph /artifacts /artifacts/{id}[/content\|/trace\|/downstream] /builds /diff /duplicates /conflicts`) |
 | `dakc mcp [--read-only]` | MCP server for AI agents ([below](#mcp-server-for-ai-agents)) |
 | `dakc watch` | Recompile incrementally on file changes |
 | `dakc review --base REF` | Knowledge diff against a git ref: facts added and retracted, pages affected, LLM calls and cost; never calls a model |
@@ -315,7 +316,7 @@ the change does to the knowledge base: facts added and retracted, pages
 affected, and the LLM calls and cost of applying it. It never calls a model.
 
 ```yaml
-- uses: thejasrao262003/dependency-aware-knowledge-compilation@v0.5.0
+- uses: thejasrao262003/dependency-aware-knowledge-compilation@v0.6.0
   with:
     workspace: .
 ```
@@ -384,6 +385,89 @@ Only the filesystem connector and the `jsonl` publisher ship today. Remote
 connectors (Drive, SharePoint, GitHub), change feeds and permissions are
 phases 2 and 3 of the RFC.
 
+## Conflicts between sources
+
+When two documents disagree, both claims stay on the page, each with its own
+sources. DAKC also tells you, at every compile:
+
+```text
+$ dakc compile
+...
+Conflicts:                  1 open   (new 1, resolved 0)   `dakc conflicts` lists them
+
+$ dakc conflicts
+conflict  cfl:1f3a356464  The recommended algorithm is "…"
+    'Argon2'                      tutorial/security/oauth2-jwt.md
+    'Bcrypt'                      team-notes.md
+```
+
+`dakc explain cfl:1f3a` shows each sentence with its file and line, the
+heading it sits under, and the pages and summaries built from it. Fix either
+document, compile, and the conflict closes. Detection is advisory: it never
+changes a claim or a page. The rules call no model; the optional verifier
+(below) does.
+
+**Most differences are not conflicts.** An MVP that ran on MongoDB and a
+production system on PostgreSQL is history, not a contradiction. DAKC
+reports a **conflict** only when the same property has two values in the
+same scope:
+- **Scope** is read from the sentence ("in release 1", "was"), the heading
+  ("Release 1 (MVP)", "Production", "Rejected alternatives") and the path
+  (`archive/`, `techstack001.md`, `docs/adr/0004-…`).
+- **Differences that scope explains** are listed as *scoped* with `--all`.
+- **An edit in place** (MongoDB → PostgreSQL in the same file) is not a
+  conflict at all: the old claim is retracted.
+- **Different values of a multi-valued property** ("supports JSONB",
+  "supports Indexing") are not compared.
+
+When the text gives no hint, tell DAKC in `dakc.toml`:
+
+```toml
+[[conflicts.scope]]
+path = "docs/mvp/**"
+label = "release 1"        # or status = "past" | "proposed"
+
+[[conflicts.accept]]       # reviewed, and kept as is
+id = "cfl:0123456789"
+reason = "two clusters, two ports"
+```
+
+**The rules are precise but narrow.** They raised no false alarm on
+FastAPI's documentation (0 findings over 11,067 claims) or on 55 labelled
+pairs that are scoped or compatible. But they compare only statements of the
+same shape: on a held-out set of contradictions written the way people
+write, they catch 4 of 55. "Ledger is written in Go" against "Ledger is a
+Python service" shares no wording at all.
+
+**The verifier asks a model about those.** It is off by default:
+
+```toml
+[conflicts]
+verifier = "llm"     # uses the workspace's provider
+max_checks = 500     # pairs judged per compile; the rest wait for the next one
+```
+
+For each new claim, it picks the few most similar claims about the same
+entity in other documents and has the model judge each pair. Its findings
+are marked **possible**, and scope still applies to them. A verdict is
+cached by the pair of claims, so each pair is paid for once.
+
+- **Quality.** With gpt-5-mini as the verifier, 50 of the 55 held-out
+  contradictions are flagged, with no false alarm in 55 other pairs. Of
+  the 5 missed, the model got 1 wrong; the free extractor and DAKC's scope
+  reading account for the rest. The sets are small, so read this as
+  indicative.
+- **Cost on FastAPI's docs**, at gpt-5-mini's measured token use: turning
+  it on judges about 23,000 pairs, about $6 once. Keeping it on through 50
+  real commits judged 291 pairs, about 8 cents in all.
+- **Checking first.** `dakc compile --dry-run` counts its calls.
+
+The conflict step takes under a millisecond on a one-file edit. The PR
+comment from `dakc review` lists the conflicts a change introduces or
+resolves (rules only, since review uses the free provider), and agents see
+them through the MCP `conflicts` tool. The taxonomy, design and evaluation
+are in [docs/rfcs/0002-conflicts.md](docs/rfcs/0002-conflicts.md).
+
 ## Guarantees, and how each is checked
 
 | Concern | What DAKC does | Checked by |
@@ -393,7 +477,7 @@ phases 2 and 3 of the RFC.
 | Model / prompt drift | Extractor, page-writer and summarizer fingerprints (model, prompt, schema) are recorded per artifact; anything built by a different provider is rebuilt | `tests/integration/test_model_drift.py` |
 | DAKC's own logic changing | Versioned layers (`dakc.versions`: parser, claim identity, entity resolution, rendering) are recorded with every build; a change re-runs exactly that layer, and rendering changes need no provider calls | `tests/integration/test_model_drift.py` |
 | Provenance | Every claim records the exact evidence sentences in each supporting passage. `dakc trace` follows displayed sentence → claim → passage → source version. `provenance = "strict"` renders only sentences that cite a claim | `tests/integration/test_provenance.py`; `dakc verify` reports citation coverage |
-| Contradictions | Conflicting claims are both kept, each with its own sources; deleting a source retracts exactly the claims it alone supported | `tests/integration/test_contradictions.py`; benchmark scenario S9 |
+| Contradictions | Conflicting claims are both kept, each with its own sources; deleting a source retracts exactly the claims it alone supported. Conflicts are flagged, never resolved, and the incremental findings equal a detection from scratch | `tests/integration/test_contradictions.py`, `tests/integration/test_conflicts.py`; `dakc verify`; benchmark scenario S9 |
 | Claim identity | Exact after normalization (never merged by similarity); paraphrases are only *reported* | `benchmarks/equivalence.py` (precision/recall incl. hard negatives) |
 | Failures and crashes | All-or-nothing commit; the extraction cache survives for retries; rollback to any earlier committed build | failure-injection and process-kill tests |
 
@@ -504,8 +588,14 @@ Unchanged facts kept with identical claim ids after a one-sentence edit, whole-p
   SQLite is a single-writer store. Concurrent builds on one machine are
   serialized; there is no multi-host or distributed mode, by design.
 - **Heuristic extraction is crude** (see above).
-- **Contradictions are kept, not resolved.** Both claims appear on the page
-  with their own sources.
+- **Contradictions are kept and flagged, not resolved.** Both claims appear
+  on the page with their own sources, and `dakc conflicts` lists them.
+  - The rules miss most contradictions worded differently: 4 of 55 in a
+    held-out test.
+  - The optional verifier closes that gap with model calls, and its
+    findings are only as good as the model.
+  - Scope must be written in the sentence, its heading, its path or a
+    `[[conflicts.scope]]` rule (RFC 0002).
 - **Hub pages and large topics are built in sections.** This bounds the cost
   of an edit and every prompt's size, but it has costs of its own:
   - a full build makes 3–5% more LLM calls;

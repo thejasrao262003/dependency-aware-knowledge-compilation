@@ -20,7 +20,7 @@ from tests.conftest import POSTGRES_DOCS, write_files  # noqa: E402
 from tests.integration.test_python_api import paid_workspace  # noqa: E402
 
 READ_TOOLS = {"status", "check_sources", "list_artifacts", "read_artifact", "explain", "trace", "downstream",
-              "graph_stats", "builds", "diff_builds", "duplicates", "verify"}
+              "graph_stats", "builds", "diff_builds", "duplicates", "verify", "conflicts"}
 
 
 def session(server, *calls: tuple[str, dict[str, Any]]):
@@ -193,3 +193,15 @@ def test_http_transport_rejects_foreign_host_headers(ws):
         with TestClient(app, base_url=base) as client:
             codes[base] = client.post("/mcp", json=init, headers=headers).status_code
     assert codes == {"http://evil.example": 421, "http://127.0.0.1:8766": 200}
+
+
+def test_conflicts_tool_lists_and_shows_a_finding(tmp_path):
+    write_files(tmp_path / "knowledge", {"database.md": "PostgreSQL supports JSONB.\n",
+                                         "architecture.md": "PostgreSQL does not support JSONB.\n"})
+    dakc.ingest(tmp_path / "knowledge", tmp_path, provider="mock")
+    listed, = session(create_server(tmp_path, read_only=True), ("conflicts", {}))
+    d = listed.structured_content
+    assert d["open"] == 1 and d["conflicts"][0]["kind"] == "conflict"
+    shown, = session(create_server(tmp_path, read_only=True), ("conflicts", {"conflict": d["conflicts"][0]["id"]}))
+    lines = {loc["path"]: loc["line"] for v in shown.structured_content["values"] for loc in v["locations"]}
+    assert lines == {"database.md": 1, "architecture.md": 1}

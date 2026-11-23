@@ -23,6 +23,21 @@ comment. A reviewer sees exactly which facts change, and the old wording is
 struck through. A text diff spread across several files never makes that
 obvious.
 
+When a change makes two documents disagree, the comment says so and expands
+the list (RFC 0002):
+
+> - **introduce 1 conflict between documents** (below)
+>
+> ▾ Conflicts introduced (1)
+> - PostgreSQL supports JSONB: **is negated** <sub>architecture.md</sub> vs **is stated** <sub>databases/postgresql.md</sub> <sub>`cfl:7e6b362bd2`</sub>
+
+That is the real output when `architecture.md`, saying "PostgreSQL does not
+support JSONB.", is added to the example corpus.
+
+A later change that makes them agree again is reported as "resolve 1
+conflict". Differences explained by release, time or environment are not
+reported, and neither are conflicts accepted in `dakc.toml`.
+
 ## Setup
 
 ```yaml
@@ -41,7 +56,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0     # the base commit must be available
-      - uses: thejasrao262003/dependency-aware-knowledge-compilation@v0.5.0
+      - uses: thejasrao262003/dependency-aware-knowledge-compilation@v0.6.0
         with:
           workspace: .       # the directory holding dakc.toml
           price: |           # optional: adds a dollar estimate per model

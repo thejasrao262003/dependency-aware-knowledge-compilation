@@ -26,7 +26,7 @@ inputs:
     description: Items listed per section of the comment.
     default: "25"
   dakc-version:
-    description: DAKC version from PyPI (e.g. "0.5.0"). Empty uses the DAKC at this action's own ref.
+    description: DAKC version from PyPI (e.g. "0.6.0"). Empty uses the DAKC at this action's own ref.
     default: ""
   github-token:
     description: Token used to post the comment (needs pull-requests write).

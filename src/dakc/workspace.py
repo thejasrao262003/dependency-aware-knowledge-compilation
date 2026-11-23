@@ -27,6 +27,27 @@ class Config:
     aliases: dict[str, str] = field(default_factory=dict)
     sources: list[dict[str, Any]] = field(default_factory=list)  # [[sources]] tables (RFC 0001); empty: source_dir
     publishers: list[dict[str, Any]] = field(default_factory=list)  # [[publishers]] tables (RFC 0001)
+    conflicts: dict[str, Any] = field(default_factory=dict)  # [conflicts]: scope rules and accepted findings (RFC 0002)
+
+    @property
+    def conflict_rules(self) -> list:
+        from dakc.conflicts import rules_from_config
+
+        return rules_from_config(self.conflicts)[0]
+
+    @property
+    def conflict_verifier(self):
+        """The conflict verifier's settings (``dakc.conflicts.verifier.Settings``), or None when off."""
+        from dakc.conflicts.verifier import Settings
+
+        return Settings.from_config(self.conflicts)
+
+    @property
+    def accepted_conflicts(self) -> dict[str, str]:
+        """Conflict id -> the reason it was accepted."""
+        from dakc.conflicts import rules_from_config
+
+        return rules_from_config(self.conflicts)[1]
 
     @property
     def alias_map(self) -> dict[str, str]:
@@ -81,6 +102,22 @@ class Config:
             '# path = "feed/changes.jsonl"',
             '# kinds = ["claim", "page", "summary"]',
             "",
+            "# Conflict detection (docs/rfcs/0002-conflicts.md). The rules are free and always on. The",
+            "# verifier asks the provider's model about pairs of related claims the rules cannot compare;",
+            "# it is off by default and costs model calls (`dakc compile --dry-run` counts them).",
+            "# [conflicts]",
+            '# verifier = "llm"                      # or "none"',
+            "# max_checks = 500                      # pairs judged per compile; the rest wait for the next one",
+            "# Tell it which documents describe another time, release or environment, so their",
+            "# differences are reported as scoped, not as conflicts.",
+            "# [[conflicts.scope]]",
+            '# path = "docs/mvp/**"',
+            '# label = "release 1"                   # or status = "past" | "proposed"',
+            "# A conflict you have reviewed and decided to keep:",
+            "# [[conflicts.accept]]",
+            '# id = "cfl:0123456789"',
+            '# reason = "the two services really do use different ports"',
+            "",
             "# Map alternative spellings to one entity, e.g. \"Postgres\" = \"PostgreSQL\".",
             "[aliases]",
         ]
@@ -111,6 +148,7 @@ class Workspace:
             aliases=dict(data.get("aliases", {})),
             sources=[dict(t) for t in data.get("sources", [])],
             publishers=[dict(t) for t in data.get("publishers", [])],
+            conflicts=dict(data.get("conflicts", {})),
         )
         return cls(root, cfg)
 

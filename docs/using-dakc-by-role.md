@@ -79,7 +79,14 @@ extractor; an LLM provider is more forgiving.
   words across documents becomes several claims: redundant, never wrong.
   `dakc duplicates` lists likely paraphrases worth consolidating.
 - **When two documents disagree,** DAKC keeps both claims side by side on the
-  page, each with its source. Treat that as a docs bug to resolve.
+  page, each with its source, and lists the disagreement in `dakc conflicts`.
+  `dakc conflicts <id>` gives the file and line of each side. Fix one and
+  compile, and it closes. The pull-request comment flags a change that
+  introduces one.
+- **Say when a statement applies.** A document about release 1, an old
+  architecture or one environment should say so: "In release 1, MongoDB is
+  the database", a "Release 1 (MVP)" heading, or an `archive/` folder. Then
+  it is not reported as a conflict with the current docs (RFC 0002).
 - **Two names for the same thing?** Ask whoever owns `dakc.toml` to add an
   alias (`"Postgres" = "PostgreSQL"`) so they share one page.
 
@@ -263,9 +270,14 @@ You don't need the CLI. Your access points:
   version and sentence. Then you know whether the document or the model is
   wrong.
 - **Docs hygiene:**
-  - Conflicting statements appear side by side on a page, each with its
+  - Documents that contradict each other are listed by `dakc conflicts`,
+    with the sentence and line of each side. The web UI's REST API serves
+    them at `/conflicts`, and an MCP agent can list them.
+  - Conflicting statements also appear side by side on a page, each with its
     source.
   - Likely duplicates are listed by `dakc duplicates`; ask a developer.
+  - A disagreement that is intended, such as two services on different
+    ports, can be accepted with a reason in `dakc.toml`.
 - **Scope:** decide with the architect which document sets feed the knowledge
   base, and which outputs (assistant, site, vector index) receive it.
 - **Cost:** every build records its LLM calls, shown in the *History* view.
@@ -316,5 +328,6 @@ first.
 | See what changed between builds | Reviewer, CI | Web UI *History*, `dakc diff A B` |
 | Undo a bad build | CI or platform owner | `dakc rollback --to N` |
 | Find duplicate facts | Docs maintainer | `dakc duplicates` |
+| Find documents that contradict each other | Docs maintainer, reviewer, agent | `dakc conflicts`, the PR comment, MCP `conflicts` |
 | Retry delivery to a vector DB or feed | CI or platform owner | `dakc publish` |
 | Know whether a compile is needed | CI, agent | `dakc status` (source changes plus `outdated`) |

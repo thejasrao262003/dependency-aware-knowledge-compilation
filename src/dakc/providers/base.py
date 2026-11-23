@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Protocol
+from typing import Any, Protocol
 
 from dakc.claims import ExtractedClaim
 
@@ -75,6 +75,7 @@ class ProviderBundle:
     writer: PageWriter
     summarizer: Summarizer
     notes: list[str] = field(default_factory=list)
+    verifier: Any = None  # the conflict verifier (dakc.conflicts.verifier); not part of fingerprints()
 
     @property
     def free(self) -> bool:

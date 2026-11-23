@@ -35,7 +35,8 @@ class VerifyResult:
             self.problems[name] = problems[:20]
 
 
-def verify_store(store: Store, output_root: Path | None = None, state_dir: Path | None = None) -> VerifyResult:
+def verify_store(store: Store, output_root: Path | None = None, state_dir: Path | None = None,
+                 conflict_rules: list | None = None, conflict_aliases: dict[str, str] | None = None) -> VerifyResult:
     res = VerifyResult()
     current = {r[0] for r in store.conn.execute("SELECT id FROM artifacts WHERE to_build IS NULL")}
     current |= {r[0] for r in store.conn.execute("SELECT id FROM sources WHERE to_build IS NULL")}
@@ -79,6 +80,20 @@ def verify_store(store: Store, output_root: Path | None = None, state_dir: Path 
     cov = citation_coverage(store)
     res.add("page citation markers point to the page's own claims", [f"{cov['invalid_markers']} invalid marker(s)"] if cov["invalid_markers"] else [])
     res.metrics["citation_coverage"] = cov
+
+    if conflict_rules is not None:
+        from dakc.conflicts import detect_in_store
+        from dakc.conflicts.verifier import verified_in_store
+        from dakc.conflicts import fingerprint as conflicts_fingerprint
+
+        if store.get_meta("conflicts_fp") == conflicts_fingerprint(conflict_rules, conflict_aliases):  # else the next compile re-judges all
+            want = {f.id: (f.kind, f.payload()) for f in detect_in_store(store, conflict_rules, conflict_aliases).values()}
+            want.update(verified_in_store(store, conflict_rules, conflict_aliases))
+            have = {i: (k, json.loads(p)) for i, k, p in store.conn.execute(
+                "SELECT id, kind, payload FROM conflicts WHERE to_build IS NULL")}
+            res.add("conflict findings equal a detection from scratch",
+                    [f"{i}: {'missing' if i not in have else 'unexpected' if i not in want else 'differs'}"
+                     for i in sorted(set(want) | set(have)) if want.get(i) != have.get(i)])
 
     if output_root is not None and state_dir is not None:
         problems = []

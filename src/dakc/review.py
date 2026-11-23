@@ -7,6 +7,7 @@ difference:
 * the documents changed;
 * the facts added and retracted, with their text;
 * the pages and summaries affected;
+* the conflicts between documents it introduces or resolves (RFC 0002);
 * the LLM calls and estimated cost of applying it.
 
 Both compiles use DAKC's deterministic mock provider, so a review never calls
@@ -70,11 +71,15 @@ class Review:
     output_tokens: int = 0
     totals: dict[str, int] = field(default_factory=dict)  # corpus size at head
     costs: list[dict[str, Any]] = field(default_factory=list)  # {label, usd}
+    conflicts_introduced: list[dict[str, Any]] = field(default_factory=list)  # {id, property, values: [{value, paths}]}
+    conflicts_resolved: list[dict[str, Any]] = field(default_factory=list)
+    conflicts_open: int = 0  # at head, not accepted in dakc.toml
 
     @property
     def has_changes(self) -> bool:
         return bool(self.facts_added or self.facts_retracted or any(self.pages.values())
-                    or any(self.documents.values()) or any(self.summaries.values()))
+                    or any(self.documents.values()) or any(self.summaries.values())
+                    or self.conflicts_introduced or self.conflicts_resolved)
 
     def to_dict(self) -> dict[str, Any]:
         return {**asdict(self), "has_changes": self.has_changes}
@@ -104,6 +109,7 @@ def _base_sources(head: SourceSet, repo_root: Path, base_tree: Path) -> SourceSe
 def _compile(store: Store, ws: Workspace, sources: SourceSet):
     return Compiler(store, make_provider("mock"), sources, aliases=ws.config.alias_map,
                     config_fingerprint=ws.config.fingerprint, provenance=ws.config.provenance,
+                    conflict_rules=ws.config.conflict_rules, conflicts_accepted=set(ws.config.accepted_conflicts),
                     jobs=1, acquire_lock=False).run()[0]
 
 
@@ -127,6 +133,18 @@ def _claim_text(store: Store, cid: str, at_build: int) -> tuple[str, list[str]]:
             if src:
                 paths.add(src[0])
     return (min(s[1] for s in sup) if sup else cid), sorted(paths)
+
+
+def _open_conflicts(store: Store, accepted: dict[str, str]) -> dict[str, dict[str, Any]]:
+    """Open conflicts at HEAD, compact: {id: {id, property, values: [{value, paths}]}}."""
+    out = {}
+    for cid, payload in store.conn.execute("SELECT id, payload FROM conflicts WHERE to_build IS NULL AND kind='conflict'"):
+        if cid in accepted:
+            continue
+        d = json.loads(payload)
+        out[cid] = {"id": cid, "property": d["property"],
+                    "values": [{"value": v["value"], "paths": sorted({o["path"] for o in v["occurrences"]})} for v in d["values"]]}
+    return out
 
 
 def _title(store: Store, aid: str, at_build: int) -> str:
@@ -169,9 +187,15 @@ def review(workspace: Path, base_ref: str, *, state_dir: Path | None = None, pri
         try:
             a = store.head
             base_paths = {r.id: r.path for r in store.load_sources().values()}
+            accepted = ws.config.accepted_conflicts
+            before = _open_conflicts(store, accepted)
             rep = _compile(store, ws, head_sources)
             b = store.head
             out = Review(base_sha[:10], head_ref)
+            after = _open_conflicts(store, accepted)
+            out.conflicts_introduced = [after[i] for i in sorted(set(after) - set(before))]
+            out.conflicts_resolved = [before[i] for i in sorted(set(before) - set(after))]
+            out.conflicts_open = len(after)
             sc = rep.scan
             out.documents = {"new": sc.get("new_paths", []), "modified": sc.get("modified_paths", []),
                              "deleted": [base_paths.get(i, i) for i in sc.get("deleted_ids", [])],
@@ -247,8 +271,21 @@ def render_markdown(r: Review, limit: int = 25) -> str:
             if summaries or r.sections_rewritten else None,
             f"- cost **{_n(r.llm_calls, 'LLM call')}**, about {r.input_tokens:,} input and {r.output_tokens:,} output tokens{cost}",
             f"- leave everything else untouched: {max(pages_total - touched, 0):,} pages",
+            (f"- **introduce {_n(len(r.conflicts_introduced), 'conflict')} between documents**"
+             + (f", resolve {len(r.conflicts_resolved)}" if r.conflicts_resolved else "") + " (below)")
+            if r.conflicts_introduced else
+            (f"- resolve {_n(len(r.conflicts_resolved), 'conflict')} between documents" if r.conflicts_resolved else None),
             "",
         ]
+        if r.conflicts_introduced:
+            items = [f"{esc(c['property'])}: " + " vs ".join(
+                f"**{esc(v['value'])}** <sub>{esc(', '.join(v['paths']))}</sub>" for v in c["values"]) + f" <sub>`{c['id']}`</sub>"
+                for c in r.conflicts_introduced]
+            lines.append(_details(f"Conflicts introduced ({len(items)})", items, limit).replace("<details>", "<details open>", 1))
+            lines.append("<sub>Advisory: DAKC keeps both claims. If the difference is one of release, time or environment, "
+                         "say so in the text or with a `[[conflicts.scope]]` rule; `dakc conflicts <id>` shows the lines.</sub>\n")
+        lines.append(_details(f"Conflicts resolved ({len(r.conflicts_resolved)})",
+                              [f"~~{esc(c['property'])}~~ <sub>`{c['id']}`</sub>" for c in r.conflicts_resolved], limit))
         lines.append(_details(f"Facts added ({len(r.facts_added)})",
                               [f"{esc(f['text'])} <sub>{esc(', '.join(f['sources']))}</sub>" for f in r.facts_added], limit))
         lines.append(_details(f"Facts retracted ({len(r.facts_retracted)})",

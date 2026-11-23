@@ -10,7 +10,7 @@
 See :mod:`dakc.kb` for the full API.
 """
 
-__version__ = "0.5.0"
+__version__ = "0.6.0"
 
 from dakc.compiler import BuildReport  # noqa: E402
 from dakc.errors import (  # noqa: E402
@@ -30,6 +30,9 @@ from dakc.kb import (  # noqa: E402
     ArtifactContent,
     ArtifactSummary,
     BuildDiff,
+    Conflict,
+    ConflictLocation,
+    ConflictValue,
     Downstream,
     DuplicatePair,
     KnowledgeBase,
@@ -58,6 +61,9 @@ __all__ = [
     "BuildReport",
     "BuildRecord",
     "BuildDiff",
+    "Conflict",
+    "ConflictLocation",
+    "ConflictValue",
     "ArtifactContent",
     "ArtifactSummary",
     "Downstream",

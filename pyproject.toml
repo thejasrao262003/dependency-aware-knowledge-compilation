@@ -1,6 +1,6 @@
 [project]
 name = "dakc"
-version = "0.5.0"
+version = "0.6.0"
 description = "Incremental compiler for AI-generated knowledge: claim-level dependency tracking, selective rebuilds, and verification against full rebuilds"
 dynamic = ["readme"]  # README.md with repository-relative links made absolute (see below)
 requires-python = ">=3.12"

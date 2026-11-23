@@ -1,0 +1,496 @@
+{
+ "generated": "2026-11-23T13:27:50+00:00",
+ "dakc_version": "0.5.0",
+ "source": {
+  "repo": "fastapi/fastapi",
+  "commit": "05e6df7e906c3decba377c37548019973f40bf15",
+  "base": "6b131a6bba9c7ee54c6324a896d0e9b8ed31c01c"
+ },
+ "settings": {
+  "max_checks": 1000000000,
+  "per_entity": 5,
+  "pairs_per_call": 10
+ },
+ "price_per_million": {
+  "input": 0.25,
+  "output": 2.0
+ },
+ "measured_tokens_per_pair": {
+  "input": 101.0,
+  "output": 124.0
+ },
+ "turn_on": {
+  "claims": 11067,
+  "candidate_pairs": 23280,
+  "pairs_judged": 23280,
+  "calls": 2328,
+  "input_tokens": 1857877,
+  "output_tokens": 311952,
+  "usd": 1.0884,
+  "seconds": 11.1
+ },
+ "replay": {
+  "commits": 50,
+  "totals": {
+   "pairs_judged": 291,
+   "calls": 58,
+   "input_tokens": 30425,
+   "output_tokens": 4015,
+   "usd": 0.0156,
+   "commits_with_no_calls": 10,
+   "max_pairs_in_one_commit": 90
+  },
+  "per_commit": [
+   {
+    "n": 1,
+    "commit": "84d5f8ea75",
+    "pairs_judged": 0,
+    "calls": 0,
+    "input_tokens": 0,
+    "output_tokens": 0,
+    "seconds": 0.7
+   },
+   {
+    "n": 2,
+    "commit": "af628068e7",
+    "pairs_judged": 2,
+    "calls": 1,
+    "input_tokens": 321,
+    "output_tokens": 30,
+    "seconds": 0.89
+   },
+   {
+    "n": 3,
+    "commit": "e10178c18d",
+    "pairs_judged": 0,
+    "calls": 0,
+    "input_tokens": 0,
+    "output_tokens": 0,
+    "seconds": 0.71
+   },
+   {
+    "n": 4,
+    "commit": "e1144f6954",
+    "pairs_judged": 2,
+    "calls": 1,
+    "input_tokens": 322,
+    "output_tokens": 30,
+    "seconds": 0.83
+   },
+   {
+    "n": 5,
+    "commit": "067f9d4777",
+    "pairs_judged": 2,
+    "calls": 1,
+    "input_tokens": 321,
+    "output_tokens": 30,
+    "seconds": 0.83
+   },
+   {
+    "n": 6,
+    "commit": "5add7a458d",
+    "pairs_judged": 0,
+    "calls": 0,
+    "input_tokens": 0,
+    "output_tokens": 0,
+    "seconds": 0.69
+   },
+   {
+    "n": 7,
+    "commit": "28eaf6a22c",
+    "pairs_judged": 10,
+    "calls": 1,
+    "input_tokens": 768,
+    "output_tokens": 134,
+    "seconds": 0.33
+   },
+   {
+    "n": 8,
+    "commit": "445c570ba8",
+    "pairs_judged": 2,
+    "calls": 1,
+    "input_tokens": 321,
+    "output_tokens": 30,
+    "seconds": 0.85
+   },
+   {
+    "n": 9,
+    "commit": "12e66580a8",
+    "pairs_judged": 0,
+    "calls": 0,
+    "input_tokens": 0,
+    "output_tokens": 0,
+    "seconds": 0.72
+   },
+   {
+    "n": 10,
+    "commit": "7030191986",
+    "pairs_judged": 2,
+    "calls": 1,
+    "input_tokens": 322,
+    "output_tokens": 30,
+    "seconds": 0.88
+   },
+   {
+    "n": 11,
+    "commit": "315f093f74",
+    "pairs_judged": 2,
+    "calls": 1,
+    "input_tokens": 321,
+    "output_tokens": 30,
+    "seconds": 0.84
+   },
+   {
+    "n": 12,
+    "commit": "5758a9c834",
+    "pairs_judged": 0,
+    "calls": 0,
+    "input_tokens": 0,
+    "output_tokens": 0,
+    "seconds": 0.8
+   },
+   {
+    "n": 13,
+    "commit": "fc07dde880",
+    "pairs_judged": 90,
+    "calls": 9,
+    "input_tokens": 7912,
+    "output_tokens": 1206,
+    "seconds": 0.4
+   },
+   {
+    "n": 14,
+    "commit": "6e5130aad6",
+    "pairs_judged": 2,
+    "calls": 1,
+    "input_tokens": 321,
+    "output_tokens": 30,
+    "seconds": 1.03
+   },
+   {
+    "n": 15,
+    "commit": "913c68062c",
+    "pairs_judged": 0,
+    "calls": 0,
+    "input_tokens": 0,
+    "output_tokens": 0,
+    "seconds": 0.86
+   },
+   {
+    "n": 16,
+    "commit": "b11137461f",
+    "pairs_judged": 2,
+    "calls": 1,
+    "input_tokens": 322,
+    "output_tokens": 30,
+    "seconds": 0.85
+   },
+   {
+    "n": 17,
+    "commit": "a3260d49e9",
+    "pairs_judged": 0,
+    "calls": 0,
+    "input_tokens": 0,
+    "output_tokens": 0,
+    "seconds": 0.72
+   },
+   {
+    "n": 18,
+    "commit": "2a1bd230b4",
+    "pairs_judged": 7,
+    "calls": 1,
+    "input_tokens": 527,
+    "output_tokens": 95,
+    "seconds": 0.92
+   },
+   {
+    "n": 19,
+    "commit": "25584a5bc8",
+    "pairs_judged": 2,
+    "calls": 1,
+    "input_tokens": 325,
+    "output_tokens": 30,
+    "seconds": 0.85
+   },
+   {
+    "n": 20,
+    "commit": "e404fd160e",
+    "pairs_judged": 2,
+    "calls": 1,
+    "input_tokens": 324,
+    "output_tokens": 30,
+    "seconds": 0.89
+   },
+   {
+    "n": 21,
+    "commit": "aa8e89334e",
+    "pairs_judged": 2,
+    "calls": 1,
+    "input_tokens": 324,
+    "output_tokens": 30,
+    "seconds": 0.88
+   },
+   {
+    "n": 22,
+    "commit": "8b83841a2e",
+    "pairs_judged": 2,
+    "calls": 1,
+    "input_tokens": 324,
+    "output_tokens": 30,
+    "seconds": 0.86
+   },
+   {
+    "n": 23,
+    "commit": "c172667d74",
+    "pairs_judged": 2,
+    "calls": 1,
+    "input_tokens": 324,
+    "output_tokens": 30,
+    "seconds": 0.85
+   },
+   {
+    "n": 24,
+    "commit": "588459730a",
+    "pairs_judged": 2,
+    "calls": 1,
+    "input_tokens": 324,
+    "output_tokens": 30,
+    "seconds": 0.87
+   },
+   {
+    "n": 25,
+    "commit": "9e34bf058d",
+    "pairs_judged": 2,
+    "calls": 1,
+    "input_tokens": 324,
+    "output_tokens": 30,
+    "seconds": 0.86
+   },
+   {
+    "n": 26,
+    "commit": "d85d47a416",
+    "pairs_judged": 2,
+    "calls": 1,
+    "input_tokens": 324,
+    "output_tokens": 30,
+    "seconds": 0.84
+   },
+   {
+    "n": 27,
+    "commit": "a3e066e05b",
+    "pairs_judged": 2,
+    "calls": 1,
+    "input_tokens": 324,
+    "output_tokens": 30,
+    "seconds": 0.91
+   },
+   {
+    "n": 28,
+    "commit": "beb0cbab7d",
+    "pairs_judged": 2,
+    "calls": 1,
+    "input_tokens": 324,
+    "output_tokens": 30,
+    "seconds": 0.88
+   },
+   {
+    "n": 29,
+    "commit": "55da91f49b",
+    "pairs_judged": 2,
+    "calls": 1,
+    "input_tokens": 324,
+    "output_tokens": 30,
+    "seconds": 0.85
+   },
+   {
+    "n": 30,
+    "commit": "4b7840ff3d",
+    "pairs_judged": 2,
+    "calls": 1,
+    "input_tokens": 324,
+    "output_tokens": 30,
+    "seconds": 0.87
+   },
+   {
+    "n": 31,
+    "commit": "94c3302e2d",
+    "pairs_judged": 2,
+    "calls": 1,
+    "input_tokens": 324,
+    "output_tokens": 30,
+    "seconds": 0.84
+   },
+   {
+    "n": 32,
+    "commit": "c43a17886f",
+    "pairs_judged": 2,
+    "calls": 1,
+    "input_tokens": 324,
+    "output_tokens": 30,
+    "seconds": 0.85
+   },
+   {
+    "n": 33,
+    "commit": "18c10d847e",
+    "pairs_judged": 2,
+    "calls": 1,
+    "input_tokens": 324,
+    "output_tokens": 30,
+    "seconds": 0.84
+   },
+   {
+    "n": 34,
+    "commit": "fc3cda4849",
+    "pairs_judged": 2,
+    "calls": 1,
+    "input_tokens": 324,
+    "output_tokens": 30,
+    "seconds": 0.87
+   },
+   {
+    "n": 35,
+    "commit": "03121f84a1",
+    "pairs_judged": 2,
+    "calls": 1,
+    "input_tokens": 324,
+    "output_tokens": 30,
+    "seconds": 0.85
+   },
+   {
+    "n": 36,
+    "commit": "4b9caed6ac",
+    "pairs_judged": 2,
+    "calls": 1,
+    "input_tokens": 324,
+    "output_tokens": 30,
+    "seconds": 0.88
+   },
+   {
+    "n": 37,
+    "commit": "4d8e818ee2",
+    "pairs_judged": 2,
+    "calls": 1,
+    "input_tokens": 324,
+    "output_tokens": 30,
+    "seconds": 0.88
+   },
+   {
+    "n": 38,
+    "commit": "ec663f531e",
+    "pairs_judged": 2,
+    "calls": 1,
+    "input_tokens": 324,
+    "output_tokens": 30,
+    "seconds": 0.88
+   },
+   {
+    "n": 39,
+    "commit": "a76e828286",
+    "pairs_judged": 2,
+    "calls": 1,
+    "input_tokens": 324,
+    "output_tokens": 30,
+    "seconds": 0.89
+   },
+   {
+    "n": 40,
+    "commit": "e4157c7c6c",
+    "pairs_judged": 2,
+    "calls": 1,
+    "input_tokens": 324,
+    "output_tokens": 30,
+    "seconds": 0.89
+   },
+   {
+    "n": 41,
+    "commit": "dd567e0aa7",
+    "pairs_judged": 2,
+    "calls": 1,
+    "input_tokens": 324,
+    "output_tokens": 30,
+    "seconds": 0.99
+   },
+   {
+    "n": 42,
+    "commit": "a1b3be01aa",
+    "pairs_judged": 2,
+    "calls": 1,
+    "input_tokens": 324,
+    "output_tokens": 30,
+    "seconds": 0.92
+   },
+   {
+    "n": 43,
+    "commit": "a978e511eb",
+    "pairs_judged": 2,
+    "calls": 1,
+    "input_tokens": 321,
+    "output_tokens": 30,
+    "seconds": 0.93
+   },
+   {
+    "n": 44,
+    "commit": "b2831196bf",
+    "pairs_judged": 0,
+    "calls": 0,
+    "input_tokens": 0,
+    "output_tokens": 0,
+    "seconds": 0.79
+   },
+   {
+    "n": 45,
+    "commit": "55ee14be5e",
+    "pairs_judged": 80,
+    "calls": 8,
+    "input_tokens": 6819,
+    "output_tokens": 1072,
+    "seconds": 0.41
+   },
+   {
+    "n": 46,
+    "commit": "74038ff79f",
+    "pairs_judged": 2,
+    "calls": 1,
+    "input_tokens": 321,
+    "output_tokens": 30,
+    "seconds": 0.9
+   },
+   {
+    "n": 47,
+    "commit": "821d37eec1",
+    "pairs_judged": 0,
+    "calls": 0,
+    "input_tokens": 0,
+    "output_tokens": 0,
+    "seconds": 0.76
+   },
+   {
+    "n": 48,
+    "commit": "b0a616d9fa",
+    "pairs_judged": 34,
+    "calls": 4,
+    "input_tokens": 3088,
+    "output_tokens": 458,
+    "seconds": 0.42
+   },
+   {
+    "n": 49,
+    "commit": "57be707b5b",
+    "pairs_judged": 2,
+    "calls": 1,
+    "input_tokens": 321,
+    "output_tokens": 30,
+    "seconds": 0.88
+   },
+   {
+    "n": 50,
+    "commit": "05e6df7e90",
+    "pairs_judged": 0,
+    "calls": 0,
+    "input_tokens": 0,
+    "output_tokens": 0,
+    "seconds": 0.89
+   }
+  ]
+ }
+}

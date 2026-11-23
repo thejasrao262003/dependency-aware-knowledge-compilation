@@ -102,9 +102,67 @@ class Status:
     # Why a compile has work even if no source changed: DAKC's own logic, the
     # configuration, or the provider changed since HEAD. Empty when there is none.
     outdated: list[str] = field(default_factory=list)
+    conflicts_open: int = 0  # conflicts found at HEAD and not accepted in dakc.toml (RFC 0002)
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
+
+
+@dataclass
+class ConflictLocation:
+    """One place that states a value: the claim, and where its source says it."""
+
+    claim_id: str
+    passage_id: str
+    path: str
+    heading: str
+    sentence: str
+    scope: str
+    line: int | None = None  # 1-based line in the source as it is on disk now; None if not found
+    evidence: str = ""  # the source's own sentence(s) behind the claim, when the extractor recorded them
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass
+class ConflictValue:
+    value: str
+    locations: list[ConflictLocation]
+
+    def to_dict(self) -> dict[str, Any]:
+        return {"value": self.value, "locations": [loc.to_dict() for loc in self.locations]}
+
+
+@dataclass
+class Conflict:
+    """A property the sources disagree on (RFC 0002). Advisory: DAKC never picks a side.
+
+    ``kind`` is ``conflict`` (the rules found the same scope holding two values),
+    ``possible`` (the optional verifier, a model, judged two statements contradictory) or
+    ``scoped`` (the values differ only across time, release, environment or status). ``accepted`` is the
+    reason given in ``dakc.toml`` when someone reviewed it and decided to keep it."""
+
+    id: str
+    kind: str
+    property: str
+    reason: str
+    values: list[ConflictValue]
+    since_build: int
+    accepted: str | None = None
+    affected: dict[str, list[ArtifactSummary]] = field(default_factory=dict)  # filled by KnowledgeBase.conflict()
+
+    @property
+    def claim_ids(self) -> list[str]:
+        return sorted({loc.claim_id for v in self.values for loc in v.locations})
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "id": self.id, "kind": self.kind, "property": self.property, "reason": self.reason,
+            "values": [v.to_dict() for v in self.values], "since_build": self.since_build,
+            "accepted": self.accepted,
+            "affected": {k: [a.to_dict() for a in v] for k, v in self.affected.items()},
+        }
 
 
 @dataclass
@@ -402,6 +460,8 @@ class KnowledgeBase:
             aliases=ws.config.alias_map, config_fingerprint=ws.config.fingerprint,
             strategy=strategy, jobs=jobs or ws.config.jobs, dry_run=dry_run,
             fault=FaultInjector(fault), exclude=ws.excluded, acquire_lock=False, provenance=ws.config.provenance,
+            conflict_rules=ws.config.conflict_rules, conflicts_accepted=set(ws.config.accepted_conflicts),
+            conflict_verifier=ws.config.conflict_verifier,
         )
 
     # ------------------------------------------------------------- inspection
@@ -436,6 +496,7 @@ class KnowledgeBase:
             counts=self.store.counts(),
             up_to_date=not sr.has_changes and not outdated,
             outdated=outdated,
+            conflicts_open=sum(1 for c in self.conflicts()),
             source_changes=sr.summary(),
             stale={k: len(v) for k, v in sorted(stale.items(), key=lambda kv: LAYER.get(kv[0], 9))},
             new_sources=len(sr.new),
@@ -544,6 +605,13 @@ class KnowledgeBase:
         cfg = store.get_meta("config_fingerprint")
         if cfg and cfg != self.workspace.config.fingerprint:
             out.append("configuration changed (entity aliases, entity resolution or provenance mode)")
+        from dakc.conflicts import fingerprint as conflicts_fingerprint
+
+        cfp = store.get_meta("conflicts_fp")
+        if cfp is None:
+            out.append("conflict detection has not run on this knowledge base yet")
+        elif cfp and cfp != conflicts_fingerprint(self.workspace.config.conflict_rules, self.workspace.config.alias_map):
+            out.append("conflict detection, its [conflicts] scope rules or the aliases changed")
         build, seen = store.build(store.head), set()
         while build is not None and "fingerprints" not in build.stats and build.stats.get("restored_to") and build.id not in seen:
             seen.add(build.id)  # a rollback records no fingerprints: use the build it restored
@@ -557,7 +625,25 @@ class KnowledgeBase:
             for comp in ("extractor", "writer", "summarizer"):
                 if now.get(comp) and recorded.get(comp) and recorded[comp] != now[comp]:
                     out.append(f"the {comp} changed ({recorded[comp]} -> {now[comp]})")
+        out += self._verifier_outdated()
         return out
+
+    def _verifier_outdated(self) -> list[str]:
+        """What the conflict verifier still has to do (RFC 0002, phase 2)."""
+        settings, stored = self.workspace.config.conflict_verifier, self.store.get_meta("verifier_fp") or ""
+        if settings is None:
+            return ["the conflict verifier was turned off: its findings are removed by the next compile"] if stored else []
+        try:
+            vf = getattr(self.provider().verifier, "fingerprint", "")
+        except Exception:
+            return []
+        if not vf:
+            return []
+        if stored != vf:
+            return ["the conflict verifier was turned on or changed: the next compile checks candidate pairs"]
+        if self.store.get_meta("verifier_complete") != vf:
+            return ["the conflict verifier has candidate pairs left to check (max_checks)"]
+        return []
 
     def _read_source(self, aid: str) -> ArtifactContent:
         """A source document as it is on disk now (it may differ from the last build;
@@ -601,6 +687,105 @@ class KnowledgeBase:
             raise InvalidArgument(f"trace needs a page or a claim; {artifact!r} is a {kind_of(aid)}")
         art = cur[0]
         return trace_page(self.store, art) if art.kind == "page" else trace_claim(self.store, art)  # type: ignore[arg-type]
+
+    # ------------------------------------------------------------- conflicts
+    def conflicts(self, *, scoped: bool = False, accepted: bool = False) -> list[Conflict]:
+        """Properties the sources disagree on, at HEAD (RFC 0002). By default only open
+        conflicts: ``scoped=True`` adds differences explained by scope, ``accepted=True``
+        adds conflicts accepted in ``dakc.toml``. Nothing here changes a claim or a page."""
+        acc = self.workspace.config.accepted_conflicts
+        rows = self.store.conn.execute(
+            "SELECT id, kind, payload, from_build FROM conflicts WHERE to_build IS NULL ORDER BY id").fetchall()
+        out = []
+        for cid, kind, payload, from_build in rows:
+            if (kind == "scoped" and not scoped) or (cid in acc and not accepted):
+                continue
+            out.append(self._conflict(cid, kind, json.loads(payload), from_build, acc.get(cid)))
+        rank = {"conflict": 0, "possible": 1, "scoped": 2}
+        return sorted(out, key=lambda c: (c.accepted is not None, rank.get(c.kind, 2), c.property, c.id))
+
+    def conflict(self, ident: str) -> Conflict:
+        """One finding, with the line each value is stated on and the pages and summaries
+        built from the claims involved. ``ident`` is its id (``cfl:…``), a unique prefix
+        of it, or the same with ``conflict:`` in place of ``cfl:``."""
+        key = ident.strip()
+        if key.startswith("conflict:"):
+            key = "cfl:" + key[len("conflict:"):]
+        if not key.startswith("cfl:"):
+            key = "cfl:" + key
+        rows = self.store.conn.execute(
+            "SELECT id, kind, payload, from_build FROM conflicts WHERE to_build IS NULL AND id LIKE ? ORDER BY id",
+            (key.replace("%", "").replace("_", "") + "%",)).fetchall()
+        if not rows:
+            raise ArtifactNotFound(f"no conflict {ident!r} at HEAD (`dakc conflicts --all` lists them)")
+        if len(rows) > 1:
+            raise InvalidArgument(f"{ident!r} matches {len(rows)} conflicts: " + ", ".join(r[0] for r in rows[:5]))
+        cid, kind, payload, from_build = rows[0]
+        c = self._conflict(cid, kind, json.loads(payload), from_build, self.workspace.config.accepted_conflicts.get(cid))
+        ss, texts = self.workspace.source_set(), {}
+        for v in c.values:
+            for loc in v.locations:
+                if loc.path not in texts:
+                    raw = ss.read_current(loc.path)
+                    texts[loc.path] = raw.decode("utf-8", errors="replace") if raw is not None else None
+                loc.evidence = self._evidence_of(loc)
+                loc.line = self._line_of(texts[loc.path], loc)
+        affected: set[str] = set()
+        for claim in c.claim_ids:
+            affected |= {i for i in downstream(self.store, claim) if kind_of(i) in ("page", "summary")}
+        names = titles(self.store, sorted(affected))
+        by_kind: dict[str, list[ArtifactSummary]] = {}
+        for i in sorted(affected):
+            by_kind.setdefault(kind_of(i), []).append(ArtifactSummary(i, kind_of(i), names.get(i, i)))
+        c.affected = dict(sorted(by_kind.items(), key=lambda kv: LAYER.get(kv[0], 9)))
+        return c
+
+    def _conflict(self, cid: str, kind: str, payload: dict[str, Any], from_build: int, accepted: str | None) -> Conflict:
+        # since: the start of the unbroken run of versions of this kind that ends at HEAD
+        since = from_build
+        for f, t, k in self.store.conn.execute(
+                "SELECT from_build, to_build, kind FROM conflicts WHERE id=? AND to_build IS NOT NULL ORDER BY to_build DESC", (cid,)):
+            if t != since or k != kind:
+                break
+            since = f
+        values = [ConflictValue(v["value"], [ConflictLocation(o["claim_id"], o["passage_id"], o["path"], o["heading"],
+                                                              o["sentence"], o["scope"]) for o in v["occurrences"]])
+                  for v in payload["values"]]
+        return Conflict(cid, kind, payload["property"], payload["reason"], values, since, accepted)
+
+    def _evidence_of(self, loc: ConflictLocation) -> str:
+        from dakc.claims import split_sentences
+
+        cur, psg = self.store.current_artifact(loc.claim_id), self.store.current_artifact(loc.passage_id)
+        if cur is None or psg is None:
+            return ""
+        sents = split_sentences(psg[0].text)  # type: ignore[attr-defined]
+        for pid, _t, _m, ev in cur[0].supports:  # type: ignore[attr-defined]
+            if pid == loc.passage_id:
+                return " ".join(sents[i] for i in ev if 0 <= i < len(sents))
+        return ""
+
+    def _line_of(self, text: str | None, loc: ConflictLocation) -> int | None:
+        """The line a claim's evidence starts on, in the source as it is now."""
+        if not text:
+            return None
+        needles = [loc.evidence, loc.sentence]
+        psg = self.store.current_artifact(loc.passage_id)
+        if psg is not None and psg[0].text.strip():  # type: ignore[attr-defined]
+            needles.append(psg[0].text.strip().splitlines()[0])  # type: ignore[attr-defined]
+        flat = re.sub(r"\s+", " ", text)
+        for needle in needles:
+            n = re.sub(r"\s+", " ", needle).strip()
+            if len(n) < 8:
+                continue
+            for probe in (n, n[:60]):
+                i = text.find(probe)
+                if i >= 0:
+                    return text.count("\n", 0, i) + 1
+                j = flat.find(probe)
+                if j >= 0:  # the sentence wraps across lines: map back through the collapsed text
+                    return _line_at_flat_offset(text, j)
+        return None
 
     def graph_stats(self) -> dict[str, dict[str, int]]:
         """Artifact counts per kind and dependency-edge counts per edge kind (HEAD)."""
@@ -700,7 +885,8 @@ class KnowledgeBase:
         re-pays every call, so it needs ``allow_cost=True``."""
         from dakc.provenance.verify import verify_against_full, verify_store
 
-        res = verify_store(self.store, self.output_root, self.workspace.state_dir)
+        res = verify_store(self.store, self.output_root, self.workspace.state_dir, self.workspace.config.conflict_rules,
+                           self.workspace.config.alias_map)
         out = VerifyReport(res.ok, res.checks, res.problems, res.metrics)
         if against_full:
             bundle = self.provider()
@@ -798,3 +984,21 @@ class KnowledgeBase:
             proj = sync_projection(store, self.output_root, self.workspace.state_dir)
             pubs = [publish_to(store, n, pub).to_dict() for n, pub in self.workspace.publishers()]
         return RollbackResult(to, new_id, proj, pubs)
+
+
+def _line_at_flat_offset(text: str, offset: int) -> int:
+    """Line of ``text`` holding the character at ``offset`` in its whitespace-collapsed form."""
+    pos, line, prev_space = 0, 1, False
+    for ch in text:
+        if ch.isspace():
+            if not prev_space:
+                pos += 1
+            prev_space = True
+        else:
+            pos += 1
+            prev_space = False
+        if pos > offset:
+            return line
+        if ch == "\n":
+            line += 1
+    return line

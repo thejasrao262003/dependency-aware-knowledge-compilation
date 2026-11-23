@@ -95,6 +95,12 @@ def test_rest_api(ws):
     assert plan["dry_run"] and plan["operation_counts"]["reextract"] == 1
     assert client.get("/builds").json()[0]["status"] in ("committed", "noop")
     assert client.get("/artifacts/page:nope").status_code == 404
+    assert client.get("/conflicts").json() == []
+    write_files(ws / "knowledge", {"databases/pg-notes.md": "PostgreSQL does not support JSONB.\n"})
+    run("compile", "-w", ws)
+    (c,) = client.get("/conflicts").json()
+    assert c["kind"] == "conflict" and client.get(f"/conflicts/{c['id']}").json()["affected"]["page"]
+    assert client.get("/conflicts/cfl:nope").status_code == 404
 
 
 def test_missing_extra_hint_keeps_brackets(ws, monkeypatch):

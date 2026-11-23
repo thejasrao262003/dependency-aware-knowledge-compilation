@@ -14,7 +14,7 @@ from dakc.errors import CompileFailed, SourceError
 from dakc.providers import make_provider
 from dakc.provenance.verify import verify_against_full
 from dakc.sources import NATIVE_IDS, FilesystemSource, Item, Source, SourceSet, make_source
-from dakc.storage import Store
+from dakc.storage import SCHEMA_VERSION, Store
 from dakc.transactions import state_digest
 
 from tests.conftest import write_files
@@ -192,7 +192,7 @@ def test_a_store_from_before_sources_upgrades_without_rebuilding(tmp_path):
     store.set_meta("schema_version", "1")
     store.close()
     store = Store(tmp_path / "s.db")
-    assert store.get_meta("schema_version") == "2"
+    assert store.get_meta("schema_version") == str(SCHEMA_VERSION)
     assert build(store, SourceSet.from_root(src)).status == "noop"
     store.close()
 

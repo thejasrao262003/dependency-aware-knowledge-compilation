@@ -52,6 +52,7 @@ dakc mcp --workspace ... --transport streamable-http        # HTTP on 127.0.0.1:
 | `builds` | read-only | build history with LLM calls and operation counts |
 | `diff_builds` | read-only | artifacts created / updated / deleted between two builds |
 | `duplicates` | read-only | likely duplicate claims (advisory) |
+| `conflicts` | read-only | statements in different documents that cannot both be true, or one finding (`conflict`) with the sentence and line of each value and the pages built from it. `include_scoped` adds differences explained by release, time or environment. Agents are told to mention an open conflict when an answer relies on one of its claims. |
 | `verify` | read-only | invariants. `against_full` (a full-rebuild comparison) is allowed only with a free provider. |
 | `compile` | not read-only, not destructive, idempotent | a preview by default; builds with `apply=true` |
 | `rollback` | destructive | restores an explicit earlier build |

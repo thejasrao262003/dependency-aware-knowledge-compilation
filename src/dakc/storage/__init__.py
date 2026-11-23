@@ -19,7 +19,7 @@ from typing import Any
 from dakc.artifacts import Artifact, from_payload
 from dakc.ingestion import SourceRecord
 
-SCHEMA_VERSION = 2  # 2: sources.key and sources.revision (RFC 0001); the published ledger
+SCHEMA_VERSION = 3  # 2: sources.key and sources.revision (RFC 0001); the published ledger. 3: conflicts (RFC 0002)
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS meta(key TEXT PRIMARY KEY, value TEXT NOT NULL);
@@ -63,6 +63,20 @@ CREATE INDEX IF NOT EXISTS edges_to ON edges(to_build);
 CREATE TABLE IF NOT EXISTS extraction_cache(
     key TEXT PRIMARY KEY, fingerprint TEXT NOT NULL, result TEXT NOT NULL, created_at TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS conflicts(
+    id TEXT NOT NULL, key TEXT NOT NULL, kind TEXT NOT NULL, payload TEXT NOT NULL,
+    from_build INTEGER NOT NULL, to_build INTEGER
+);
+CREATE INDEX IF NOT EXISTS conflicts_cur ON conflicts(id) WHERE to_build IS NULL;
+CREATE INDEX IF NOT EXISTS conflicts_key ON conflicts(key) WHERE to_build IS NULL;
+CREATE INDEX IF NOT EXISTS conflicts_from ON conflicts(from_build);
+CREATE INDEX IF NOT EXISTS conflicts_to ON conflicts(to_build);
+CREATE TABLE IF NOT EXISTS conflict_index(
+    key TEXT NOT NULL, claim_id TEXT NOT NULL, passage_id TEXT NOT NULL, value TEXT NOT NULL, polarity INTEGER NOT NULL,
+    scope TEXT NOT NULL, path TEXT NOT NULL, heading TEXT NOT NULL, sentence TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS conflict_index_key ON conflict_index(key);
+CREATE INDEX IF NOT EXISTS conflict_index_claim ON conflict_index(claim_id);
 CREATE TABLE IF NOT EXISTS published(
     publisher TEXT NOT NULL, id TEXT NOT NULL, kind TEXT NOT NULL, state_hash TEXT NOT NULL,
     build INTEGER NOT NULL, published_at TEXT NOT NULL, PRIMARY KEY(publisher, id)

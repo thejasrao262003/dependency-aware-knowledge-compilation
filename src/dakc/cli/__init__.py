@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import re
 import sys
 from collections.abc import Iterator
 from contextlib import contextmanager
@@ -12,6 +13,7 @@ from typing import Annotated, Optional
 
 import typer
 from rich.console import Console
+from rich.markup import escape
 from rich.table import Table
 from rich.tree import Tree
 
@@ -255,7 +257,11 @@ def explain_cmd(
     as_json: JSON = False,
     limit: Annotated[int, typer.Option(help="Max dependencies listed.")] = 30,
 ) -> None:
-    """Explain an artifact's dependencies, dependents and staleness."""
+    """Explain an artifact's dependencies, dependents and staleness (or a conflict: cfl:…)."""
+    if artifact.strip().startswith(("cfl:", "conflict:")):
+        with _open(workspace) as kb:
+            _show_conflict(kb.conflict(artifact), as_json)
+        return
     with _open(workspace) as kb:
         exp = kb.explain(artifact)
     if as_json:
@@ -354,6 +360,75 @@ def duplicates(
 
 
 @app.command()
+def conflicts(
+    conflict: Annotated[Optional[str], typer.Argument(help="Show one finding in full: its id (cfl:…) or a unique prefix.")] = None,
+    workspace: WS = Path("."),
+    show_all: Annotated[bool, typer.Option("--all", help="Also list differences explained by scope, and accepted conflicts.")] = False,
+    check: Annotated[bool, typer.Option("--check", help="Exit with status 1 if a conflict is open (for CI).")] = False,
+    as_json: JSON = False,
+) -> None:
+    """Statements in different sources that cannot both be true. Advisory: nothing is changed."""
+    with _open(workspace) as kb:
+        if conflict:
+            _show_conflict(kb.conflict(conflict), as_json)
+            return
+        found = kb.conflicts(scoped=show_all, accepted=show_all)
+    open_ = [c for c in found if c.kind in ("conflict", "possible") and c.accepted is None]
+    if as_json:
+        _emit_json({"open": len(open_), "conflicts": [c.to_dict() for c in found]})
+    elif not found:
+        console.print("[green]No conflicts[/green] between sources at HEAD." + ("" if show_all else "  (`--all` adds scoped differences)"))
+    else:
+        for c in found:
+            tag = ("[green]accepted[/green]" if c.accepted is not None
+                   else "[red]conflict[/red]" if c.kind == "conflict"
+                   else "[yellow]possible[/yellow]" if c.kind == "possible" else "[cyan]scoped[/cyan]")
+            console.print(f"{tag}  [bold]{c.id}[/bold]  {escape(c.property)}")
+            for v in c.values:
+                where = ", ".join(sorted({loc.path for loc in v.locations}))
+                console.print(f"    {escape(repr(v.value)):28}  [dim]{escape(where[:90])}[/dim]")
+        possible = sum(1 for c in open_ if c.kind == "possible")
+        console.print(f"\n{len(open_)} open conflict(s)" + (f", {possible} of them possible (judged by the verifier)" if possible else "")
+                      + ". `dakc conflicts <id>` shows the sentences, lines and affected pages.")
+    if check and open_:
+        raise typer.Exit(1)
+
+
+def _show_conflict(c, as_json: bool) -> None:
+    if as_json:
+        _emit_json(c.to_dict())
+        return
+    label = ("Accepted conflict" if c.accepted is not None else "Conflict" if c.kind == "conflict"
+             else "Possible conflict" if c.kind == "possible" else "Scoped difference")
+    console.print(f"[bold]{label} {c.id}[/bold]  (since build {c.since_build})")
+    console.print(f"{'About:   ' if c.kind == 'possible' else 'Property:'} {escape(c.property)}")
+    console.print(f"Why:      {escape(c.reason)}")
+    for v in c.values:
+        console.print(f"\n[bold]{v.value}[/bold]")
+        for loc in v.locations:
+            heading = re.sub(r"\s*\{\s*#[^}]*\}?", "", loc.heading)  # mkdocs anchors: "Title { #id }"
+            heading = heading if len(heading) <= 70 else "…" + heading[-69:]
+            console.print(f"  {loc.path}" + (f":{loc.line}" if loc.line else "")
+                          + f"  [dim]{escape(heading)}  ({escape(loc.scope)})[/dim]")
+            console.print(f"    \"{escape(loc.evidence or loc.sentence)}\"")
+            if loc.evidence and loc.evidence.strip() != loc.sentence.strip():
+                console.print(f"    [dim]claim: {escape(loc.sentence)}[/dim]")
+    if c.affected:
+        console.print("\nBuilt from these claims:")
+        for kind, items in c.affected.items():
+            names = ", ".join(a.title for a in items[:8]) + (f" … {len(items) - 8} more" if len(items) > 8 else "")
+            console.print(f"  {kind} ({len(items)}): {names}")
+    if c.accepted is not None:
+        console.print(f"\nAccepted in dakc.toml: {escape(c.accepted or '(no reason given)')}")
+    elif c.kind in ("conflict", "possible"):
+        if c.kind == "possible":
+            console.print("\n[dim]Judged by the conflict verifier (a model), not by DAKC's rules: check both statements.[/dim]")
+        console.print(escape("\nResolution: edit one of the sources and compile; the conflict closes when they agree."
+                             " If it is a difference of time, release or environment, say so in the text or with a"
+                             " [[conflicts.scope]] rule. To keep it as is, add it to [[conflicts.accept]] in dakc.toml."))
+
+
+@app.command()
 def status(workspace: WS = Path("."), as_json: JSON = False) -> None:
     """Head build, artifact counts and staleness against the current sources."""
     with _open(workspace) as kb:
@@ -363,6 +438,8 @@ def status(workspace: WS = Path("."), as_json: JSON = False) -> None:
         return
     console.print(f"Workspace: {st.workspace}\nSources:   {st.source_root}\nProvider:  {st.provider}\nHEAD:      build {st.head or '-'}")
     console.print("Artifacts: " + ", ".join(f"{k} {v}" for k, v in sorted(st.counts.items(), key=lambda kv: _layer(kv[0]))))
+    if st.conflicts_open:
+        console.print(f"[red]Conflicts[/red]: {st.conflicts_open} open (`dakc conflicts`)")
     if st.up_to_date:
         console.print("[green]Up to date[/green]: no source changes since HEAD.")
         return

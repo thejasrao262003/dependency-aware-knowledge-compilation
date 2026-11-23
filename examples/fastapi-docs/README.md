@@ -84,6 +84,29 @@ parsing limits to one docs page:
    shows the exact sentence, document and version.
 7. **`dakc verify --against-full`**: identical to a from-scratch rebuild.
 
+## Two documents that disagree
+
+[results/conflicts-walkthrough.md](results/conflicts-walkthrough.md) follows
+real documentation drift. In 0.118.0, FastAPI moved its security tutorial
+from PassLib with "Bcrypt" to pwdlib with "Argon2"
+([`efdafa43`](https://github.com/fastapi/fastapi/commit/efdafa43613f084d198e51f6858e8610beddb5ed)).
+A team's notes copied from the earlier docs still say Bcrypt.
+
+1. **Two sources, one knowledge base:** FastAPI's docs and the team's notes.
+2. **A pull request** copies the old advice into the notes. The comment from
+   `dakc review` says it would *introduce 1 conflict between documents*,
+   and shows both sentences.
+3. **Merged anyway.** `dakc compile` reports `Conflicts: 1 open`, and
+   `dakc explain` shows `tutorial/security/oauth2-jwt.md:73` against
+   `team/auth.md:11`, with the pages built on them.
+4. **`dakc conflicts --check`** exits 1, so CI can fail on it.
+5. **Resolved** by putting the old advice under a heading, "Before FastAPI
+   0.118.0". The same sentences now apply to a different release, so they are
+   a *scoped* difference, not a conflict.
+6. **`dakc verify`:** the findings equal a detection from scratch.
+
+It runs in about 20 seconds and calls no model.
+
 ## An agent doing it over MCP
 
 [results/agent-session.md](results/agent-session.md) records two real sessions.
@@ -132,6 +155,8 @@ dakc serve -w examples/fastapi-docs/.work/ui-demo-kb  # then open http://127.0.0
 - **Changes** shows the 25-call plan.
 - **History** shows what build 2 changed.
 - **Any page** lets you select a citation to see the exact source sentence.
+- **Conflicts** shows a team's notes, copied from FastAPI's docs before
+  0.118.0, still recommending Bcrypt against the tutorial's Argon2.
 
 ![Changes view: one modified document, 25 LLM calls to catch up](../../docs/images/ui-changes.png)
 
@@ -142,6 +167,7 @@ pip install 'dakc[mcp,mkdocs]' mkdocs-material
 python examples/fastapi-docs/replay.py          # 50 commits, several minutes; writes results/replay.json
 python examples/fastapi-docs/report.py          # results/replay.md
 python examples/fastapi-docs/walkthrough.py     # results/walkthrough.md
+python examples/fastapi-docs/conflicts_walkthrough.py   # results/conflicts-walkthrough.md
 python examples/fastapi-docs/agent_session.py   # results/agent-session.md (needs the `claude` CLI; uses your Claude usage)
 mkdocs serve -f examples/fastapi-docs/mkdocs.yml
 ```

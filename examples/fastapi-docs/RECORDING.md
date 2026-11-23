@@ -88,6 +88,20 @@ dakc verify --against-full -w demo-kb
 > "And the incremental result is identical to a full rebuild. Replayed over
 > FastAPI's last fifty documentation commits, that held at every single one."
 
+**Optional, 30 seconds more: documents that disagree**
+```bash
+printf '# Team notes\n\nThe recommended algorithm is "Bcrypt".\n' > fastapi/docs/en/docs/team-notes.md
+dakc compile -w demo-kb | grep Conflicts
+dakc explain cfl:1f3a -w demo-kb
+rm fastapi/docs/en/docs/team-notes.md                       # afterwards
+```
+> "FastAPI switched its password-hashing advice from Bcrypt to Argon2 in
+> 0.118. Notes copied from the old docs still say Bcrypt. DAKC flags the two
+> sentences, with file and line, at every compile, and in the pull request."
+
+The full story, including the pull-request comment, is in
+[results/conflicts-walkthrough.md](results/conflicts-walkthrough.md).
+
 **2:50–3:00. Close**
 > "`pip install dakc`. It's open source, Apache 2.0. Links below."
 

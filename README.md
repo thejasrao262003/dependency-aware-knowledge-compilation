@@ -283,6 +283,10 @@ extra: `pip install 'dakc[api]'`.
   everything an edit to it would invalidate, and the dependency graph around
   it.
 - **History.** Every build, and what it changed.
+- **Conflicts.** Statements in different documents that cannot both be true,
+  with each document's exact sentence, file and line, the pages built on
+  them, and how to resolve it. A claim, page or document involved in one
+  says so ([below](#conflicts-between-sources)).
 
 ![Selecting a citation shows the exact sentence it came from](docs/images/ui-provenance.png)
 
@@ -316,7 +320,7 @@ the change does to the knowledge base: facts added and retracted, pages
 affected, and the LLM calls and cost of applying it. It never calls a model.
 
 ```yaml
-- uses: thejasrao262003/dependency-aware-knowledge-compilation@v0.6.0
+- uses: thejasrao262003/dependency-aware-knowledge-compilation@v0.6.1
   with:
     workspace: .
 ```
@@ -402,7 +406,13 @@ conflict  cfl:1f3a356464  The recommended algorithm is "…"
 ```
 
 `dakc explain cfl:1f3a` shows each sentence with its file and line, the
-heading it sits under, and the pages and summaries built from it. Fix either
+heading it sits under, and the pages and summaries built from it. This is
+real drift: FastAPI moved from Bcrypt to Argon2 in 0.118.0, and notes copied
+from the earlier docs still say Bcrypt. [A walkthrough](examples/fastapi-docs/results/conflicts-walkthrough.md)
+follows it from the pull request that introduces it to its resolution, and
+`dakc serve` shows it in its Conflicts view:
+
+![The Conflicts view: Argon2 against Bcrypt, each with its sentence, file and line, and how to resolve it](docs/images/ui-conflicts.png) Fix either
 document, compile, and the conflict closes. Detection is advisory: it never
 changes a claim or a page. The rules call no model; the optional verifier
 (below) does.
@@ -452,14 +462,14 @@ entity in other documents and has the model judge each pair. Its findings
 are marked **possible**, and scope still applies to them. A verdict is
 cached by the pair of claims, so each pair is paid for once.
 
-- **Quality.** With gpt-5-mini as the verifier, 50 of the 55 held-out
-  contradictions are flagged, with no false alarm in 55 other pairs. Of
-  the 5 missed, the model got 1 wrong; the free extractor and DAKC's scope
-  reading account for the rest. The sets are small, so read this as
-  indicative.
-- **Cost on FastAPI's docs**, at gpt-5-mini's measured token use: turning
-  it on judges about 23,000 pairs, about $6 once. Keeping it on through 50
-  real commits judged 291 pairs, about 8 cents in all.
+- **Quality.** On 55 labelled contradictions, the rules plus the verifier
+  catch 52 with gpt-5-mini (no false alarm in 55 other pairs), or 53 with
+  gpt-4o-mini (2 false alarms). The set is small and model-written, and it
+  was used to fix DAKC's scope reading, so read this as optimistic.
+- **Cost on FastAPI's docs.** Turning it on judges about 23,000 pairs once:
+  about 70 cents with gpt-4o-mini, or about $6 with gpt-5-mini, whose
+  reasoning is most of its output. Keeping it on through 50 real commits
+  judged 291 pairs: under a cent, or about 8 cents.
 - **Checking first.** `dakc compile --dry-run` counts its calls.
 
 The conflict step takes under a millisecond on a one-file edit. The PR

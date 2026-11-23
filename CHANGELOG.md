@@ -1,5 +1,53 @@
 # Changelog
 
+## v0.6.1: conflicts in the web UI, a FastAPI walkthrough, and a cheaper verifier
+
+### Added
+
+- **A Conflicts view in the web UI** (`dakc serve`).
+  - The list shows open conflicts, with a toggle for scoped and accepted
+    ones. The navigation shows a badge with the open count, and the
+    Overview mentions them.
+  - Each conflict shows its values side by side ("Argon2 ≠ Bcrypt"), each
+    with its exact sentence, file and line, heading and scope, plus the
+    pages and summaries built on them.
+  - It shows how to resolve it, with a `[[conflicts.scope]]` or
+    `[[conflicts.accept]]` snippet to copy. The UI stays read-only.
+  - A claim, passage, page or document that is part of an open conflict
+    shows a notice linking to it.
+
+- **A conflicts walkthrough on FastAPI's docs**
+  (`examples/fastapi-docs/conflicts_walkthrough.py`, output in
+  `results/conflicts-walkthrough.md`).
+  - The story is real drift: FastAPI moved from Bcrypt to Argon2 in 0.118.0,
+    and a team's notes copied from the earlier docs still say Bcrypt.
+  - It follows the conflict from the pull-request comment that reports it,
+    to `dakc explain`, to the CI gate, to resolving it as history.
+  - It takes about 20 seconds and calls no model. `RECORDING.md` has an
+    optional 30-second scene.
+- **gpt-4o-mini measured as the conflict verifier.** With the rules, it
+  catches 53 of 55 held-out contradictions with 2 false alarms in 55 other
+  pairs; gpt-5-mini catches 52 with none. gpt-4o-mini writes a fifth of the
+  output tokens: turning the verifier on for FastAPI's docs costs about 70
+  cents instead of about $6.
+
+### Changed
+
+- **Conflict scope reads tense and modality better:**
+  - "deprecated", and a change whose result lasts ("was removed", "has
+    been replaced"), describe the present, not the past;
+  - "may" that grants a limit ("each tenant may send up to 500 requests")
+    is permission, not a proposal;
+  - "used to read" is past; "is used to store" is not.
+- **Scoped reasons show values as the documents write them** ("Argon2",
+  not "argon2").
+
+### Upgrading from 0.6.0
+
+- The conflict detector's version changes, so the first compile re-judges
+  every claim. It commits a build even if no document changed; on
+  FastAPI's docs that takes under a second.
+
 ## v0.6.0: conflicts between sources
 
 ### Added

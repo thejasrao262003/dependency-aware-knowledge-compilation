@@ -279,19 +279,64 @@ mark { background: var(--mark); color: inherit; border-radius: 3px; padding: 0 2
 .diff-kind { margin: 18px 0 4px; font-weight: 600; font-size: 14px; display: flex; gap: 8px; align-items: center; }
 .ops { display: flex; flex-wrap: wrap; gap: 6px; }
 
+/* ---------------------------------------------------------------- conflicts
+   Cobalt means "changed", so disagreement takes the rose of a deletion, and a model's
+   judgement the amber of "stale": both are things to look at, neither is a change. */
+.rail .badge.conflict { background: var(--deleted); color: var(--paper); }
+.pill.conflict { color: var(--deleted); border-color: currentColor; }
+.pill.possible { color: var(--stale); border-color: currentColor; }
+.pill.accepted { color: var(--valid); border-color: currentColor; }
+.pill.scope { color: var(--ink); background: var(--surface-2); }
+.callout.conflict { border-left-color: var(--deleted); background: color-mix(in srgb, var(--deleted) 10%, transparent); }
+.callout.warn { border-left-color: var(--stale); background: color-mix(in srgb, var(--stale) 11%, transparent); }
+.conflict-row { grid-template-columns: auto minmax(0, 1fr) auto; gap: 16px; align-items: center; }
+.eyebrow .mono { text-transform: none; letter-spacing: 0; }
+.conflict-row .pill { justify-self: start; }
+.conflict-row .prop { display: block; overflow: hidden; text-overflow: ellipsis; }
+.conflict-row .sub { display: block; font-size: 13px; color: var(--muted); margin-top: 2px; overflow: hidden; text-overflow: ellipsis; }
+.conflict-row .sub b { color: var(--ink-2); font-weight: 600; }
+.conflict-row .vs { color: var(--deleted); font-weight: 600; }
+/* The signature: the values the documents give, facing each other across a "not equal". */
+.faceoff { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 18px; margin: 14px 0 10px; }
+.faceoff .val {
+  font-family: var(--font-display); font-size: 44px; line-height: 1; letter-spacing: 0.01em;
+  padding: 8px 14px 4px; border: 1px solid var(--rule); border-radius: 8px; background: var(--surface);
+  overflow-wrap: anywhere; max-width: 100%;
+}
+.faceoff .ne { font-family: var(--font-display); font-size: 48px; line-height: 1; color: var(--deleted); }
+.values { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; margin-top: 22px; }
+.value-card h3 { color: var(--ink); font-size: 15px; }
+.loc + .loc { border-top: 1px solid var(--rule); margin-top: 14px; padding-top: 14px; }
+.loc-src { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; font-size: 13.5px; }
+.loc-src a { overflow-wrap: anywhere; }
+.loc-heading { font-size: 13px; margin: 6px 0 8px; }
+.loc blockquote { margin: 0; padding: 10px 12px; background: var(--surface-2); border-left: 3px solid var(--deleted); border-radius: 0 8px 8px 0; font-size: 15px; line-height: 1.5; }
+.loc-links { font-size: 12.5px; margin: 8px 0 0; color: var(--muted); }
+.resolve p { margin: 0 0 8px; font-size: 14px; }
+.snippet { position: relative; margin: 0 0 14px; }
+.snippet pre { margin: 0; padding: 10px 12px; padding-right: 70px; background: var(--surface-2); border-radius: 8px; font-family: var(--font-mono); font-size: 12.5px; line-height: 1.6; overflow-x: auto; white-space: pre; }
+.snippet .copy { position: absolute; top: 8px; right: 8px; cursor: pointer; background: var(--surface); }
+.doc-pick { margin: 2px 0 8px; max-width: 100%; overflow-x: auto; }
+.doc-pick button { font-family: var(--font-mono); font-size: 12px; white-space: nowrap; }
+
 /* ---------------------------------------------------------------- responsive / a11y */
 @media (max-width: 900px) {
   .shell { grid-template-columns: 1fr; }
   .rail { display: flex; gap: 4px; overflow-x: auto; padding: 8px 12px; border-right: 0; border-bottom: 1px solid var(--rule); }
   .rail a { white-space: nowrap; }
   main { padding: 20px 16px 48px; }
-  .grid-2, .read, .builds { grid-template-columns: 1fr; }
+  .grid-2, .read, .builds { grid-template-columns: minmax(0, 1fr); }
   .prov { position: static; }
   .stratum { grid-template-columns: 84px minmax(0, 1fr); }
   .stratum-note { grid-column: 2; }
   .legend { margin-left: 98px; }
   .ws { display: none; }
   h1.title { font-size: 32px; }
+  .faceoff .val { font-size: 32px; }
+  .faceoff .ne { font-size: 34px; }
+  .values { grid-template-columns: 1fr; }
+  .conflict-row { grid-template-columns: 1fr; gap: 4px; }
+  .conflict-row .id { display: none; }
 }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }

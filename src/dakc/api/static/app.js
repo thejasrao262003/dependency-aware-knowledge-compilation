@@ -206,6 +206,8 @@ async function overview(view) {
     <p class="eyebrow">${swatch("source")} Knowledge base · build ${st.head || "–"}</p>
     <h1 class="title">${esc(head)}</h1>
     <p class="lede">${lede}</p>
+    ${st.conflicts_open ? `<div class="callout conflict"><a href="#/conflicts"><strong>${plural(st.conflicts_open, "open conflict", "open conflicts")}</strong></a>
+      between documents: statements that cannot both be true.</div>` : ""}
     ${stack(st.counts, ov)}
     <div class="grid-2" style="margin-top:36px">
       <section class="card"><h3>Recent builds</h3><ul class="list timeline">${recent.map((b) => buildRow(b, st.head)).join("")}</ul>
@@ -293,6 +295,7 @@ async function artifact(view, ident, params) {
     view.innerHTML = `<p class="eyebrow">Not found</p><h1 class="title">${esc(ident)}</h1><div class="empty">${esc(e.message)}</div>`;
     return;
   }
+  const notice = await conflictNotice(exp);
   if (!live()) return;
   const id = exp.id, kind = exp.kind;
   const statusCls = { VALID: "valid", STALE: "stale", DELETED: "deleted" }[exp.status] || "";
@@ -304,6 +307,7 @@ async function artifact(view, ident, params) {
       ${exp.version ? `<span class="pill">version ${exp.version}</span>` : ""}
       ${exp.last_changed_build ? `<span class="pill">built in #${exp.last_changed_build}</span>` : ""}</div>
     ${exp.reasons?.length ? `<div class="callout">${exp.reasons.map(esc).join("<br>")}. <a href="#/changes">What a compile would redo</a>.</div>` : ""}
+    ${notice}
     <nav class="tabs" aria-label="Artifact views">${tabs.map(([t, label]) =>
       `<a href="#/a/${enc(id)}?tab=${t}" ${t === tab ? 'aria-current="page"' : ""}>${label}</a>`).join("")}</nav>
     <div id="tab"><p class="loading">Loading…</p></div>`;
@@ -546,6 +550,145 @@ async function builds(view, selected) {
     }).join("") : '<p class="muted">No artifacts changed.</p>'}</div>`;
 }
 
+// ------------------------------------------------------------------ conflicts (RFC 0002)
+const CONFLICT_KIND = { conflict: "Conflict", possible: "Possible conflict", scoped: "Scoped difference" };
+const conflictPill = (c) => c.accepted != null ? '<span class="pill accepted">accepted</span>'
+  : `<span class="pill ${esc(c.kind)}">${esc(c.kind === "possible" ? "possible" : c.kind)}</span>`;
+// A negation's two values are "is stated" and "is negated": say it plainly.
+const valueLabel = (v) => ({ "is stated": "Yes", "is negated": "No" }[v] ?? v);
+const docsOf = (v) => [...new Set(v.locations.map((l) => l.path))];
+
+async function conflicts(view, ident, params) {
+  if (ident) return conflictDetail(view, ident);
+  const all = params.get("show") === "all";
+  const live = begin(view);
+  const [st, found] = await Promise.all([api("/status"), api(`/conflicts?scoped=${all}&accepted=${all}`)]);
+  if (!live()) return;
+  const open = found.filter((c) => (c.kind === "conflict" || c.kind === "possible") && c.accepted == null);
+  const head = open.length ? `${plural(open.length, "open conflict", "open conflicts")} between documents.`
+    : "No open conflicts between documents.";
+  const seg = `<div class="seg" role="group" aria-label="Show">${[["open", "Open"], ["all", "With scoped and accepted"]].map(([k, label]) =>
+    `<button type="button" data-show="${k}" aria-pressed="${(k === "all") === all}">${label}</button>`).join("")}</div>`;
+  const rows = found.map((c) => `<li><a class="row conflict-row" href="#/conflicts/${enc(c.id)}">
+      ${conflictPill(c)}
+      <span class="t"><span class="prop">${esc(c.property)}</span>
+        <span class="sub">${c.values.map((v) => `<b>${esc(valueLabel(v.value))}</b> ${esc(docsOf(v).join(", "))}`).join('<span class="vs" aria-label="against"> ≠ </span>')}</span></span>
+      <span class="id">since #${c.since_build}</span></a></li>`).join("");
+  view.innerHTML = `
+    <p class="eyebrow"><span class="swatch" style="background:var(--deleted)"></span> Conflicts · build ${st.head || "–"}</p>
+    <h1 class="title">${esc(head)}</h1>
+    <p class="lede">Statements in different documents that cannot both be true. DAKC keeps both claims, each with its own
+      source, and never picks a side: a conflict closes when the documents agree.</p>
+    <div class="toolbar">${seg}</div>
+    ${found.length ? `<ul class="list card" style="padding:4px 12px">${rows}</ul>`
+      : `<div class="empty">${all ? "Nothing at all: no two documents give different values for the same property, in any scope."
+        : `Nothing open. ${st.counts.claim ? `DAKC compared ${plural(st.counts.claim, "claim", "claims")}.` : ""}
+          <a href="#/conflicts?show=all">Show scoped differences</a>, such as one release against another.`}
+        <p class="muted" style="margin:10px 0 0;font-size:13.5px">The rules compare statements of the same shape. With
+          <code>[conflicts] verifier = "llm"</code> in <code>dakc.toml</code>, a model also checks related statements
+          worded differently.</p></div>`}`;
+  view.querySelectorAll("[data-show]").forEach((b) => b.addEventListener("click", () => {
+    location.hash = b.dataset.show === "all" ? "#/conflicts?show=all" : "#/conflicts";
+  }));
+}
+
+async function conflictDetail(view, ident) {
+  const live = begin(view);
+  let c;
+  try { c = await api(`/conflicts/${enc(ident)}`); }
+  catch (e) {
+    if (!live()) return;
+    view.innerHTML = `<p class="eyebrow">Conflicts</p><h1 class="title">${esc(ident)}</h1><div class="empty">${esc(e.message)}
+      It may have closed: <a href="#/conflicts">see the open ones</a>.</div>`;
+    return;
+  }
+  if (!live()) return;
+  const label = c.accepted != null ? "Accepted conflict" : CONFLICT_KIND[c.kind] || c.kind;
+  const faceoff = c.kind !== "possible" && c.values.length <= 4
+    ? `<div class="faceoff" aria-label="The values the documents give">${c.values.map((v) =>
+      `<span class="val">${esc(valueLabel(v.value))}</span>`).join('<span class="ne" aria-hidden="true">≠</span>')}</div>` : "";
+  const card = (v) => `<section class="card value-card">
+      <h3>${c.kind === "possible" ? "One statement" : esc({ "is stated": "States it", "is negated": "Denies it" }[v.value] ?? v.value)}</h3>
+      ${v.locations.map((l) => `<div class="loc">
+        <div class="loc-src">${swatch("source")}<a class="mono" href="#/a/${enc(l.path)}">${esc(l.path)}${l.line ? `:${l.line}` : ""}</a>
+          <span class="pill ${l.scope === "current" ? "" : "scope"}">${esc(l.scope)}</span></div>
+        ${l.heading ? `<p class="muted loc-heading">${esc(heading(l.heading))}</p>` : ""}
+        <blockquote>${esc(l.evidence || l.sentence)}</blockquote>
+        <p class="loc-links">${link(l.claim_id, "Trace the claim")} · ${link(l.passage_id, "Open the passage")}</p></div>`).join("")}
+    </section>`;
+  // Which document describes another time is the reader's call: offer each one. Preselect the
+  // value stated in the fewest places (on a tie, the last), the likelier odd one out.
+  const docs = [...new Set(c.values.flatMap((v) => v.locations.map((l) => l.path)))];
+  const odd = c.values.reduce((a, v) => (v.locations.length <= a.locations.length ? v : a), c.values[0]);
+  const scopePath = odd?.locations[0]?.path || docs[0] || "docs/old/**";
+  const scopeText = (path) => `[[conflicts.scope]]\npath = "${path}"\nlabel = "release 1"        # or status = "past"`;
+  const snippet = (id, text) => `<div class="snippet"><pre id="${id}">${esc(text)}</pre>
+      <button type="button" class="pill copy" data-copy="${id}">Copy</button></div>`;
+  const affected = Object.entries(c.affected || {}).map(([k, items]) =>
+    `<p class="muted" style="margin:12px 0 6px">${esc(KIND[k] || k)} · ${fmt(items.length)}</p><div class="chips">${items.slice(0, 24).map((a) =>
+      `<a class="pill" href="#/a/${enc(a.id)}">${swatch(a.kind)} ${esc(a.title)}</a>`).join("")}${items.length > 24 ? `<span class="muted">and ${fmt(items.length - 24)} more</span>` : ""}</div>`).join("");
+  view.innerHTML = `
+    <p class="eyebrow"><span class="swatch" style="background:var(--${c.kind === "possible" ? "stale" : c.kind === "scoped" ? "muted" : "deleted"})"></span>
+      ${esc(label)} · <span class="mono">${esc(c.id)}</span> · since <a href="#/builds/${c.since_build}">build ${c.since_build}</a></p>
+    <h1 class="title">${esc(c.property)}</h1>
+    ${faceoff}
+    <p class="lede">${esc(c.reason.charAt(0).toUpperCase() + c.reason.slice(1))}.</p>
+    ${c.kind === "possible" ? '<div class="callout warn">Judged by the conflict verifier, a model, not by DAKC\'s rules. Check both statements.</div>' : ""}
+    ${c.accepted != null ? `<div class="callout">Accepted in <code>dakc.toml</code>: ${esc(c.accepted || "no reason given")}</div>` : ""}
+    <div class="values">${c.values.map(card).join("")}</div>
+    <div class="grid-2" style="margin-top:28px">
+      <section class="card"><h3>Built on these statements</h3>${affected || '<p class="muted">No page or summary uses them yet.</p>'}</section>
+      <section class="card resolve"><h3>${c.kind === "scoped" ? "Why it is not a conflict" : "Resolve it"}</h3>
+        ${c.kind === "scoped" ? `<p>The values apply to different scopes: a release, a time, an environment, or a statement that is not
+          a fact today. Nothing needs fixing. If the documents should agree, remove the scope from the text.</p>` : `
+        <p><b>Fix the text.</b> Edit either document and compile. The conflict closes when they agree.</p>
+        <p><b>A difference of time, release or environment?</b> Say so in the sentence or its heading (“Before
+          version 2”), or tell DAKC which document describes another time:</p>
+        ${docs.length > 1 ? `<div class="seg doc-pick" role="group" aria-label="Document the rule is for">${docs.slice(0, 4).map((d) =>
+          `<button type="button" data-doc="${esc(d)}" aria-pressed="${d === scopePath}">${esc(d.split("/").pop())}</button>`).join("")}</div>` : ""}
+        ${snippet("scope-snippet", scopeText(scopePath))}
+        <p><b>Keep both as they are.</b> Record that someone reviewed it:</p>
+        ${snippet("accept-snippet", `[[conflicts.accept]]\nid = "${c.id}"\nreason = "…"`)}
+        <p class="muted" style="font-size:13px;margin:10px 0 0">This UI is read-only: add these to <code>dakc.toml</code>, then compile.</p>`}
+      </section>
+    </div>`;
+  view.querySelectorAll("[data-doc]").forEach((b) => b.addEventListener("click", () => {
+    view.querySelectorAll("[data-doc]").forEach((x) => x.setAttribute("aria-pressed", String(x === b)));
+    $("#scope-snippet", view).textContent = scopeText(b.dataset.doc);
+  }));
+  view.querySelectorAll("[data-copy]").forEach((b) => b.addEventListener("click", async () => {
+    const text = $(`#${b.dataset.copy}`, view).textContent;
+    try { await navigator.clipboard.writeText(text); b.textContent = "Copied"; }
+    catch (e) { // no clipboard (an insecure origin, or permission denied): select the text instead
+      const range = document.createRange();
+      range.selectNodeContents($(`#${b.dataset.copy}`, view));
+      getSelection().removeAllRanges();
+      getSelection().addRange(range);
+      b.textContent = "Selected: press Ctrl+C";
+    }
+    setTimeout(() => { b.textContent = "Copy"; }, 2000);
+  }));
+}
+
+// Open conflicts a claim, passage, page or document is part of: a reader should know a fact is disputed.
+async function conflictNotice(exp) {
+  if (!["claim", "passage", "page", "source"].includes(exp.kind)) return "";
+  let open, claims = new Set();
+  try {
+    open = await api("/conflicts");
+    if (!open.length) return "";
+    if (exp.kind === "page") claims = new Set((await api(`/artifacts/${enc(exp.id)}/trace`)).claims.map((c) => c.claim_id));
+  } catch (e) { return ""; }
+  const hit = open.filter((c) => c.values.some((v) => v.locations.some((l) =>
+    (exp.kind === "claim" && l.claim_id === exp.id) || (exp.kind === "passage" && l.passage_id === exp.id)
+    || (exp.kind === "source" && l.path === exp.title) || (exp.kind === "page" && claims.has(l.claim_id)))));
+  if (!hit.length) return "";
+  const what = { claim: "This claim is", passage: "A claim from this passage is", page: "A claim on this page is",
+    source: "A statement in this document is" }[exp.kind];
+  return `<div class="callout conflict">${what} contradicted by another document:
+    ${hit.slice(0, 3).map((c) => `<a href="#/conflicts/${enc(c.id)}">${esc(c.property)}</a>`).join("; ")}${hit.length > 3 ? ` and ${fmt(hit.length - 3)} more` : ""}.</div>`;
+}
+
 // ------------------------------------------------------------------ shell
 function setNav(section) {
   document.querySelectorAll(".rail a").forEach((a) => {
@@ -563,6 +706,9 @@ async function refreshShell() {
     const badge = $("#changes-badge");
     badge.hidden = !changed;
     badge.textContent = changed;
+    const cb = $("#conflicts-badge");
+    cb.hidden = !st.conflicts_open;
+    cb.textContent = st.conflicts_open || "";
     document.title = `DAKC · ${name}`;
   } catch (e) { $("#ws").textContent = "workspace unavailable"; }
 }
@@ -573,7 +719,7 @@ async function route() {
   const params = new URLSearchParams(qs || "");
   const parts = path.split("/").filter(Boolean);
   const view = $("#view");
-  const section = { explore: "explore", a: "explore", changes: "changes", builds: "builds" }[parts[0]] || "overview";
+  const section = { explore: "explore", a: "explore", changes: "changes", builds: "builds", conflicts: "conflicts" }[parts[0]] || "overview";
   setNav(section);
   if (parts[0] !== "explore") window.scrollTo(0, 0); // explore re-renders while typing; keep its scroll
   try {
@@ -582,6 +728,7 @@ async function route() {
     else if (parts[0] === "a") await artifact(view, decodeURIComponent(parts.slice(1).join("/")), params);
     else if (parts[0] === "changes") await changes(view);
     else if (parts[0] === "builds") await builds(view, parts[1]);
+    else if (parts[0] === "conflicts") await conflicts(view, parts[1] ? decodeURIComponent(parts.slice(1).join("/")) : null, params);
     else view.innerHTML = `<h1 class="title">No such page.</h1><p><a href="#/">Back to the overview</a></p>`;
   } catch (e) {
     view.innerHTML = `<h1 class="title">Could not load this view.</h1><div class="empty err">${esc(e.message)}</div>`;

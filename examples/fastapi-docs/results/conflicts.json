@@ -1,6 +1,6 @@
 {
- "generated": "2026-11-23T13:44:37+00:00",
- "dakc_version": "0.5.0",
+ "generated": "2026-11-23T17:18:07+00:00",
+ "dakc_version": "0.6.0",
  "source": {
   "repo": "fastapi/fastapi",
   "commit": "05e6df7e906c3decba377c37548019973f40bf15"
@@ -203,14 +203,14 @@
   ]
  },
  "cost_seconds": {
-  "one_file_edit": 0.00033,
-  "rejudge_everything": 0.677
+  "one_file_edit": 0.00037,
+  "rejudge_everything": 0.736
  },
  "recall": {
   "negation": {
    "all": [
     150,
-    107
+    108
    ],
    "plain": [
     100,

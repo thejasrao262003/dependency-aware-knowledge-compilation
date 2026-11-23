@@ -68,9 +68,19 @@ PREDICATE_BEFORE = {"is", "be", "been", "being", "remain", "stay", "become"}
 SYNONYMS = {"mandatory": "required", "sync": "synchronous", "db": "database", "datastore": "database",
             "postgres": "postgresql", "k8s": "kubernetes", "mongo": "mongodb", "golang": "go"}
 COPULAS = {"is", "are"}
-# "used" ("is used by") and "legacy" ("legacy clients") describe things, not the time of a statement.
+# "used" ("is used by"), "legacy" ("legacy clients") and "deprecated" ("X is deprecated") describe
+# things, not the time of a statement. A heading or path that says "Deprecated" still marks a section.
 PAST_MARKERS = {"was", "were", "had", "previously", "formerly", "originally", "initially", "earlier", "until",
-                "deprecated", "former", "old"}
+                "former", "old"}
+# "X was deprecated / removed / replaced": a change whose result still holds, so the statement is current.
+_LASTING_CHANGE = re.compile(
+    r"\b(?:was|were|has been|have been)\s+(?:(?:also|then|later|eventually|fully|officially|formally|since)\s+)?"
+    r"(?:deprecated|removed|replaced|dropped|discontinued|retired|renamed|superseded|sunset|archived|disabled|deleted"
+    r"|migrated|moved|merged)\b")
+# "used to read" is past; "is used to store" is not.
+_USED_TO = re.compile(r"(?<!is )(?<!are )(?<!was )(?<!were )(?<!be )(?<!been )(?<!being )\bused to\b")
+# "may" that grants a limit is permission, not a proposal: "each tenant may send up to 500 requests".
+_PERMISSION = re.compile(r"\bmay\s+(?:not\s+)?(?:[a-z\-]+\s+){0,3}?(?:up to|at most|no more than|a maximum of|not exceed)\b")
 PROPOSED_MARKERS = {"should", "could", "may", "might", "would", "plan", "plans", "planned", "planning",
                     "propose", "proposed", "proposal", "consider", "considering", "considered",
                     "option", "optionally", "intend", "intends", "roadmap", "eventually", "future"}
@@ -234,9 +244,9 @@ def scope_of(sentence: str, heading: str, path: str, rules: list[ScopeRule] | No
         lead = s.split(",")[0].split()[:2]
         if CONDITIONAL_MARKERS & set(lead):
             status = "conditional"
-        elif PROPOSED_MARKERS & words:
+        elif PROPOSED_MARKERS & words and not (PROPOSED_MARKERS & words == {"may"} and _PERMISSION.search(s)):
             status = "proposed"
-        elif PAST_MARKERS & words:
+        elif PAST_MARKERS & set(_TOKEN.findall(_LASTING_CHANGE.sub(" ", s))) or _USED_TO.search(s):
             status = "past"
     phrases = " ".join(m.group(0) for m in _scope_phrases(s))
     time = set(_TIME.findall(" ".join(_PAREN.findall(s)) + " " + phrases))
@@ -458,7 +468,7 @@ def _judge(key: str, members: list[tuple[Parsed, str]], readable: str, why: str)
         reason = (f"{why}, and none of them is limited to a release, time or environment" if plain
                   else f"{why}, in the same scope ({'; '.join(scopes)})")
         return Finding(fid, "conflict", readable, reason, _values(members_c))
-    labels = sorted({f"{v}: {p.scope.label()}" for p, v in members})
+    labels = sorted({f"{_as_written(v, [p.occ.sentence])}: {p.scope.label()}" for p, v in members}, key=str.casefold)
     statuses = {p.scope.status for p, _ in members}
     if len({p.scope for p, _ in members}) == 1:  # one scope, but not a statement of fact
         why = f"{why}, but only in {statuses.pop()} statements"
@@ -467,7 +477,7 @@ def _judge(key: str, members: list[tuple[Parsed, str]], readable: str, why: str)
     return Finding(fid, "scoped", readable, f"{why} ({'; '.join(labels)})", _values(members))
 
 
-DETECTOR_VERSION = "conflicts/4"  # bump on any change to parsing, scope or judging: stores re-judge everything
+DETECTOR_VERSION = "conflicts/7"  # bump on any change to parsing, scope or judging: stores re-judge everything
 
 # One index row per comparable key of a claim occurrence:
 # (key, claim_id, passage_id, value, polarity, scope_json, path, heading, sentence)

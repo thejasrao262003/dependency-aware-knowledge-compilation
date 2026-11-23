@@ -196,3 +196,26 @@ def test_a_store_built_before_conflict_detection_gets_it_on_the_next_compile(tmp
         rep = kb.compile()
         assert rep.status == "committed" and len(rep.ops["conflict_found"]) == 1
         assert kb.compile().status == "noop"
+
+
+def test_the_web_ui_conflicts_view(tmp_path):
+    """What the Conflicts view, its badge and the notices on artifacts read from the server."""
+    pytest.importorskip("fastapi")
+    from fastapi.testclient import TestClient
+
+    from dakc.api import create_app
+
+    ws = workspace(tmp_path, {"database.md": DB, "architecture.md": ARCH_NO})
+    with dakc.open(ws) as kb:
+        kb.compile()
+    client = TestClient(create_app(ws), base_url="http://localhost")
+    assert 'data-nav="conflicts"' in client.get("/ui/").text and "conflictDetail" in client.get("/ui/app.js").text
+    assert client.get("/status").json()["conflicts_open"] == 1  # the badge
+    (listed,) = client.get("/conflicts").json()
+    full = client.get(f"/conflicts/{listed['id']}").json()
+    assert {loc["line"] for v in full["values"] for loc in v["locations"]} == {3, 5}
+    assert any(a["id"] == "page:postgresql" for a in full["affected"]["page"])
+    # a page's notice matches the conflict's claims against the page's trace
+    traced = {c["claim_id"] for c in client.get("/artifacts/page:postgresql/trace").json()["claims"]}
+    assert traced >= {loc["claim_id"] for v in full["values"] for loc in v["locations"]}
+    assert client.get("/conflicts/cfl:nope").status_code == 404

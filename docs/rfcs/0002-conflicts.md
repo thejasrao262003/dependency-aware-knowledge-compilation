@@ -261,6 +261,7 @@ the mock provider can count the calls and tokens a real model would cost.
 | `dakc conflicts ID`, `dakc explain cfl:…` | every value, the file and line that states it, the heading and scope, the pages and summaries built from those claims, and how to resolve it |
 | `kb.conflicts(scoped=False, accepted=False)`, `kb.conflict(id)` | `Conflict` objects (Python API) |
 | `GET /conflicts`, `GET /conflicts/{id}` | REST (`dakc serve`) |
+| The web UI (`dakc serve`) | a Conflicts view: the values side by side, each with its sentence, file and line, the pages built on them, and how to resolve it; notices on the claims, pages and documents involved |
 | MCP `conflicts` | agents are told to mention an open conflict when an answer relies on one of its claims |
 | `dakc review` and the GitHub Action | the pull-request comment lists conflicts the change introduces (expanded) and resolves |
 
@@ -317,7 +318,7 @@ The full output, including every key it lists, is in
 
   | Planted | All sentences | Plain statements |
   |---|---|---|
-  | negation ("is" → "is not", "supports" → "does not support") | 107 / 150 (71%) | 90 / 100 (90%) |
+  | negation ("is" → "is not", "supports" → "does not support") | 108 / 150 (72%) | 90 / 100 (90%) |
   | a different value for a single-valued property | 70 / 127 (55%) | 62 / 80 (78%) |
 
   "Plain statements" excludes list fragments ("Editor support (obviously)"),
@@ -328,7 +329,7 @@ The full output, including every key it lists, is in
   - **incremental compile:** the conflict step took **0.4 ms** for a
     one-file edit;
   - **re-judging all 11,067 claims** (after a change to the scope rules):
-    0.70 s.
+    0.74 s.
 
 ### Labelled pairs, written the way people write
 
@@ -342,31 +343,32 @@ labelled `contradiction`, `scoped` or `compatible`. There are two sets:
   quote.
 
 With `--provider-config`, the pairs the rules do not flag, and that a
-compile would show the verifier, are judged by that provider's verifier.
-The verifier below is gpt-5-mini. It ran twice on the held-out set: before
-and after the fixes described below.
+compile would show the verifier, are judged by that provider's verifier,
+ten pairs per call. Two models were measured on the held-out set: gpt-5-mini,
+which reasons before it answers, and gpt-4o-mini, which does not.
 
-| Held-out set (110 pairs) | rules | rules + verifier, first run | **rules + verifier, after the fixes** |
+| Held-out set (110 pairs) | contradictions caught | false alarms | output tokens per pair |
 |---|---|---|---|
-| contradictions flagged | 4 / 55 (7%) | 43 / 55 (78%) | **50 / 55 (91%)** |
-| scoped or compatible pairs flagged (false alarms) | 0 / 55 | 1 / 55 | **0 / 55** |
+| rules alone | 4 / 55 (7%) | 0 / 55 | none |
+| rules + gpt-5-mini | **52 / 55 (95%)** | **0 / 55** | about 121 |
+| rules + gpt-4o-mini | **53 / 55 (96%)** | 2 / 55 | about 25 |
 
-By kind of contradiction:
+By kind of contradiction, the verifier rows are the same for both models
+except one pair, noted below:
 
-| Kind | rules | first run | **after the fixes** |
-|---|---|---|---|
-| same wording, one word negated or changed | 4 / 5 | 5 / 5 | **5 / 5** |
-| negation in other words | 0 / 10 | 7 / 10 | **10 / 10** |
-| antonym | 0 / 10 | 10 / 10 | **10 / 10** |
-| synonym or alias | 0 / 8 | 5 / 8 | **7 / 8** |
-| the same property, worded differently | 0 / 12 | 7 / 12 | **9 / 12** |
-| implied ("uses only X" / "also writes to Y") | 0 / 10 | 9 / 10 | **9 / 10** |
+| Kind | rules | rules + verifier |
+|---|---|---|
+| same wording, one word negated or changed | 4 / 5 | 5 / 5 |
+| negation in other words | 0 / 10 | 10 / 10 |
+| antonym | 0 / 10 | 10 / 10 |
+| synonym or alias | 0 / 8 | 7 / 8 |
+| the same property, worded differently | 0 / 12 | 10 / 12 (gpt-4o-mini 11 / 12) |
+| implied ("uses only X" / "also writes to Y") | 0 / 10 | 10 / 10 |
 
-On the dev set, the first run flagged 35 of 41 (rules alone: 19), with no
-false alarm in 40 pairs; it was not run again. Results:
-`benchmarks/conflicts/results-verifier-gpt-5-mini-before-fixes.json`
-(first run), `results-verifier-gpt-5-mini.json` (after the fixes), and the
-model's verdicts with reasons in `verdicts-gpt-5-mini.json`.
+Results, and each model's verdicts with its reasons, are in
+`benchmarks/conflicts/` (`results-verifier-*.json`, `verdicts-*.json`). The
+dev set was judged once, by gpt-5-mini, before the fixes below: 35 of 41,
+with no false alarm (`results-verifier-gpt-5-mini-before-fixes.json`).
 
 What this says:
 
@@ -376,48 +378,51 @@ What this says:
   4 of 55. In the held-out set an antonym is rarely the only difference
   ("logins require two-factor authentication" against "two-factor
   authentication is optional when signing in").
-- **The verifier closes most of the gap.** The first run's 12 misses were
-  all DAKC's: 5 pairs never reached the model, because the free extractor
-  names their subject differently. DAKC's own scope reading made the
-  other 7 *scoped*:
-  - four came from two bugs: "from **Ga**teway" read as the GA release
-    marker, and "used" ("are not used by") or "legacy" ("from legacy
-    clients") marking a sentence as past;
-  - two were values read as scopes: a region, and "runs on Python 3.11";
-  - one was "was deprecated", read as past.
-- **The fixes**, then the second run:
-  - the two bugs are fixed;
-  - a product's version or a region after the verb is now a value, not a
-    scope;
-  - the verifier compares entities by name without a possessive
-    ("Ledger's" is Ledger).
-- **The 5 contradictions still missed:**
-  - **2 never reach the model:** the free extractor groups "Billing's DB"
-    and "Inventory's HTTP API" into entities of their own. An LLM
+- **With a verifier, almost everything that reaches the model is caught.**
+  - Two contradictions never reach it: the free extractor groups "Billing's
+    DB" and "Inventory's HTTP API" into entities of their own. An LLM
     extractor would not.
-  - **2 the model flagged, and DAKC's scope reading made scoped:** "each
-    tenant may send up to 500 requests" ("may" read as a proposal) and
-    "the v1 Orders API was deprecated" (read as past).
-  - **1 the model called compatible:** "requests from Gateway to Ledger
-    time out after 30 seconds" against "Gateway gives up on a Ledger call
-    after 5 seconds".
-- **The model is not fully repeatable.** The first run's false alarm ("Ledger
-  is not a stateless service" against "Ledger is a stateful service") did
-  not recur in the second run. In a compile each pair is judged once and
-  its verdict cached, so a knowledge base sees one answer per pair.
-- **What it cost:**
-  - the first run: 14 calls on both sets, 12,891 input and 15,786 output
-    tokens, about 3.5 cents at $0.25 / $2.00 per million tokens;
-  - the second: 9 calls, 8,594 and 10,645 tokens, about 2.3 cents.
+  - gpt-5-mini misses one: it called "requests from Gateway to Ledger time
+    out after 30 seconds" and "Gateway gives up on a Ledger call after 5
+    seconds" compatible.
+  - gpt-4o-mini's two false alarms: it read a connect timeout and a response
+    timeout as one property, and missed that "Ledger 2.0 uses PostgreSQL"
+    and "Ledger 3.0 moves the primary database to CockroachDB" are two
+    releases.
+- **A model that does not reason is good enough, and much cheaper.** gpt-4o-mini
+  catches as much, with two false alarms in 55, and writes a fifth of the
+  output tokens. Findings are advisory and labelled `possible`, so it is a
+  reasonable default; gpt-5-mini is the choice when false alarms cost more
+  than tokens.
+- **How the numbers got here.** The first run (gpt-5-mini, 43 of 55, one
+  false alarm) missed 12. Reading those misses showed that most were
+  DAKC's, not the model's, and led to these fixes, each general rather
+  than a word from the set:
+  - two scope-reading bugs: "from **Ga**teway" read as the GA release
+    marker, and "used" or "legacy" in a sentence marking it as past;
+  - a product's version or a region after the verb ("runs on Python
+    3.11", "lives in the eu-west-1 region") is a value, not a scope;
+  - "deprecated", and a lasting change ("was removed", "was replaced"),
+    describe the present, not the past;
+  - "may" that grants a limit ("each tenant may send up to 500 requests")
+    is permission, not a proposal;
+  - the verifier compares entities by name without a possessive
+    ("Ledger's" is Ledger);
+  - "used to read" is past again, after the "used" fix had broken it.
 
-  gpt-5-mini's reasoning makes the output about 120 tokens per pair, ten
-  times what a short answer needs.
-- **Two caveats.** Both sets are small, and the held-out set was written by
-  a model from a brief, not taken from real documentation. Read the
-  percentages as indicative. The fixes were found by reading the held-out
-  misses, so the second run is no longer fully held out. Each fix is
-  general (a bug, or a class of value), and none adds wording from the set.
-  A stemming bug ("retries" against "retry") was found the same way.
+  The rules' stemming bug ("retries" against "retry") was found the same
+  way. Because of all this, **the held-out set is no longer held out**: its
+  numbers are now an optimistic estimate. A fresh set, from real
+  documentation, is the next measurement.
+- **Caveats.** The sets are small, and were written by a model from a
+  brief. The models are not fully repeatable: gpt-5-mini's one false alarm
+  in the first run did not recur in the second. In a compile each pair is
+  judged once and its verdict cached, so a knowledge base sees one answer
+  per pair.
+- **What the runs cost:** gpt-5-mini, 23 calls over two runs, about 5.8
+  cents at $0.25 / $2.00 per million tokens; gpt-4o-mini, 9 calls, 8,612
+  input and 2,192 output tokens, about a quarter of a cent at $0.15 / $0.60.
+  Re-scoring after the fixes used the saved verdicts and cost nothing.
 
 `--verdicts verdicts.json` keeps the model's verdicts, so evaluating again
 after a change to DAKC's rules or scope reading costs nothing.
@@ -428,19 +433,19 @@ after a change to DAKC's rules or scope reading costs nothing.
 verifier on and unbounded, then keeps it on through the last 50 commits
 that changed them. It counts the pairs and calls a compile makes, with the
 mock provider, and prices the pairs at the token rates measured above
-(about 101 input and 124 output tokens per pair, at $0.25 / $2.00 per
-million). Results are in
+(gpt-5-mini: about 101 input and 124 output tokens per pair, at $0.25 /
+$2.00 per million; gpt-4o-mini: about 98 and 25, at $0.15 / $0.60, with
+`--price 0.15:0.60 --tokens-per-pair 98:25`). Results are in
 [examples/fastapi-docs/results/verifier-volume.md](../../examples/fastapi-docs/results/verifier-volume.md).
 
 | | Pairs judged | Model calls | Cost at measured rates |
 |---|---:|---:|---:|
-| Turning the verifier on (11,067 claims) | 23,280 | 2,328 | about $6.36, once |
-| Keeping it on through 50 commits | 291 | 58 | about $0.08 in all |
+| Turning the verifier on (11,067 claims) | 23,280 | 2,328 | gpt-5-mini about $6.36, gpt-4o-mini about $0.69, once |
+| Keeping it on through 50 commits | 291 | 58 | gpt-5-mini about 8 cents, gpt-4o-mini under 1 cent, in all |
 
 - 10 of the 50 commits needed no call, and the busiest judged 90 pairs.
-- Output is most of the cost. A model that does not reason writes a short
-  answer and would cost a fraction of this, but its quality is not
-  measured.
+- Output is most of a reasoning model's cost. gpt-4o-mini writes short
+  answers and costs about a ninth as much, with the quality measured above.
 - With the default `max_checks = 500`, turning the verifier on is spread
   over many compiles. To check a whole knowledge base in one go, raise
   `max_checks` for one compile; `--dry-run` shows the calls first.
@@ -462,15 +467,14 @@ million). Results are in
   inside one document is left to the rules.
 - **Scope must be written down, and is read literally.** It is read from
   the sentence, its heading and its path. "As of this release", three
-  paragraphs up, is not seen. Some words mislead it, and each makes a real
-  contradiction *scoped*:
-  - "was deprecated" is read as past, though the deprecation still holds;
-  - "may" is read as a proposal, also when it grants permission ("each
-    tenant may send up to 500 requests");
-  - a version or region in a leading phrase is a scope ("In eu-west-1, …"),
+  paragraphs up, is not seen. Versions are read by position:
+  - in a leading phrase a version or region is a scope ("In eu-west-1, …"),
     and after the verb a value ("lives in eu-west-1"). Only "on", "with"
-    and "for" make a version a value: "available in PostgreSQL 9.4" is
-    still read as a release.
+    and "for" make a version a value, so "available in PostgreSQL 9.4" is
+    still read as a release, and a real contradiction can come out
+    *scoped*;
+  - a version in the subject ("Ledger 2.0 uses PostgreSQL") is not read as
+    a release, so two releases can come out as a conflict.
 - **What the extractor records limits recall.** The free heuristic
   extractor needs a capitalised name in a sentence. An LLM extractor
   records more claims, and normalizes their wording, which helps matching.
@@ -480,15 +484,14 @@ million). Results are in
 
 ## Next
 
-1. **Measure a model that does not reason**, for a cheaper verifier, and
-   build a held-out set from real documentation.
+1. **A fresh held-out set from real documentation.** The current one has
+   been read to fix DAKC, so its numbers are optimistic.
 2. **A local NLI model as a second verifier**, behind the same
    `verifier` setting: free and deterministic, weaker on implied
    contradictions.
-3. **Tense and modality:** "was deprecated" and "may send" should not
-   change a statement's scope.
+3. **Versions in the subject:** "Ledger 2.0 uses …" against "Ledger 3.0
+   …" are two releases.
 4. **Declared functional properties:**
    `[conflicts] single_valued = ["on-call team", "owner"]`.
 5. **An opt-in page marker.** Pages would stay unchanged by default, so
    detection stays advisory.
-6. **A conflicts view in the web UI.**

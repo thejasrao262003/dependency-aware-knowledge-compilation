@@ -240,3 +240,19 @@ def test_two_runtimes_are_a_conflict_not_two_releases():
     found = detect(occurrences(("a.md", "A", "Catalog runs on Python 3.11."), "a")
                    + occurrences(("b.md", "B", "Catalog does not run on Python 3.11."), "b"))
     assert [f.kind for f in found.values()] == ["conflict"]
+
+
+@pytest.mark.parametrize("sentence,heading,label", [
+    ("The v1 Orders API was deprecated.", "Overview", "current"),  # the deprecation still holds
+    ("Gateway is deprecated.", "Overview", "current"),
+    ("The Billing API has been removed.", "Overview", "current"),
+    ("MongoDB was the database.", "Overview", "past"),  # a state that no longer holds
+    ("Gateway accepts XML.", "Deprecated APIs", "past"),  # a heading still marks its section
+    ("Each tenant may send up to 500 requests per second to the Ledger API.", "Overview", "current"),  # permission
+    ("Clients may not exceed 100 connections.", "Overview", "current"),
+    ("Ledger may move to CockroachDB.", "Overview", "proposed"),  # possibility
+    ("The Reporting service used to read from the Ledger database.", "Overview", "past"),
+    ("Redis is used to store sessions.", "Overview", "current"),
+])
+def test_tense_and_modality(sentence, heading, label):
+    assert scope_of(sentence, heading, "b.md").label() == label

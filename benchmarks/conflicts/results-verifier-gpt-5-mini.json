@@ -3,7 +3,7 @@
   "pairs": 110,
   "verifier": "llm-verifier/1:hosted-agent:gpt-5-mini:t0.0:d2c7836c6e",
   "recall": [
-   50,
+   52,
    55
   ],
   "false_flags": [
@@ -11,8 +11,8 @@
    55
   ],
   "precision": [
-   50,
-   50
+   52,
+   52
   ],
   "contradictions_rules_or_verifier_can_see": [
    53,
@@ -59,7 +59,7 @@
     "label": "contradiction",
     "category": "implied",
     "n": 10,
-    "flagged": 9
+    "flagged": 10
    },
    {
     "label": "contradiction",
@@ -83,7 +83,7 @@
     "label": "contradiction",
     "category": "value in other words",
     "n": 12,
-    "flagged": 9
+    "flagged": 10
    },
    {
     "label": "scoped",
@@ -527,7 +527,7 @@
     "id": "t037",
     "label": "contradiction",
     "category": "value in other words",
-    "verdict": "scoped",
+    "verdict": "conflict",
     "extracted": true,
     "reaches_verifier": true,
     "model": [
@@ -655,7 +655,7 @@
     "id": "t048",
     "label": "contradiction",
     "category": "implied",
-    "verdict": "scoped",
+    "verdict": "conflict",
     "extracted": true,
     "reaches_verifier": true,
     "model": [

@@ -106,3 +106,47 @@ def test_markdown_table_rows_keep_their_column_headers():
     ]
     assert all(b.heading == "Grid" for b in rows)
     assert not any("|" in b.text for b in blocks)
+
+
+# A session note as Reckon writes it: YAML front matter, then sentences that end with
+# HTML-comment receipts (a turn reference, or a source reference with its turn).
+RECKON_NOTE = b"""---
+session: 3f9a12c4
+date: 2026-03-01
+tags: [auth, redis]
+---
+# Session 3
+
+- The refresh endpoint takes a per-user Redis lock with a 5-second TTL. <!-- t:3f9a12c4 -->
+- Use Argon2 for password hashing. <!-- rs_01JDQ8X4Z7K3M9P2Q5R8S1T4V6#t:3f9a12c4 -->
+
+Redis holds sessions. <!-- t:aa11 --> Postgres holds users. <!-- t:bb22 -->
+"""
+
+
+def _without_comments_or_front_matter(md: bytes) -> bytes:
+    import re
+
+    return re.sub(rb" ?<!--.*?-->", b"", md.split(b"---\n", 2)[2])
+
+
+def test_turn_reference_comments_and_front_matter_never_reach_passages_or_claims():
+    from dakc.claims import heuristic_extract, segment
+
+    doc = parse_bytes(RECKON_NOTE, "markdown")
+    passages = segment("src:s", doc)
+    assert [p.text for p in passages] == [
+        "The refresh endpoint takes a per-user Redis lock with a 5-second TTL.",
+        "Use Argon2 for password hashing.",
+        "Redis holds sessions. Postgres holds users.",
+    ]
+    claims = [c for p in passages for c in heuristic_extract(p.text)]
+    assert claims
+    leaked = ("<!--", "-->", "3f9a12c4", "rs_01", "aa11", "session:", "date:", "tags:", "2026-03-01")
+    for text in [b.text for b in doc.blocks] + [c.text for c in claims] + [m for c in claims for m in c.mentions]:
+        assert not any(x in text for x in leaked), text
+    # The comments and the front matter change no text: same blocks, same hashes, as the plain document.
+    plain = parse_bytes(_without_comments_or_front_matter(RECKON_NOTE), "markdown")
+    assert [(b.kind, b.text, b.heading) for b in plain.blocks] == [(b.kind, b.text, b.heading) for b in doc.blocks]
+    assert plain.text_hash == doc.text_hash
+    assert parse_bytes(RECKON_NOTE.replace(b"\n", b"\r\n"), "markdown").text_hash == doc.text_hash

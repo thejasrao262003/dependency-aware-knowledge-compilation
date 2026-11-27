@@ -8,12 +8,17 @@ import os
 from pathlib import Path
 
 import pytest
+from typer.testing import CliRunner
 
 import dakc
+from dakc.cli import app
 from dakc.compiler import projection
 from dakc.compiler.projection import MANIFEST, sync_projection
 
 from tests.conftest import POSTGRES_DOCS, write_files
+
+runner = CliRunner()
+
 
 @pytest.fixture
 def kb(tmp_path):
@@ -225,6 +230,33 @@ def test_verify_reports_drift_without_repairing(kb):
     assert page.read_text(encoding="utf-8") == "tampered\n" and not (kb.output_root / "pages" / "redis.md").exists()
     kb.compile()
     assert kb.verify().ok and "wiki_files_drifted" not in kb.verify().metrics
+
+
+def test_cli_reports_repairs_in_text_json_and_on_failure(kb):
+    ws = str(kb.root)
+    (kb.output_root / "pages" / "jsonb.md").write_text("tampered\n", encoding="utf-8")
+    r = runner.invoke(app, ["compile", "-w", ws, "--json"])
+    assert r.exit_code == 0, r.output
+    p = json.loads(r.output)["projection"]
+    assert p["repaired"] == 1 and p["repaired_paths"] == ["pages/jsonb.md"] and p["written"] == 0
+
+    (kb.output_root / "pages" / "redis.md").unlink()
+    r = runner.invoke(app, ["compile", "-w", ws])
+    assert r.exit_code == 0, r.output
+    assert "repaired: 1" in r.output and "repaired pages/redis.md" in r.output
+
+    v = runner.invoke(app, ["verify", "-w", ws])
+    assert v.exit_code == 0 and "PASS  wiki files match the store" in v.output
+    (kb.output_root / "index.md").write_text("tampered\n", encoding="utf-8")
+    v = runner.invoke(app, ["verify", "-w", ws])
+    assert v.exit_code == 1 and "FAIL  wiki files match the store" in v.output and "index.md" in v.output
+    assert (kb.output_root / "index.md").read_text(encoding="utf-8") == "tampered\n"  # verify does not repair
+
+    write_files(kb.source_root, {"databases/new.md": "CockroachDB extends PostgreSQL.\n"})
+    r = runner.invoke(app, ["compile", "-w", ws, "--fault", "commit:2"])
+    assert r.exit_code == 1 and "previous valid compilation preserved: yes" in r.output
+    assert "repaired: 1" in r.output and "repaired index.md" in r.output
+    assert runner.invoke(app, ["verify", "-w", ws]).exit_code == 0
 
 
 def test_report_dict_caps_the_path_list_but_not_the_count(kb):

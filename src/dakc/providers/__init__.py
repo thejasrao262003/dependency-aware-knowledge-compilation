@@ -10,6 +10,10 @@ estimated tokens. Used by the benchmark to model LLM cost.
 variable and default model of each preset in :data:`PRESETS`. Anything set in
 ``[provider.<name>]`` overrides the preset.
 ``custom``: bring your own client.
+
+:func:`make_provider` builds the bundle a compile uses; :func:`make_client` builds just the
+model client underneath it, for code that wants to call the same model DAKC is
+configured with. Both take the options of ``[provider.<name>]``.
 """
 
 from __future__ import annotations
@@ -24,15 +28,26 @@ from dakc.providers.base import (
     ProviderBundle,
 )
 from dakc.providers.deterministic import HeuristicExtractor, TemplatePageWriter, TemplateSummarizer
-from dakc.providers.llm import LLMExtractor, LLMPageWriter, LLMSummarizer, OpenAICompatibleClient, ProviderError
+from dakc.providers.llm import (
+    Completion,
+    LLMClient,
+    LLMExtractor,
+    LLMPageWriter,
+    LLMSummarizer,
+    OpenAICompatibleClient,
+    ProviderError,
+)
 
 __all__ = [
     "ClaimView",
+    "Completion",
     "ExtractResult",
     "GenResult",
+    "LLMClient",
     "PageLead",
     "ProviderBundle",
     "ProviderError",
+    "make_client",
     "make_provider",
     "compatible_client",
     "PROVIDERS",
@@ -72,7 +87,14 @@ PRESETS: dict[str, dict[str, Any]] = {
 _COMPATIBLE = dict(model="llama3.1", json_mode="none", temperature=0.0, seed=0, max_tokens=4096, token_param="max_tokens",
                    require_key=False)
 ALIASES = {"claude": "anthropic", "xai": "grok", "google": "gemini", "lm-studio": "lmstudio"}
-PROVIDERS = ("heuristic", "mock", "claude-code", "anthropic", *PRESETS, "custom")
+_DETERMINISTIC = ("heuristic", "mock")
+_WITH_CLIENT = ("claude-code", "anthropic", *PRESETS, "custom")  # the providers make_client builds
+PROVIDERS = (*_DETERMINISTIC, *_WITH_CLIENT)
+
+
+def _choices(names: tuple[str, ...]) -> str:
+    aliases = ", ".join(f"{a} ({c})" for a, c in ALIASES.items() if c in names)
+    return f"choose one of {', '.join(names)}" + (f"; or an alias: {aliases}" if aliases else "")
 
 
 def compatible_client(name: str, options: dict[str, Any]) -> OpenAICompatibleClient:
@@ -88,29 +110,53 @@ def compatible_client(name: str, options: dict[str, Any]) -> OpenAICompatibleCli
     return OpenAICompatibleClient(name="openai-compat" if name == "openai" else name, **opts)
 
 
-def make_provider(name: str, options: dict[str, Any] | None = None) -> ProviderBundle:
+def make_client(name: str, options: dict[str, Any] | None = None) -> LLMClient:
+    """The model client of provider ``name``, configured by ``options``: the keys of its
+    ``[provider.<name>]`` table in ``dakc.toml``, with the same names and defaults.
+
+    This is the client a compile with that configuration uses, so its ``fingerprint``
+    is the one DAKC records. Call ``client.complete(system, user, json_schema=None)``
+    to get a :class:`Completion`. Failures raise :class:`ProviderError`, whose
+    ``transient`` says whether asking again later may succeed. Calls made this way are
+    not cached or counted by DAKC.
+
+    ``name`` is one of ``claude-code``, ``anthropic``, an OpenAI-compatible preset in
+    :data:`PRESETS`, ``custom``, or an alias in :data:`ALIASES`. ``heuristic`` and
+    ``mock`` have no model client. For ``custom``, ``path`` is used as given; a
+    workspace resolves it relative to itself first.
+    """
     options = dict(options or {})
+    canonical = ALIASES.get(name, name)
+    if canonical in PRESETS:
+        return compatible_client(canonical, options)
+    if canonical == "claude-code":
+        from dakc.providers.claude_code import ClaudeCodeClient
+
+        return ClaudeCodeClient(**options)
+    if canonical == "anthropic":
+        from dakc.providers.anthropic_provider import AnthropicClient
+
+        return AnthropicClient(**options)
+    if canonical == "custom":
+        return load_custom_client(options)
+    if canonical in _DETERMINISTIC:
+        raise ProviderError(f"provider {name!r} is deterministic and has no model client; {_choices(_WITH_CLIENT)}")
+    raise ProviderError(f"unknown provider {name!r}; {_choices(_WITH_CLIENT)}")
+
+
+def make_provider(name: str, options: dict[str, Any] | None = None) -> ProviderBundle:
+    """The extractor, page writer, summarizer and conflict verifier of provider ``name``.
+    LLM providers share one client, built by :func:`make_client` from ``options``."""
     name = ALIASES.get(name, name)
     from dakc.conflicts.verifier import HeuristicVerifier, LLMVerifier
 
-    if name in ("heuristic", "mock"):
+    if name in _DETERMINISTIC:
         as_llm = name == "mock"
         return ProviderBundle(name, HeuristicExtractor(as_llm), TemplatePageWriter(as_llm), TemplateSummarizer(as_llm),
                               verifier=HeuristicVerifier(as_llm))
-    if name in PRESETS:
-        client = compatible_client(name, options)
-    elif name == "claude-code":
-        from dakc.providers.claude_code import ClaudeCodeClient
-
-        client = ClaudeCodeClient(**options)
-    elif name == "anthropic":
-        from dakc.providers.anthropic_provider import AnthropicClient
-
-        client = AnthropicClient(**options)
-    elif name == "custom":
-        client = load_custom_client(options)
-    else:
-        raise ProviderError(f"unknown provider {name!r}; choose one of {', '.join(PROVIDERS)}")
+    if name not in _WITH_CLIENT:
+        raise ProviderError(f"unknown provider {name!r}; {_choices(PROVIDERS)}")
+    client = make_client(name, options)
     return ProviderBundle(name, LLMExtractor(client), LLMPageWriter(client), LLMSummarizer(client),
                           verifier=LLMVerifier(client))
 

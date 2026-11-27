@@ -2,7 +2,9 @@
 
 Install with ``pip install 'dakc[anthropic]'``. Credentials are resolved by the
 SDK (``ANTHROPIC_API_KEY``, ``ANTHROPIC_AUTH_TOKEN`` or an ``ant auth login``
-profile).
+profile), unless ``api_key_env`` names another environment variable that is set:
+then its value is the API key. The key is passed to the SDK and never stored,
+logged or put in an error message.
 
 Notes for current models:
 * ``temperature`` is not sent: it is rejected on current models and API
@@ -15,6 +17,8 @@ Notes for current models:
 """
 
 from __future__ import annotations
+
+import os
 
 from dakc.providers.llm import Completion, ProviderError
 
@@ -32,13 +36,16 @@ class AnthropicClient:
         max_tokens: int = 16000,
         fallbacks: bool = True,
         client: object | None = None,  # injection seam for tests
+        api_key_env: str | None = None,  # last, so positional calls of 0.7 keep their meaning
     ):
         if client is None:
             try:
                 import anthropic
             except ImportError as exc:  # pragma: no cover - depends on optional extra
                 raise ProviderError("the Claude provider needs the 'anthropic' extra: pip install 'dakc[anthropic]'") from exc
-            client = anthropic.Anthropic()
+            key = os.environ.get(api_key_env, "") if api_key_env else ""
+            # unset or empty: the SDK's own resolution, exactly as without api_key_env
+            client = anthropic.Anthropic(api_key=key) if key else anthropic.Anthropic()
         self.client = client
         self.model = model
         self.effort = effort

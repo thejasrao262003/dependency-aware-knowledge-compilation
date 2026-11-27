@@ -21,7 +21,7 @@ from dakc import kb as api
 from dakc.artifacts import LAYER
 from dakc.compiler import STRATEGIES
 from dakc.errors import BuildLocked, CompileFailed, CostNotAllowed, DakcError
-from dakc.invalidation import render
+from dakc.invalidation import projection_lines, render
 from dakc.kb import KnowledgeBase
 from dakc.workspace import CONFIG_NAME, Workspace
 
@@ -57,6 +57,9 @@ def _errors() -> Iterator[None]:
     except CompileFailed as exc:
         err.print(f"[red]compilation failed:[/red] {exc}")
         err.print(f"previous valid compilation preserved: {'yes' if exc.preserved else '[red]NO[/red]'} (HEAD = build {exc.head})")
+        if exc.projection and exc.projection.get("repaired"):
+            for line in projection_lines(exc.projection):
+                err.print(line, markup=False, highlight=False)
         raise typer.Exit(1) from exc
     except BuildLocked as exc:
         err.print(f"[red]error:[/red] {exc}")
@@ -611,8 +614,9 @@ def rollback_cmd(
     """Restore the knowledge base to an earlier committed build (sources are untouched)."""
     with _open(workspace) as kb:
         r = kb.rollback(to, wait=wait)
-    console.print(f"Restored state of build {r.restored_build} as build {r.new_build}. "
-                  f"Wiki files written: {r.projection['written']}, deleted: {r.projection['deleted']}.")
+    console.print(f"Restored state of build {r.restored_build} as build {r.new_build}.")
+    for line in projection_lines(r.projection):
+        console.print(line, markup=False, highlight=False)
     _print_publications(r.publications)
     console.print("Note: sources on disk are unchanged; `dakc status` shows what differs from them.")
 

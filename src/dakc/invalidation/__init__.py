@@ -88,10 +88,20 @@ def render(report: BuildReport) -> str:
                 f"Artifact versions written: {ch.get('artifact_versions_written', 0)}, deleted: {ch.get('artifacts_deleted', 0)}"
             )
         if report.projection:
-            p = report.projection
-            lines.append(f"Wiki files written: {p.get('written', 0)}, deleted: {p.get('deleted', 0)}")
+            lines += projection_lines(report.projection)
     for note in report.notes:
         lines.append(f"note: {note}")
     if report.dry_run:
         lines += ["", "No files modified."]
     return "\n".join(lines)
+
+
+def projection_lines(p: dict, limit: int = 10) -> list[str]:
+    """The wiki file operations of a compile or rollback, naming the repaired files."""
+    lines = [f"Wiki files written: {p.get('written', 0)}, deleted: {p.get('deleted', 0)}"
+             + (f", repaired: {p['repaired']} (edited or deleted by hand; restored from the store)" if p.get("repaired") else "")]
+    paths = p.get("repaired_paths", [])
+    lines += [f"  repaired {rel}" for rel in paths[:limit]]
+    if len(paths) > limit:
+        lines.append(f"  … {len(paths) - limit} more")
+    return lines

@@ -78,7 +78,7 @@ rule is the *verifying trace* from build systems:
 |---|---|---|
 | passage | — (deterministic segmentation) | — |
 | claim (extraction) | H(extractor fp, passage text hash); each passage records the fp that produced its claims (`extracted_by`), and a passage whose fp differs from the current extractor is re-extracted even if its text is unchanged | — |
-| page | H(writer fp, entity display name, [(claim id, claim content hash)], related entity names) | H(gen sig, [(claim id, [source paths])]) |
+| page | H(writer fp, entity display name, [(claim id, claim content hash)] of its *current* claims, related entity names) | H(gen sig, [(claim id, [source paths])], the History list: [(claim id, text)]) |
 | summary | H(summarizer fp, topic, [(page id, title, lead hash)]) | — |
 | index | — | H([(id, title)] of pages and summaries) |
 
@@ -89,6 +89,55 @@ A page has two signatures because its *body* comes from the LLM, but its
 - Only provenance changes (a duplicate source added, a supporting source
   deleted or renamed): the stored body is reused and only the Sources section
   is re-rendered, with **zero** LLM calls.
+
+## History: claims that only past documents state
+
+A `[[conflicts.scope]]` rule can declare what a folder describes, for example
+`path = "sessions/**"` with `status = "past"` (RFC 0002). A claim whose
+**every** supporting document a rule declares past is history. Its page lists
+it in a deterministic `## History` section after the body, and the page writer
+never sees it. A claim with any other support is current.
+
+- **A reversal.** "… is Bcrypt" only in a March session note, and "… is
+  Argon2" in `current/auth.md`: the page shows Argon2 among its facts and
+  Bcrypt under History, each with its citation.
+- **Order and numbering.** History lists claims by their earliest supporting
+  path, so notes named by date read in order. Its citations continue the
+  page's numbering: `[^C1]`..`[^Cn]` are the current claims, then History's.
+- **A page whose every claim is history** gets a one-sentence deterministic
+  body and no writer call.
+
+**Only a declared status counts.** RFC 0002 also infers scope from a
+sentence's tense and from its heading and path ("was", "Previous tools",
+`archive/`). That reading is tuned for conflicts, where a wrong "past" only
+turns a finding into a scoped one. On a page it would hide a current fact. On
+FastAPI's documentation (commit `b0a616d9`, mock provider) it would move 7,576
+of 11,065 claims (68%) to History, on 1,647 of 2,336 pages, including "Falcon
+is another high performance Python framework" (under "Previous tools") and
+"FastAPI has a great future ahead" (under "History, Design and Future").
+Rendering therefore reads the rules alone (`dakc.conflicts.rule_status`).
+
+**Invalidation.** Whether a claim is history depends on the paths of all the
+documents that support it, and on the rules. Both are inputs of its pages:
+
+- **In the signatures.** The generation signature covers the current claims
+  only. The render signature covers the History list (claim ids and texts)
+  and every claim's citations. A claim that moves between current and history
+  therefore changes the signatures of exactly the pages that show it: the
+  body is regenerated, because the writer's input changed, and the History
+  section is re-rendered by code.
+- **Supports.** The set of documents behind a claim changes only when the
+  claim is touched, or when a source is renamed or deleted. Each of these
+  already makes the claim's pages candidates.
+- **Rules.** The part of `[[conflicts.scope]]` that rendering reads (each
+  rule's pattern and status, in order) is in the config fingerprint. A change
+  re-checks every page and rebuilds only those whose signatures changed.
+  Labels are not in it, because they do not affect pages, and a workspace
+  with no status rule keeps the fingerprint it had.
+- **Version.** `versions.RENDER = "render/2"` records the change. A page with
+  no history claims renders byte for byte as before, so an upgrade re-renders
+  every page with no provider call. Pages that gain a History section
+  regenerate their bodies.
 
 ## Early cutoff
 
@@ -247,8 +296,8 @@ benchmark tests it.
 
   A store whose history predates versioning is treated as outdated in every
   layer.
-- **Configuration** (entity aliases, provenance mode) is part of the config
-  fingerprint.
+- **Configuration** (entity aliases, provenance mode, the status of
+  `[[conflicts.scope]]` rules) is part of the config fingerprint.
 
 ## Provenance
 

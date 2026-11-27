@@ -629,7 +629,8 @@ class KnowledgeBase:
                     out.append(f"{label} logic changed ({stored.get(key) or 'none'} -> {current[key]})")
         cfg = store.get_meta("config_fingerprint")
         if cfg and cfg != self.workspace.config.fingerprint:
-            out.append("configuration changed (entity aliases, entity resolution or provenance mode)")
+            out.append("configuration changed (entity aliases, entity resolution, provenance mode or the status of "
+                       "[[conflicts.scope]] rules)")
         from dakc.conflicts import fingerprint as conflicts_fingerprint
 
         from dakc.links import LINKS_VERSION
@@ -956,7 +957,7 @@ class KnowledgeBase:
                 raise CostNotAllowed("a full-rebuild comparison with an LLM provider re-pays every call; pass allow_cost=True")
             ws = self.workspace
             equal, detail = verify_against_full(self.store, ws.source_set(), bundle, ws.config.alias_map, ws.excluded,
-                                                ws.config.provenance, ws.config.fingerprint)
+                                                ws.config.provenance, ws.config.fingerprint, ws.config.conflict_rules)
             out.equal_to_full_rebuild = equal
             out.full_rebuild_diff = detail
             out.ok = out.ok and equal

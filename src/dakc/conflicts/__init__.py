@@ -234,6 +234,25 @@ class ScopeRule:
         return _PLACEHOLDER.sub(lambda m: values[m.group(1)], self.label)
 
 
+def rule_status(path: str, rules: list[ScopeRule] | None) -> str | None:
+    """The status the ``[[conflicts.scope]]`` rules declare for the document at ``path``, or
+    None when no rule with a status matches. The last matching rule wins, as in :func:`scope_of`.
+
+    Page rendering reads this, and only this, to put claims under History: a declared status,
+    not one inferred from a sentence's tense or a heading (see ``docs/dependency-model.md``)."""
+    status = None
+    for r in rules or ():
+        if r.status and r.applies(path):
+            status = r.status
+    return status
+
+
+def status_rules(rules: list[ScopeRule] | None) -> list[tuple[str, str]]:
+    """The part of the rules that :func:`rule_status` reads, in order: what the configuration
+    fingerprint must cover for pages to follow a change of declared status."""
+    return [(r.pattern, r.status) for r in rules or () if r.status]
+
+
 def _stem(tok: str) -> str:
     if len(tok) > 4 and tok.endswith("ies"):
         return tok[:-3] + "y"  # retries -> retry, policies -> policy

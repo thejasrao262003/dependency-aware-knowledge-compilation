@@ -126,15 +126,18 @@ def verify_store(store: Store, output_root: Path | None = None, state_dir: Path 
 
 
 def verify_against_full(store: Store, source_root: Path | SourceSet, provider, aliases: dict[str, str], exclude: tuple[Path, ...] = (),
-                        provenance: str = "report", config_fingerprint: str = "") -> tuple[bool, dict]:
-    """Rebuild from scratch into a temporary store and compare canonical states."""
+                        provenance: str = "report", config_fingerprint: str = "",
+                        conflict_rules: list | None = None) -> tuple[bool, dict]:
+    """Rebuild from scratch into a temporary store and compare canonical states. ``conflict_rules``
+    are the workspace's ``[[conflicts.scope]]`` rules: the status they declare decides which
+    claims pages list under History, so the reference build must read them too."""
     from dakc.compiler import Compiler
 
     with tempfile.TemporaryDirectory(prefix="dakc-verify-") as tmp:
         ref_store = Store(Path(tmp) / "full.db")
         try:
             Compiler(ref_store, provider, source_root, aliases=aliases, strategy="full", exclude=exclude,
-                     provenance=provenance, config_fingerprint=config_fingerprint).run()
+                     provenance=provenance, config_fingerprint=config_fingerprint, conflict_rules=conflict_rules).run()
             ref, cand = canonical_state(ref_store), canonical_state(store)
         finally:
             ref_store.close()

@@ -237,6 +237,21 @@ Detection never changes a claim, a page or a signature. It is not part of
 the canonical state, so it cannot affect `verify --against-full` or the
 benchmark.
 
+### Past-scoped claims on pages
+
+The status a `[[conflicts.scope]]` rule declares is also read by page
+rendering, which is separate from detection. A claim whose every supporting
+document a rule declares past is listed under a deterministic `## History`
+section of its page, not among its current facts. With the session-notes rule
+above, Bcrypt (stated only in a March note) is History on the Auth page and
+Argon2 (stated in `current/auth.md`) is current. The finding between them
+stays *scoped*.
+
+Only declared status moves a claim. Scope inferred from a sentence, heading or
+path stays a conflict-detection matter: it is tuned so that a wrong "past"
+costs a finding, not a fact on a page. Design, invalidation and measurements:
+"History" in [docs/dependency-model.md](../dependency-model.md) and ADR-29.
+
 ### The verifier (optional)
 
 The rules compare statements of the same shape. "Ledger is written in Go"

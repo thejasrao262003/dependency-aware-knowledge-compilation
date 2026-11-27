@@ -508,6 +508,57 @@ details, so they should not be inside it.
   claims, pages and summaries, which is a compiler concern (RFC 0001,
   phase 3).
 
+## ADR-29: Claims that only past documents state are rendered as History
+
+**Decision.** A claim whose every supporting document a `[[conflicts.scope]]`
+rule declares `status = "past"` is listed in a deterministic `## History`
+section of each page that shows it, after the body, with its citation. The
+page writer is given the current claims only. Any current support makes a
+claim current. A page whose every claim is history gets a one-sentence
+deterministic body and no writer call.
+
+- **Declared status only.** History follows the rules (`rule_status`), not
+  the scope RFC 0002 infers from tense, headings and paths.
+- **Signatures.** The generation signature covers the current claims, the
+  render signature the History list. The status part of the rules (pattern
+  and status, in order) is in the config fingerprint, added only when some
+  rule has a status.
+- **Version.** `RENDER` goes to `render/2`. `PAGE` is unchanged, since
+  bumping it would rewrite every hub section.
+
+**Why.** Session notes (one per working session, under `sessions/`) record
+decisions that later notes or current documents reverse. Showing "the
+password hashing algorithm is Bcrypt" beside "… is Argon2" as two current
+facts is wrong, and dropping the old one loses history the notes exist to
+keep. The scope rules already say which documents describe the past (RFC
+0002), so pages can follow them.
+
+- **Why not inferred scope.** Inference is tuned for conflicts: a wrong
+  "past" only turns a finding into a scoped one. On FastAPI's documentation
+  it would have moved 68% of the claims to History, on 70% of the pages,
+  including present-tense facts under headings such as "Previous tools".
+  A declared status is explicit, reviewable, and changes nothing for a
+  workspace without one.
+- **Why the writer does not see history claims.** Given the old value as a
+  fact, a model writes it as one. Filtering its sentences afterwards (as
+  strict provenance does) cannot fix a sentence that merges both values.
+- **Why it is in the signatures.** Whether a claim is history depends on
+  the paths of all its supporting documents and on the rules, so it is a
+  page input. With the split in both signatures and the rules in the config
+  fingerprint, a claim that moves rebuilds exactly the pages that show it,
+  and a randomized test (moves across the boundary, rule changes) keeps
+  incremental equal to full.
+
+**Trade-offs.**
+
+- A claim that moves between current and history regenerates the bodies of
+  its pages (writer calls), not only their History sections, because the
+  writer's input changed.
+- Changing a rule's status re-checks every page. Only the affected ones are
+  rebuilt, but the check reads every claim once.
+- A heading such as "History" in a current document does not make its facts
+  history. Put such documents under a folder a rule declares past.
+
 ## Libraries reused rather than reimplemented
 
 | Need | Library |

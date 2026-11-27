@@ -19,7 +19,7 @@ treated as outdated in every layer.
 PARSER = "parse/3"  # 2: Markdown tables parsed, one labelled block per row; 3: re-parsing refreshes the heading of unchanged passages
 CLAIM_IDENTITY = "claim-id/2"
 ENTITY_RESOLUTION = "entity/1"
-RENDER = "render/1"
+RENDER = "render/2"  # 2: claims that only past-scoped documents support are listed under History on their pages
 SUMMARY = "summary/2"  # 2: topics with more than 64 pages are summarized hierarchically, in sections
 PAGE = "page/2"  # 2: entity pages with more than 64 claims are written in sections grouped by source
 

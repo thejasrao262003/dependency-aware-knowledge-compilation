@@ -170,14 +170,26 @@ def trace_page(store: Store, page: PageArt) -> PageTrace:
     return PageTrace(page.id, page.title, claims, sentences, list(page.dropped))
 
 
+def history_sentences(page: PageArt) -> int:
+    """How many of a page's displayed sentences are its History section: listed by code after
+    the body, one per claim whose documents are all declared past. They are traced like any
+    other sentence, but are not generated text."""
+    if not page.history:
+        return 0
+    return len(body_sentences(displayed_body(page).rsplit("\n## History\n", 1)[-1]))
+
+
 def citation_coverage(store: Store) -> dict:
-    """Share of generated page sentences that cite at least one valid claim."""
+    """Share of generated page sentences that cite at least one valid claim. Every marker,
+    History's included, must point to one of the page's claims."""
     total = cited = invalid = 0
     for aid, payload in store.conn.execute("SELECT id, payload FROM artifacts WHERE kind='page' AND to_build IS NULL"):
         from dakc.artifacts import from_payload
 
-        t = trace_page(store, from_payload("page", aid, json.loads(payload)))  # type: ignore[arg-type]
-        total += len(t.sentences)
-        cited += sum(1 for s in t.sentences if s.cites)
+        page = from_payload("page", aid, json.loads(payload))
+        t = trace_page(store, page)  # type: ignore[arg-type]
+        generated = t.sentences[:len(t.sentences) - history_sentences(page)]  # type: ignore[arg-type]
+        total += len(generated)
+        cited += sum(1 for s in generated if s.cites)
         invalid += len(t.invalid_markers)
     return {"sentences": total, "cited": cited, "coverage": round(cited / total, 4) if total else 1.0, "invalid_markers": invalid}

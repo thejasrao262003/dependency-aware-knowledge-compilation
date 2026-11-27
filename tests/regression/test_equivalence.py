@@ -92,3 +92,41 @@ def test_random_edit_sequence_stays_equivalent(base, tmp_path):
         d = diff_states(canonical_state(ref), canonical_state(inc))
         ref.close()
         assert d.equal, (step, ops, d.by_kind(), d.different[:3], d.missing[:3], d.extra[:3])
+
+
+def test_past_scope_rules_stay_equivalent(base, tmp_path):
+    """Pages list claims that only past-scoped documents support under History (versions.RENDER
+    = render/2). Which claims those are depends on every supporting document's path and on the
+    rules, so documents are also moved between a past and a current folder, and the rules
+    change between steps. After each step, incremental must equal full with the same rules."""
+    from dakc.conflicts import ScopeRule
+
+    root, _ = base
+    corpus = tmp_path / "corpus"
+    shutil.copytree(root / "corpus", corpus)
+    rules_by_step = {0: [ScopeRule("topic-001/**", status="past", label="{path}")],
+                     5: [ScopeRule("topic-000/**", status="past")],
+                     8: [ScopeRule("topic-*/**", status="past"), ScopeRule("topic-000/doc-000[0-4]*", status="current")],
+                     10: []}
+    inc = Store(tmp_path / "I.db")
+    rng = random.Random(99)
+    rules: list = []
+    history_seen = 0
+    for step in range(12):
+        rules = rules_by_step.get(step, rules)
+        ops = []
+        if step:
+            ops = [_random_edit(corpus, rng, step) for _ in range(rng.randint(1, 2))]
+            files = sorted(corpus.rglob("*.md"))
+            moved = rng.choice(files)  # across the past/current boundary
+            other = "topic-000" if moved.parent.name != "topic-000" else "topic-001"
+            moved.rename(corpus / other / moved.name)
+            ops.append(f"move {moved.name} -> {other}")
+        compile_once(inc, corpus, conflict_rules=rules)
+        ref = Store(tmp_path / f"B{step}.db")
+        compile_once(ref, corpus, strategy="full", conflict_rules=rules)
+        d = diff_states(canonical_state(ref), canonical_state(inc))
+        history_seen += sum(1 for p in ref.load_state().of("page").values() if p.history)
+        ref.close()
+        assert d.equal, (step, ops, d.by_kind(), d.different[:3], d.missing[:3], d.extra[:3])
+    assert history_seen > 0, "the sequence must exercise pages with history"

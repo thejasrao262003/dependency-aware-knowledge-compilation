@@ -7,7 +7,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from dakc.hashing import entity_key, h_obj
+from dakc.hashing import entity_key
 from dakc.providers import ProviderBundle, make_provider
 from dakc.sources import FilesystemSource, Source, SourceSet, make_source
 from dakc.storage import Store
@@ -56,10 +56,12 @@ class Config:
 
     @property
     def fingerprint(self) -> str:
-        """Hash of configuration that changes derived content (entity aliases)."""
-        from dakc import versions
+        """Hash of configuration that changes derived content: entity aliases, the provenance
+        mode, and the status ``[[conflicts.scope]]`` rules declare (pages show past-scoped
+        claims under History)."""
+        from dakc.compiler import config_fingerprint
 
-        return h_obj({"aliases": self.alias_map, "entity_resolution": versions.ENTITY_RESOLUTION, "provenance": self.provenance})
+        return config_fingerprint(self.alias_map, self.provenance, self.conflict_rules)
 
     def to_toml(self) -> str:
         lines = [
@@ -126,7 +128,8 @@ class Config:
             '# path = "docs/mvp/**"',
             '# label = "release 1"                   # or status = "past" | "proposed"',
             '# A label with "{path}" gives each matching document its own scope (or "{dir}", each folder):',
-            "# notes that record a decision and later its reversal are then not a conflict.",
+            "# notes that record a decision and later its reversal are then not a conflict. A claim that",
+            "# only documents declared past state is listed under History on its page.",
             "# [[conflicts.scope]]",
             '# path = "sessions/**"',
             '# status = "past"',

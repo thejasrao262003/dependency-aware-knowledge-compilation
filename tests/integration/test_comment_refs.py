@@ -133,6 +133,16 @@ def test_trace_and_read_carry_each_evidence_sentences_refs(kb):
     json.dumps(claim.to_dict()), json.dumps(t.to_dict())  # JSON-safe
 
 
+def test_evidence_of_unknown_sentences_carries_every_comment_of_the_passage(kb):
+    from dakc.artifacts import ClaimArt
+    from dakc.provenance.trace import trace_claim
+
+    psg = next(p for p in kb.artifacts("passage", query="Postgres holds", limit=None))
+    (ev,) = trace_claim(kb.store, ClaimArt("clm:test", ((psg.id, "Redis holds the Sessions.", ("Redis",), ()),))).evidence
+    assert ev.sentences == ["Redis holds the Sessions. Postgres holds the Users."]  # the whole passage
+    assert ev.refs == [["t:aa11", "t:bb22"]]
+
+
 def test_text_edits_next_to_comments_reuse_sentences_as_usual(kb, tmp_path):
     """Comments never enter sentence keys: editing one sentence of a commented paragraph
     re-extracts only that sentence, and the untouched sentence keeps its claim and refs."""
@@ -211,3 +221,13 @@ def test_mcp_trace_and_read_artifact_carry_refs(kb):
     assert {e["source_path"]: e["refs"] for e in tr.structured_content["evidence"]} == {
         SESSION: [["t:aa11"]], "current/auth.md": [[]]}
     assert sorted(s["refs"] for s in read.structured_content["metadata"]["supports"]) == [[[]], [["t:aa11"]]]
+
+
+def test_publisher_records_of_passages_carry_refs(kb):
+    from dakc.publishers import build_records
+
+    rows = [(aid, "passage", sh, b) for aid, sh, b in kb.store.conn.execute(
+        "SELECT id, state_hash, from_build FROM artifacts WHERE kind = 'passage' AND to_build IS NULL")]
+    meta = {r.text: r.metadata for r in build_records(kb.store, rows)}
+    assert meta["Redis holds the Sessions. Postgres holds the Users."]["refs"] == [["t:aa11"], ["t:bb22"]]
+    assert "refs" not in meta["Argon2 hashes every Password. Redis holds the Sessions."]

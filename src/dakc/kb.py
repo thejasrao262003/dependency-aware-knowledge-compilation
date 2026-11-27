@@ -619,9 +619,9 @@ class KnowledgeBase:
     def _current(self, ids: Iterable[str]) -> dict[str, Any]:
         """The current versions of several artifacts, by id (missing ids are left out)."""
         out: dict[str, Any] = {}
-        ids = sorted(set(ids))
-        for i in range(0, len(ids), 500):
-            chunk = ids[i:i + 500]
+        keys = sorted(set(ids))
+        for i in range(0, len(keys), 500):
+            chunk = keys[i:i + 500]
             q = f"SELECT id, kind, payload FROM artifacts WHERE to_build IS NULL AND id IN ({','.join('?' * len(chunk))})"
             for aid, kind, payload in self.store.conn.execute(q, chunk):
                 out[aid] = from_payload(kind, aid, json.loads(payload))

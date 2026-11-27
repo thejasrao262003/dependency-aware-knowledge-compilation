@@ -3,7 +3,8 @@
 For a page, every body sentence is mapped to the claims it cites (``[^Cn]``).
 Every claim is mapped to each supporting passage, that passage's source path
 and source version (content hash and the build that registered it), and the
-exact evidence sentences inside the passage.
+exact evidence sentences inside the passage, each with the bodies of the HTML
+comments written after it in the source (``refs``).
 """
 
 from __future__ import annotations
@@ -28,6 +29,9 @@ class Evidence:
     source_version_build: int | None
     heading: str
     sentences: list[str]
+    # refs[i]: the bodies of the HTML comments written after sentences[i] in the source
+    # ("<!-- t:3f9a12c4 -->" -> "t:3f9a12c4"); [] when there are none.
+    refs: list[list[str]] = field(default_factory=list)
 
 
 @dataclass
@@ -136,9 +140,12 @@ def trace_claim(store: Store, claim: ClaimArt, ref: str = "") -> ClaimTrace:
             "SELECT path, raw_hash, from_build FROM sources WHERE id=? AND to_build IS NULL", (passage.source_id,)
         ).fetchone()
         sents = split_sentences(passage.text)
+        picked = [i for i in ev if 0 <= i < len(sents)]
+        # Unknown evidence falls back to the whole passage, with all of its comments.
+        refs = [list(passage.sentence_refs(i)) for i in picked] or [[r for rs in passage.refs for r in rs]]
         ct.evidence.append(Evidence(
             pid, passage.source_id, row[0] if row else "?", row[1][:16] if row else "?", row[2] if row else None,
-            passage.heading, [sents[i] for i in ev if 0 <= i < len(sents)] or [passage.text],
+            passage.heading, [sents[i] for i in picked] or [passage.text], refs,
         ))
     return ct
 

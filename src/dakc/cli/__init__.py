@@ -303,6 +303,11 @@ def explain_cmd(
         console.print(f"  - {r}")
 
 
+def _refs_note(refs: list[str]) -> str:
+    """The comments written after an evidence sentence, e.g. "  refs: t:3f9a12c4"."""
+    return f"  [cyan]refs: {escape(', '.join(refs))}[/cyan]" if refs else ""
+
+
 @app.command()
 def trace(
     artifact: Annotated[str, typer.Argument(help="A page or claim, e.g. page:postgresql or a page title")],
@@ -321,8 +326,8 @@ def trace(
         console.print(f"Claim: [bold]{t.claim_id}[/bold]\n  {t.text}")
         for e in t.evidence:
             console.print(f"  <- {e.source_path} @ {e.source_raw_hash} (registered in build {e.source_version_build}), {e.passage_id}")
-            for s in e.sentences:
-                console.print(f"       [dim]\"{s}\"[/dim]")
+            for s, refs in zip(e.sentences, e.refs or [[]] * len(e.sentences)):
+                console.print(f"       [dim]\"{s}\"[/dim]" + _refs_note(refs))
         return
     console.print(f"Page: [bold]{t.page_id}[/bold]  ({t.title})\n\nGenerated sentences:")
     for i, s in enumerate(t.sentences, 1):
@@ -335,8 +340,8 @@ def trace(
         for e in c.evidence:
             console.print(f"       <- {e.source_path} @ {e.source_raw_hash} (build {e.source_version_build}), {e.passage_id}"
                           + (f", section '{e.heading}'" if e.heading else ""))
-            for s in e.sentences:
-                console.print(f"          [dim]\"{s[:140]}\"[/dim]")
+            for s, refs in zip(e.sentences, e.refs or [[]] * len(e.sentences)):
+                console.print(f"          [dim]\"{s[:140]}\"[/dim]" + _refs_note(refs))
     n = len(t.sentences)
     console.print(f"\n{n - len(t.uncited)} of {n} displayed sentences cite a claim; {len(t.invalid_markers)} invalid citation marker(s).")
     if t.dropped:

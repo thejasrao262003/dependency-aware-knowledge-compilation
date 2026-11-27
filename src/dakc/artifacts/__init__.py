@@ -66,13 +66,23 @@ class PassageArt(Artifact):
     heading: str = ""
     occurrence: int = 0
     extracted_by: str = ""  # fingerprint of the extractor whose claims this passage supports
+    # Per sentence (split_sentences(text)), the bodies of the HTML comments written after it
+    # in the source; empty when there are none. Metadata only: it is outside the id, the
+    # text hash and the extraction cache key, and nothing downstream reads it, so a
+    # comment-only edit writes a new passage version and nothing else (trace reads it).
+    refs: tuple[tuple[str, ...], ...] = ()
     kind: ClassVar[str] = "passage"
 
     def content(self):
         return {"text": self.text}
 
     def payload(self):
-        return {"source_id": self.source_id, "text": self.text, "text_hash": self.text_hash, "heading": self.heading, "occurrence": self.occurrence, "extracted_by": self.extracted_by}
+        return {"source_id": self.source_id, "text": self.text, "text_hash": self.text_hash, "heading": self.heading, "occurrence": self.occurrence, "extracted_by": self.extracted_by,
+                **({"refs": [list(r) for r in self.refs]} if self.refs else {})}
+
+    def sentence_refs(self, i: int) -> tuple[str, ...]:
+        """The comment bodies written after sentence ``i``."""
+        return self.refs[i] if 0 <= i < len(self.refs) else ()
 
     def deps(self):
         return [(self.source_id, "from_source")]
@@ -255,7 +265,8 @@ class IndexArt(Artifact):
 
 def from_payload(kind: str, id_: str, p: dict[str, Any]) -> Artifact:
     if kind == "passage":
-        return PassageArt(id_, p["source_id"], p["text"], p["text_hash"], p.get("heading", ""), p.get("occurrence", 0), p.get("extracted_by", ""))
+        return PassageArt(id_, p["source_id"], p["text"], p["text_hash"], p.get("heading", ""), p.get("occurrence", 0), p.get("extracted_by", ""),
+                          tuple(tuple(r) for r in p.get("refs", ())))
     if kind == "claim":
         return ClaimArt(id_, tuple((s[0], s[1], tuple(s[2]), tuple(s[3]) if len(s) > 3 else ()) for s in p["supports"]))
     if kind == "entity":

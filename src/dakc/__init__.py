@@ -46,6 +46,7 @@ from dakc.kb import (  # noqa: E402
     init,
 )
 from dakc.kb import open_kb as open  # noqa: E402,A001  (dakc.open, like tarfile.open)
+from dakc.parsing import split_sentences  # noqa: E402
 from dakc.provenance import Explanation  # noqa: E402
 from dakc.provenance.trace import ClaimTrace, PageTrace  # noqa: E402
 from dakc.publishers import Publisher, PublishResult, Record  # noqa: E402
@@ -78,6 +79,8 @@ __all__ = [
     "SourceInfo",
     "Status",
     "VerifyReport",
+    # text: the sentences that claim evidence and comment refs index (versioned by PARSER)
+    "split_sentences",
     # extending (RFC 0001)
     "Item",
     "SourceConnector",

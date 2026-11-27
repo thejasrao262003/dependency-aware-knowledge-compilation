@@ -381,6 +381,7 @@ async function evidenceHTML(evidence) {
       <span class="muted">registered in build ${e.source_version_build ?? "–"} · ${esc(e.source_raw_hash)}</span></div>
     ${e.heading ? `<p class="muted" style="margin:0 0 6px;font-size:13px">Section: ${esc(heading(e.heading))}</p>` : ""}
     <blockquote>${texts[i] ? highlight(texts[i], e.sentences) : e.sentences.map(esc).join(" ")}</blockquote>
+    ${(e.refs || []).some((r) => r.length) ? `<p class="muted" style="margin:6px 0 0;font-size:12.5px">Refs: ${(e.refs || []).flat().map((r) => `<code>${esc(r)}</code>`).join(" ")}</p>` : ""}
     <p style="margin:6px 0 0;font-size:12.5px">${link(e.passage_id, "Open the passage")}</p></div>`).join("");
 }
 

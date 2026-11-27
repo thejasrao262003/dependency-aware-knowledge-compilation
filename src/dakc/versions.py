@@ -16,7 +16,10 @@ A store whose builds predate this mechanism has no recorded versions and is
 treated as outdated in every layer.
 """
 
-PARSER = "parse/3"  # 2: Markdown tables parsed, one labelled block per row; 3: re-parsing refreshes the heading of unchanged passages
+PARSER = "parse/4"  # 2: Markdown tables parsed, one labelled block per row; 3: re-parsing refreshes the heading of unchanged passages;
+# 4: the HTML comments written after a Markdown sentence are kept as passage metadata (refs). The rules of
+# split_sentences are part of this layer: changing them is a parser change (and, since claim evidence is
+# stored as sentence indices, a claim-identity change too, so claims are re-derived from the cache).
 CLAIM_IDENTITY = "claim-id/2"
 ENTITY_RESOLUTION = "entity/1"
 RENDER = "render/1"

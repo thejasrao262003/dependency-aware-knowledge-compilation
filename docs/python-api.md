@@ -28,9 +28,9 @@ Instances are cheap to open.
 | `plan(full=False)` | `BuildReport` | Dry run. Nothing is written or spent. `has_work()` and `llm_calls()` tell you whether a compile is needed and what it costs. Exact for free providers. For LLM providers, extraction calls are exact and page and summary counts are an estimate (`report.exact` is false). |
 | `compile(full=False, wait=0.0)` | `BuildReport` | Takes the build lock, commits atomically, updates the wiki files, then runs the configured publishers. `report.publications` has one result per publisher; a failing publisher does not fail the build. `report.projection` counts the wiki file operations (see [Wiki files](#wiki-files)). Raises `BuildLocked` or `CompileFailed`. |
 | `artifacts(kind=None, query=None, limit=100)` | `list[ArtifactSummary]` | Ordered by layer, then id. `query` is a case-insensitive substring of the title, or of the full text for claims and passages |
-| `read(artifact)` | `ArtifactContent` | Rendered Markdown for pages, summaries and the index. Text for claims and passages. For a source document, its current text on disk, with `metadata['changed_since_build']`. |
+| `read(artifact)` | `ArtifactContent` | Rendered Markdown for pages, summaries and the index. Text for claims and passages. For a source document, its current text on disk, with `metadata['changed_since_build']`. A claim's `metadata['supports']` give each supporting passage with its `evidence_sentences` and their `refs`; a passage's `metadata['refs']` are those of every sentence (see *Comments after a sentence*). |
 | `explain(artifact)` | `Explanation` | Dependencies, dependents, upstream sources, signatures, history, `VALID` / `STALE` / `DELETED` with reasons. `STALE` means a source upstream changed. That is an upper bound: `plan()` shows whether the artifact actually changes. |
-| `trace(artifact)` | `PageTrace` or `ClaimTrace` | Each page sentence, the claims it cites, and each claim's passage, source version and evidence sentences |
+| `trace(artifact)` | `PageTrace` or `ClaimTrace` | Each page sentence, the claims it cites, and each claim's passage, source version and evidence sentences. Each evidence entry's `refs[i]` lists the comments written after `sentences[i]` |
 | `downstream(artifact)` | `Downstream` | Everything an edit to this source or artifact would invalidate, by kind |
 | `graph_stats()` | `dict` | Artifact and edge counts |
 | `export_graph(fmt="json", around=None)` | `str` | `json` (node-link), `dot`, or `reactflow` |
@@ -81,6 +81,58 @@ file. Only files listed in `.dakc/projection.json` (the files DAKC wrote) are
 repaired or deleted; your own files in the wiki directory are left alone. To
 change a page, change its sources: a hand edit is overwritten by the next
 compile.
+
+## Comments after a sentence
+
+In Markdown paragraphs and list items, the HTML comments written after a
+sentence are kept as that sentence's metadata, its `refs`. Tools that write
+receipts into their notes use them, Reckon for example:
+
+```markdown
+- The refresh endpoint takes a per-user Redis lock with a 5-second TTL. <!-- t:3f9a12c4 -->
+- Use Argon2 for password hashing. <!-- rs_01JDQ8X4Z7K3M9P2Q5R8S1T4V6#t:3f9a12c4 -->
+```
+
+```python
+claim = kb.trace("clm:…")                 # or a page: kb.trace("page:argon2").claims
+for ev in claim.evidence:
+    for sentence, refs in zip(ev.sentences, ev.refs):
+        print(ev.source_path, sentence, refs)   # ... "Use Argon2 for password hashing." ['rs_01JDQ8X4Z7K3M9P2Q5R8S1T4V6#t:3f9a12c4']
+
+kb.read("clm:…").metadata["supports"]     # [{"passage_id", "text", "evidence_sentences": [1], "refs": [["t:3f9a12c4"]]}, ...]
+```
+
+- `refs` holds comment bodies, trimmed: `<!-- t:3f9a12c4 -->` gives `"t:3f9a12c4"`.
+  A sentence without comments has `[]`.
+- A comment belongs to the sentence its preceding text ends in: the one it
+  follows, or the one it sits inside. Several comments after one sentence are
+  kept in order.
+- Comments in headings and table cells are dropped. So is a line that starts
+  with `<!--`: CommonMark reads it as an HTML block, and DAKC never reads the
+  text of HTML blocks. Write the comment after the sentence, on its line.
+- YAML front matter (`---` ... `---` at the top of a Markdown file) is skipped.
+- Comments are not text. They are outside passage ids, text hashes and the
+  extraction cache, and no claim, page or summary is built from them. Adding,
+  rewriting, moving or removing a comment makes no provider call and rewrites
+  no page: the compile writes new passage versions (`passage_refs_changed` in
+  the report) and nothing else.
+
+## Splitting text into sentences
+
+`dakc.split_sentences(text) -> list[str]` is the splitter DAKC itself uses.
+Claim evidence (`evidence_sentences`), sentence reuse and comment `refs` are
+all indices into its result for a passage's text, so use it to map them back
+to sentences:
+
+```python
+passage = kb.read("psg:…")
+dakc.split_sentences(passage.text)        # ["Redis holds the Sessions.", "Postgres holds the Users."]
+```
+
+It splits after `.`, `!` or `?` and whitespace, before an uppercase letter, a
+digit, a quote or an opening bracket. Part of the public API since 0.8; the
+splitting rules are versioned by PARSER (`dakc.versions.PARSER`), so a change
+to them re-parses every source.
 
 ## Errors
 

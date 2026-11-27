@@ -17,7 +17,7 @@ from dataclasses import dataclass
 from rapidfuzz import fuzz
 
 from dakc.hashing import h, normalize_claim, normalize_text, short
-from dakc.parsing import ParsedDocument
+from dakc.parsing import ParsedDocument, split_sentences  # split_sentences: re-exported, it lived here before 0.8
 
 
 @dataclass(frozen=True)
@@ -28,6 +28,7 @@ class Passage:
     text_hash: str
     heading: str = ""
     occurrence: int = 0
+    refs: tuple[tuple[str, ...], ...] = ()  # per sentence: its comment bodies (Block.refs); not in the id
 
 
 def passage_id(source_id: str, text_hash: str, occurrence: int) -> str:
@@ -35,7 +36,8 @@ def passage_id(source_id: str, text_hash: str, occurrence: int) -> str:
 
 
 def segment(source_id: str, doc: ParsedDocument) -> list[Passage]:
-    """One passage per body block. Identical blocks in a source get an occurrence index."""
+    """One passage per body block. Identical blocks in a source get an occurrence index.
+    A block's comment refs ride along as metadata: the id covers only the text."""
     seen: Counter[str] = Counter()
     out: list[Passage] = []
     for block in doc.body_blocks:
@@ -45,7 +47,7 @@ def segment(source_id: str, doc: ParsedDocument) -> list[Passage]:
         th = h(text)
         occ = seen[th]
         seen[th] += 1
-        out.append(Passage(passage_id(source_id, th, occ), source_id, text, th, block.heading, occ))
+        out.append(Passage(passage_id(source_id, th, occ), source_id, text, th, block.heading, occ, block.refs))
     return out
 
 
@@ -63,7 +65,6 @@ class ExtractedClaim:
     evidence: tuple[int, ...] = ()
 
 
-_SENT_SPLIT = re.compile(r"(?<=[.!?])\s+(?=[A-Z0-9\"'(\[])")
 _TOKEN = re.compile(r"[A-Za-z][A-Za-z0-9+#]*(?:[.\-'][A-Za-z0-9+#]+)*")
 _STOP = frozenset(
     """a an the this that these those it its it's they them their there here he she we you i
@@ -108,10 +109,6 @@ def extract_mentions(sentence: str) -> tuple[str, ...]:
     if current:
         mentions.append(" ".join(current))
     return tuple(sorted(set(mentions)))
-
-
-def split_sentences(text: str) -> list[str]:
-    return [s.strip() for s in _SENT_SPLIT.split(text) if s.strip()]
 
 
 def heuristic_extract(passage_text: str, targets: tuple[int, ...] | None = None) -> list[ExtractedClaim]:

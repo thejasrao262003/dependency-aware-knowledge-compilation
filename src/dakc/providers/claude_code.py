@@ -15,20 +15,30 @@ request overhead (cached between calls) on top of DAKC's prompt. Fine for increm
 compiles, which make a few to a few dozen calls. A first build of a large corpus makes
 thousands, and Claude subscriptions' limits assume ordinary individual use: use an
 API-key provider for that.
+
+A failed call raises :class:`ProviderError`. Its ``transient`` is True when asking again
+later may work: no answer within ``timeout``, or an API error that is a rate or usage
+limit, a server error, a timeout or a lost connection. Claude Code reports the API's
+HTTP status as ``api_error_status`` (2.1.312); without it, the error text is read.
 """
 
 from __future__ import annotations
 
 import json
+import re
 import shutil
 import subprocess
 import tempfile
 import time
 from pathlib import Path
 
-from dakc.providers.llm import Completion, ProviderError
+from dakc.providers.llm import Completion, ProviderError, is_transient_status
 
 LARGE_BUILD_CALLS = 200  # above this, a compile notes that an API-key provider suits it better
+# What Claude Code says when the API call behind it failed in a way that may pass
+_API_STATUS = re.compile(r"\bAPI Error: (\d{3})\b")
+_TRANSIENT_TEXT = re.compile(r"rate.?limit|usage limit reached|overloaded|timed out|connection error|"
+                             r"connection closed|no response from api", re.I)
 
 
 class ClaudeCodeClient:
@@ -55,13 +65,13 @@ class ClaudeCodeClient:
         if self._workdir is None:  # an empty directory: no project settings, CLAUDE.md, hooks or MCP servers
             self._workdir = tempfile.mkdtemp(prefix="dakc-claude-code-")
         cmd = self._command(system, json_schema)
-        last = ""
+        last, transient = "", False
         for attempt in range(self.retries + 1):
             try:
                 proc = subprocess.run(cmd, input=user, capture_output=True, text=True, cwd=self._workdir,
                                       timeout=self.timeout)
             except subprocess.TimeoutExpired:
-                last = f"no answer within {self.timeout:.0f} s"
+                last, transient = f"no answer within {self.timeout:.0f} s", True
             else:
                 try:
                     data = json.loads(proc.stdout)
@@ -75,9 +85,22 @@ class ClaudeCodeClient:
                     text = json.dumps(structured) if json_schema is not None and structured is not None else str(data.get("result") or "")
                     return Completion(text, tokens_in, int(usage.get("output_tokens") or 0))
                 detail = (data or {}).get("result") if isinstance(data, dict) else None
-                last = str(detail or proc.stderr.strip() or proc.stdout.strip() or f"exit status {proc.returncode}")[:300]
+                full = str(detail or proc.stderr.strip() or proc.stdout.strip() or f"exit status {proc.returncode}")
+                last, transient = full[:300], _transient(data, full)
                 if isinstance(data, dict) and data.get("subtype") not in (None, "success", "error_during_execution"):
+                    transient = False
                     break  # e.g. error_max_structured_output_retries: asking again will not help
             if attempt < self.retries:
                 time.sleep(2 ** attempt)
-        raise ProviderError(f"Claude Code call failed: {last}")
+        raise ProviderError(f"Claude Code call failed: {last}", transient=transient)
+
+
+def _transient(data: object, text: str) -> bool:
+    """Whether a failed ``claude -p`` may succeed later: by the API error's HTTP status
+    when Claude Code reports one, otherwise by what its message says."""
+    status = data.get("api_error_status") if isinstance(data, dict) else None
+    if isinstance(status, int) and not isinstance(status, bool):
+        return is_transient_status(status)
+    if m := _API_STATUS.search(text):
+        return is_transient_status(int(m.group(1)))
+    return bool(_TRANSIENT_TEXT.search(text))

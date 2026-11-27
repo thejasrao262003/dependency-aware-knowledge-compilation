@@ -101,6 +101,7 @@ def test_a_failed_call_says_what_happened(tmp_path, fake_claude, monkeypatch):
     with dakc.open(ws) as kb, pytest.raises(CompileFailed, match="Claude Code call failed: rate limited") as err:
         kb.compile()
     assert err.value.preserved  # nothing was committed
+    assert err.value.__cause__.transient  # a rate limit: compiling again later may work
 
 
 def test_no_claude_code_installed(tmp_path):

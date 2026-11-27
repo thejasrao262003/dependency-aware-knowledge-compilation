@@ -22,7 +22,24 @@ from dakc.providers.base import ClaimView, ExtractResult, GenResult, PageLead
 
 
 class ProviderError(RuntimeError):
-    pass
+    """A model call failed, or a provider is misconfigured.
+
+    ``transient`` is True when asking again later may succeed: a rate limit (HTTP 429)
+    or server error (5xx) that outlasted the client's own retries, a timeout, or a
+    failed connection. It is False for everything else (a rejected request, a missing
+    key, a refusal, a truncated answer), where asking again gets the same answer. DAKC
+    itself does not act on it; code that calls a client directly can use it to decide
+    whether to retry later.
+    """
+
+    def __init__(self, *args: object, transient: bool = False):
+        super().__init__(*args)
+        self.transient = transient
+
+
+def is_transient_status(status: int) -> bool:
+    """HTTP statuses worth asking again later: request timeout, rate limit, server errors."""
+    return status in (408, 429) or status >= 500
 
 
 @dataclass
@@ -257,25 +274,36 @@ class OpenAICompatibleClient:
             payload["response_format"] = {"type": "json_schema", "json_schema": {"name": "output", "schema": json_schema, "strict": True}}
         elif json_schema is not None and self.json_mode == "json_object":
             payload["response_format"] = {"type": "json_object"}
+        url = f"{self.base_url}/chat/completions"
         last: Exception | None = None
         for attempt in range(self.retries):
             try:
-                r = self.http.post(f"{self.base_url}/chat/completions", json=payload)
-                if r.status_code == 429 or r.status_code >= 500:
-                    last = ProviderError(f"HTTP {r.status_code}: {r.text[:200]}")
-                else:
-                    r.raise_for_status()
-                    data = r.json()
-                    choice = data["choices"][0]
-                    if choice.get("finish_reason") == "length":
-                        raise ProviderError("completion truncated (finish_reason=length); raise max_tokens")
-                    usage = data.get("usage") or {}
-                    return Completion(
-                        choice["message"]["content"] or "",
-                        int(usage.get("prompt_tokens", 0)),
-                        int(usage.get("completion_tokens", 0)),
-                    )
-            except (httpx.TransportError, httpx.TimeoutException) as exc:
+                r = self.http.post(url, json=payload)
+            except (httpx.UnsupportedProtocol, httpx.InvalidURL) as exc:  # a bad base_url: asking again cannot help
+                raise ProviderError(f"cannot send a request to {url}: {exc}") from exc
+            except httpx.RequestError as exc:  # timeouts, refused or dropped connections
                 last = exc
+            else:
+                if is_transient_status(r.status_code):
+                    last = ProviderError(f"HTTP {r.status_code}: {r.text[:200]}")
+                elif not r.is_success:  # rejected (400, 401, 403, 404, ...): the same request fails again
+                    raise ProviderError(f"HTTP {r.status_code} from {url}: {r.text[:200]}")
+                else:
+                    return self._completion(r, url)
             time.sleep(2**attempt)
-        raise ProviderError(f"request to {self.base_url} failed after {self.retries} attempts: {last}")
+        raise ProviderError(f"request to {self.base_url} failed after {self.retries} attempts: {last}",
+                            transient=last is not None)
+
+    @staticmethod
+    def _completion(r: httpx.Response, url: str) -> Completion:
+        try:
+            data = r.json()
+            choice = data["choices"][0]
+            finish, content = choice.get("finish_reason"), choice["message"]["content"]
+            usage = data.get("usage") or {}
+            tokens = int(usage.get("prompt_tokens", 0)), int(usage.get("completion_tokens", 0))
+        except (ValueError, LookupError, TypeError, AttributeError) as exc:
+            raise ProviderError(f"unexpected response from {url}: {r.text[:200]!r}") from exc
+        if finish == "length":
+            raise ProviderError("completion truncated (finish_reason=length); raise max_tokens")
+        return Completion(content or "", *tokens)

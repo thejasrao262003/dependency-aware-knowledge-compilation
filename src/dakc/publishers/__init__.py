@@ -158,7 +158,8 @@ def build_records(store: Store, rows: list[tuple[str, str, str, int]], resolver:
         if kind == "passage":
             src = res.source_path(p["source_id"])
             out.append(Record(aid, kind, state_hash, p.get("heading") or aid, p["text"], [src] if src else [], build,
-                              {"heading": p.get("heading", ""), "source_id": p["source_id"]}))
+                              {"heading": p.get("heading", ""), "source_id": p["source_id"],
+                               **({"refs": p["refs"]} if p.get("refs") else {})}))
         elif kind == "claim":
             sup = p["supports"]
             text = min(s[1] for s in sup) if sup else ""

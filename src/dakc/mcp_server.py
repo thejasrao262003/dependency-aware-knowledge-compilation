@@ -151,7 +151,9 @@ def create_server(workspace: str | Path = ".", *, read_only: bool = False, max_l
         index (statements carry [^Cn] citation markers; use trace to resolve them), the
         text of claims and passages, or, for a source document (by path), its text as it is
         on disk now, with metadata.changed_since_build telling whether the knowledge base
-        has caught up with it."""
+        has caught up with it. For a claim, metadata.supports gives each supporting passage
+        with its evidence sentence indices and refs: the HTML comments written after each
+        of those sentences in the source (for example turn references)."""
         with session() as kb:
             c = kb.read(artifact)
         d = c.to_dict()
@@ -185,7 +187,9 @@ def create_server(workspace: str | Path = ".", *, read_only: bool = False, max_l
     def trace(artifact: ArtifactRef, limit: Limit = 50) -> dict[str, Any]:
         """Sentence-level provenance. For a page: each displayed sentence, the claims it cites,
         and for each claim the source document, version and exact evidence sentences. For a
-        claim: its evidence. Uncited sentences are listed separately."""
+        claim: its evidence. Each evidence entry's refs[i] lists the HTML comments written
+        after sentences[i] in the source (for example turn references). Uncited sentences are
+        listed separately."""
         with session() as kb:
             t = kb.trace(artifact)
         d = t.to_dict()

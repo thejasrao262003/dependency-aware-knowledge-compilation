@@ -7,6 +7,7 @@ rendering: a comment-only edit costs no provider call and changes no page.
 
 from __future__ import annotations
 
+import asyncio
 import json
 from pathlib import Path
 
@@ -164,3 +165,49 @@ def test_upgrading_to_parse_4_fills_refs_and_runs_nothing_else(kb, tmp_path):
     assert wiki_bytes(kb) == pages and derived_state(kb) == derived
     assert kb.trace(SHARED).evidence and equals_full(kb.store, kb.source_root, tmp_path)
     assert kb.compile().status == "noop"
+
+
+# ----------------------------------------------------------------- front ends
+def test_cli_trace_shows_refs(kb):
+    from typer.testing import CliRunner
+
+    from dakc.cli import app
+
+    runner = CliRunner()
+    r = runner.invoke(app, ["trace", SHARED, "-w", str(kb.root), "--json"])
+    assert r.exit_code == 0, r.output
+    assert {e["source_path"]: e["refs"] for e in json.loads(r.output)["evidence"]} == {
+        SESSION: [["t:aa11"]], "current/auth.md": [[]]}
+    r = runner.invoke(app, ["trace", "page:argon2", "-w", str(kb.root)])
+    assert r.exit_code == 0 and "refs: rs_01JDQ8X4Z7K3M9P2Q5R8S1T4V6#t:3f9a12c4" in r.output
+
+
+def test_rest_trace_and_read_carry_refs(kb):
+    from fastapi.testclient import TestClient
+
+    from dakc.api import create_app
+
+    client = TestClient(create_app(kb.root), base_url="http://localhost")
+    tr = client.get(f"/artifacts/{SHARED}/trace").json()
+    assert {e["source_path"]: e["refs"] for e in tr["evidence"]} == {SESSION: [["t:aa11"]], "current/auth.md": [[]]}
+    page = client.get("/artifacts/page:argon2/trace").json()
+    assert ["rs_01JDQ8X4Z7K3M9P2Q5R8S1T4V6#t:3f9a12c4"] in [r for c in page["claims"] for e in c["evidence"] for r in e["refs"]]
+    read = client.get(f"/artifacts/{SHARED}/read").json()
+    assert sorted(s["refs"] for s in read["metadata"]["supports"]) == [[[]], [["t:aa11"]]]
+
+
+def test_mcp_trace_and_read_artifact_carry_refs(kb):
+    pytest.importorskip("mcp")
+    from mcp import Client
+
+    from dakc.mcp_server import create_server
+
+    async def go():
+        async with Client(create_server(kb.root)) as c:
+            return await c.call_tool("trace", {"artifact": SHARED}), await c.call_tool("read_artifact", {"artifact": SHARED})
+
+    tr, read = asyncio.run(go())
+    assert not tr.is_error and not read.is_error
+    assert {e["source_path"]: e["refs"] for e in tr.structured_content["evidence"]} == {
+        SESSION: [["t:aa11"]], "current/auth.md": [[]]}
+    assert sorted(s["refs"] for s in read.structured_content["metadata"]["supports"]) == [[[]], [["t:aa11"]]]

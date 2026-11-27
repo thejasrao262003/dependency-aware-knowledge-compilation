@@ -150,3 +150,52 @@ def test_turn_reference_comments_and_front_matter_never_reach_passages_or_claims
     assert [(b.kind, b.text, b.heading) for b in plain.blocks] == [(b.kind, b.text, b.heading) for b in doc.blocks]
     assert plain.text_hash == doc.text_hash
     assert parse_bytes(RECKON_NOTE.replace(b"\n", b"\r\n"), "markdown").text_hash == doc.text_hash
+
+
+def test_trailing_comments_are_kept_as_refs_of_the_sentence_they_end():
+    from dakc.claims import segment
+    from dakc.parsing import split_sentences
+
+    doc = parse_bytes(RECKON_NOTE, "markdown")
+    assert [b.refs for b in doc.body_blocks] == [
+        (("t:3f9a12c4",),),
+        (("rs_01JDQ8X4Z7K3M9P2Q5R8S1T4V6#t:3f9a12c4",),),
+        (("t:aa11",), ("t:bb22",)),
+    ]
+    for b in doc.body_blocks:  # one entry per sentence, in sentence order
+        assert len(b.refs) == len(split_sentences(b.text))
+    passages = segment("src:s", doc)
+    assert [p.refs for p in passages] == [b.refs for b in doc.body_blocks]
+    # refs are metadata: the passage ids are those of the same text without comments
+    plain = segment("src:s", parse_bytes(_without_comments_or_front_matter(RECKON_NOTE), "markdown"))
+    assert [p.id for p in plain] == [p.id for p in passages] and all(p.refs == () for p in plain)
+
+
+def test_comment_placement_rules():
+    def refs(md: str):
+        (block,) = parse_bytes(md.encode(), "markdown").body_blocks
+        return block.text, block.refs
+
+    # several comments after one sentence, and a sentence without any
+    assert refs("Redis holds sessions. <!-- t:1 --><!-- t:2 --> Redis holds locks. Kafka streams events. <!-- t:3 -->\n") == (
+        "Redis holds sessions. Redis holds locks. Kafka streams events.", (("t:1", "t:2"), (), ("t:3",)))
+    # a soft line break between sentences; a comment glued to the full stop
+    assert refs("Redis holds sessions.<!-- t:1 -->\nKafka streams events. <!-- t:2 -->\n")[1] == (("t:1",), ("t:2",))
+    # inside a sentence it belongs to that sentence
+    assert refs("Redis holds <!-- t:1 --> sessions. Kafka streams events.\n") == (
+        "Redis holds sessions. Kafka streams events.", (("t:1",), ()))
+    # comment bodies are trimmed; empty comments and other inline HTML are dropped
+    assert refs("Redis holds sessions. <!--   t:1\n  --> <!-- --> <br>\n") == ("Redis holds sessions.", (("t:1",),))
+    # a block without comments has no refs
+    assert refs("Redis holds sessions.\n")[1] == ()
+
+
+def test_comments_outside_sentences_are_dropped():
+    md = (b"# Auth <!-- t:h -->\n\n<!-- a standalone comment -->\n\n"
+          b"| Store | Holds |\n|---|---|\n| Redis <!-- t:c --> | sessions |\n\n- <!-- t:only -->\n\n"
+          b"<!-- t:x --> A line that starts with a comment is an HTML block, whose text is not read (as before).\n")
+    doc = parse_bytes(md, "markdown")
+    assert [(b.kind, b.text, b.refs) for b in doc.blocks] == [
+        ("heading", "Auth", ()),
+        ("table_row", "Store: Redis; Holds: sessions.", ()),  # table cells keep their text, as before, without refs
+    ]

@@ -394,6 +394,7 @@ class Compiler:
         added: dict[str, PassageArt] = {}
         doc_links: dict[str, dlinks.DocLinks] = {}  # the links and anchors of every document read in this build
         reheaded: set[str] = set()  # kept passages whose heading changed
+        reannotated: set[str] = set()  # kept passages whose comment refs changed
         gone_by_source: dict[str, set[str]] = defaultdict(set)  # replaced passage versions, for sentence reuse
         for sid, info in sorted(to_parse, key=lambda t: t[1].path):
             try:
@@ -427,14 +428,22 @@ class Compiler:
             gone_by_source[sid] |= gone
             for pid in fresh:
                 p = new_by_id[pid]
-                added[pid] = PassageArt(pid, sid, p.text, p.text_hash, p.heading, p.occurrence, P.extractor.fingerprint)
+                added[pid] = PassageArt(pid, sid, p.text, p.text_hash, p.heading, p.occurrence, P.extractor.fingerprint, p.refs)
             # A passage's id covers its text, not its heading: a heading inserted or renamed
             # above it keeps the passage (and its claims) but moves it to another section.
+            # Nor its comment refs: a comment edited, added or removed after a sentence
+            # keeps the passage and its claims, and only the passage is rewritten. Nothing
+            # downstream reads refs (trace reads them from the passage), so no claim, page
+            # or summary changes, and no provider is called.
             for pid in sorted(old_pids & new_by_id.keys()):
                 if passages[pid].heading != new_by_id[pid].heading:
                     passages[pid] = replace(passages[pid], heading=new_by_id[pid].heading)
                     reheaded.add(pid)
                     report.op("passage_heading_changed", pid)
+                if passages[pid].refs != new_by_id[pid].refs:
+                    passages[pid] = replace(passages[pid], refs=new_by_id[pid].refs)
+                    reannotated.add(pid)
+                    report.op("passage_refs_changed", pid)
         report.counts["sources_processed"] = len(to_parse)
 
         # Passages whose claims came from a different extractor (model, prompt or
@@ -945,7 +954,7 @@ class Compiler:
                         cs.edges[aid] = after.deps()
 
         all_or = (lambda kind, new, ids: set(old.of(kind)) | set(new)) if full else (lambda kind, new, ids: ids)
-        diff("passage", passages, all_or("passage", passages, removed_pids | set(added) | reheaded))
+        diff("passage", passages, all_or("passage", passages, removed_pids | set(added) | reheaded | reannotated))
         diff("claim", claims, all_or("claim", claims, touched_claims))
         diff("entity", entities, all_or("entity", entities, touched_entities))
         diff("relationship", rels, all_or("relationship", rels, touched_rels))

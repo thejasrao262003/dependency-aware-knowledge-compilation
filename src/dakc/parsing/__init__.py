@@ -1,4 +1,4 @@
-"""Turn source files into ordered text blocks.
+"""Turn source files into ordered text blocks, and text into sentences.
 
 Supported: Markdown, plain text, HTML, JSON and PDF (PyMuPDF, optional extra).
 Each parser returns blocks in document order. Headings are kept as context but
@@ -6,13 +6,20 @@ are not passages; code blocks are dropped (they are not prose claims). Markdown
 table rows become one block each, with every cell labelled by its column header
 ("Row — Header: value; Header: value."), so a fact taken from a table still says
 which column it belongs to.
+
+In Markdown paragraphs and list items, an HTML comment written after a sentence
+(``... TTL. <!-- t:3f9a12c4 -->``) is not text: it is kept as that sentence's
+metadata (:attr:`Block.refs`), outside the block's text and every hash, so editing
+a comment never re-extracts anything.
 """
 
 from __future__ import annotations
 
 import json
+import re
 from dataclasses import dataclass
 from pathlib import Path
+from typing import NamedTuple
 
 from dakc.hashing import h, normalize_text
 
@@ -37,6 +44,11 @@ class Block:
     text: str
     kind: str  # paragraph | list_item | heading | pdf_block | json_field
     heading: str = ""
+    # Markdown paragraphs and list items only. For each sentence of ``text``
+    # (``split_sentences(text)``, same order), the bodies of the HTML comments written
+    # after it: ``<!-- t:3f9a12c4 -->`` gives ``"t:3f9a12c4"``. Empty when the block has
+    # no comment. Never part of ``text``, so never part of a passage id or any hash.
+    refs: tuple[tuple[str, ...], ...] = ()
 
 
 @dataclass(frozen=True)
@@ -63,8 +75,27 @@ def parse_bytes(raw: bytes, source_type: str) -> ParsedDocument:
         parser = _PARSERS[source_type]
     except KeyError as exc:
         raise ParseError(f"unsupported source type {source_type!r}") from exc
-    blocks = [Block(normalize_text(b.text), b.kind, b.heading) for b in parser(raw)]
+    blocks = [Block(normalize_text(b.text), b.kind, b.heading, b.refs) for b in parser(raw)]
     return ParsedDocument(source_type, tuple(b for b in blocks if b.text))
+
+
+# --------------------------------------------------------------------------- #
+# Sentences
+# --------------------------------------------------------------------------- #
+
+_SENT_SPLIT = re.compile(r"(?<=[.!?])\s+(?=[A-Z0-9\"'(\[])")
+
+
+def split_sentences(text: str) -> list[str]:
+    """Split text into sentences: after ``.``, ``!`` or ``?`` and whitespace, before an
+    uppercase letter, a digit, a quote or an opening bracket. Deterministic and
+    language-agnostic on purpose: claim evidence, sentence reuse and comment refs are
+    all indices into this list, so every part of DAKC must split the same way.
+
+    Part of the public API since 0.8; the splitting rules are versioned by PARSER
+    (:data:`dakc.versions.PARSER`).
+    """
+    return [s.strip() for s in _SENT_SPLIT.split(text) if s.strip()]
 
 
 # --------------------------------------------------------------------------- #
@@ -127,7 +158,8 @@ def _parse_markdown(raw: bytes) -> list[Block]:
                 pending_heading = None
             else:
                 kind = "list_item" if in_list else "paragraph"
-                blocks.append(Block(text, kind, _heading_path(headings, 99)))
+                text, refs = _text_and_refs(_inline_parts(tok))
+                blocks.append(Block(text, kind, _heading_path(headings, 99), refs))
         elif tok.type == "heading_close":
             pending_heading = None
     return blocks
@@ -150,10 +182,19 @@ def _table_row_text(header: list[str], cells: list[str]) -> str:
     return text if not text or text.endswith((".", "!", "?")) else text + "."
 
 
-def _inline_text(tok) -> str:  # markdown_it Token
+class _Comment(NamedTuple):
+    body: str
+
+
+_COMMENT = re.compile(r"<!--(.*?)-->", re.DOTALL)
+
+
+def _inline_parts(tok) -> list[str | _Comment]:  # markdown_it Token
+    """The inline text of a token, in order, with its HTML comments as :class:`_Comment`.
+    Other inline HTML is dropped, as are empty comments."""
     if not tok.children:
-        return tok.content
-    parts: list[str] = []
+        return [tok.content]
+    parts: list[str | _Comment] = []
     for child in tok.children:
         if child.type in ("text", "code_inline"):
             parts.append(child.content)
@@ -161,7 +202,37 @@ def _inline_text(tok) -> str:  # markdown_it Token
             parts.append(" ")
         elif child.type == "image":
             parts.append(child.content)
-    return "".join(parts)
+        elif child.type == "html_inline":
+            parts += [_Comment(m.group(1).strip()) for m in _COMMENT.finditer(child.content) if m.group(1).strip()]
+    return parts
+
+
+def _inline_text(tok) -> str:  # markdown_it Token
+    return "".join(p for p in _inline_parts(tok) if isinstance(p, str))
+
+
+def _text_and_refs(parts: list[str | _Comment]) -> tuple[str, tuple[tuple[str, ...], ...]]:
+    """The text of the parts, and the comment bodies of each of its sentences.
+
+    A comment belongs to the sentence its preceding text ends in: the sentence it
+    follows (``A. <!-- c --> B.``: sentence 0), the one it sits in, or the first
+    sentence when nothing precedes it. The text is exactly what it would be without
+    the comments, so adding, editing or removing one changes no passage."""
+    text = "".join(p for p in parts if isinstance(p, str))
+    if not any(isinstance(p, _Comment) for p in parts):
+        return text, ()
+    n = len(split_sentences(normalize_text(text)))
+    if not n:
+        return text, ()
+    refs: list[list[str]] = [[] for _ in range(n)]
+    prefix: list[str] = []
+    for p in parts:
+        if isinstance(p, _Comment):
+            i = len(split_sentences(normalize_text("".join(prefix)))) - 1
+            refs[min(max(i, 0), n - 1)].append(p.body)
+        else:
+            prefix.append(p)
+    return text, tuple(tuple(r) for r in refs)
 
 
 def _heading_path(headings: dict[int, str], upto: int) -> str:

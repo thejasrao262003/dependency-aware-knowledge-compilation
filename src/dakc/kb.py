@@ -27,13 +27,13 @@ import difflib
 import json
 import re
 from collections import Counter
-from collections.abc import Iterator
+from collections.abc import Iterable, Iterator
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any
 
 from dakc import versions
-from dakc.artifacts import KINDS, LAYER, kind_of
+from dakc.artifacts import KINDS, LAYER, from_payload, kind_of
 from dakc.compiler import STRATEGIES, BuildReport, Compiler
 from dakc.compiler.projection import sync_projection
 from dakc.errors import (
@@ -591,7 +591,10 @@ class KnowledgeBase:
     def read(self, artifact: str) -> ArtifactContent:
         """The current version of an artifact. Pages, summaries and the index return
         their rendered Markdown; claims and passages their text; a source document
-        its current text on disk."""
+        its current text on disk. A claim's ``metadata['supports']`` give, for each
+        supporting passage, its evidence sentence indices and the comment bodies
+        written after each of those sentences (``refs``); a passage's
+        ``metadata['refs']`` those of every sentence, when it has any."""
         aid = self.resolve(artifact)
         if kind_of(aid) == "source":
             return self._read_source(aid)
@@ -603,12 +606,26 @@ class KnowledgeBase:
         text = payload.get("rendered") or payload.get("text") or art.title
         meta = {k: v for k, v in payload.items() if k not in ("rendered", "text", "body")}
         if art.kind == "claim":
+            psgs = self._current(art.passage_ids)  # type: ignore[attr-defined]
             meta = {
                 "mentions": list(art.mentions),  # type: ignore[attr-defined]
-                "supports": [{"passage_id": p, "text": t, "evidence_sentences": list(e)} for p, t, _, e in art.supports],  # type: ignore[attr-defined]
+                "supports": [{"passage_id": p, "text": t, "evidence_sentences": list(e),
+                              "refs": [list(psgs[p].sentence_refs(i)) if p in psgs else [] for i in e]}  # type: ignore[attr-defined]
+                             for p, t, _, e in art.supports],  # type: ignore[attr-defined]
             }
         title = titles(self.store, [aid]).get(aid, art.title)
         return ArtifactContent(aid, art.kind, title, version, from_build, text, meta)
+
+    def _current(self, ids: Iterable[str]) -> dict[str, Any]:
+        """The current versions of several artifacts, by id (missing ids are left out)."""
+        out: dict[str, Any] = {}
+        ids = sorted(set(ids))
+        for i in range(0, len(ids), 500):
+            chunk = ids[i:i + 500]
+            q = f"SELECT id, kind, payload FROM artifacts WHERE to_build IS NULL AND id IN ({','.join('?' * len(chunk))})"
+            for aid, kind, payload in self.store.conn.execute(q, chunk):
+                out[aid] = from_payload(kind, aid, json.loads(payload))
+        return out
 
     def _outdated(self) -> list[str]:
         """What a compile would redo besides source changes, read from what HEAD recorded:

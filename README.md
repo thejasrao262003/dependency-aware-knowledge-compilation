@@ -584,6 +584,10 @@ each provider are tested against a fake server; `claude-code` was also run again
 real CLI. A changed model or provider rebuilds what it produced, and nothing else (see
 *Guarantees*).
 
+`api_key_env` works for `anthropic` too: it names the variable that holds the key.
+When it is unset, the SDK finds the key as usual (`ANTHROPIC_API_KEY`,
+`ANTHROPIC_AUTH_TOKEN` or a login profile). Changing it does not rebuild anything.
+
 ### Claude without an API key
 
 `provider = "claude-code"` sends DAKC's model calls through the Claude Code CLI, with
@@ -613,6 +617,27 @@ The heuristic extractor is a baseline: it treats capitalized and camel-case
 terms as entities and each such sentence as a claim. Use an LLM provider for
 extraction quality. The invalidation guarantees do not depend on the
 extractor.
+
+### Using DAKC's clients from your own code
+
+`dakc.providers.make_client` builds the model client of any provider above, from the
+same options as its `[provider.<name>]` table, so your application can call the model
+its knowledge base uses:
+
+```python
+from dakc.providers import ProviderError, make_client
+
+client = make_client("gemini", {"model": "gemini-flash-latest"})
+try:
+    reply = client.complete("Answer in one sentence.", "What is a write-ahead log?")
+except ProviderError as exc:
+    if not exc.transient:   # transient: a rate limit, server error, timeout or lost connection
+        raise
+    ...                     # worth trying again later
+```
+
+Its `fingerprint` is the one a compile records for that configuration. DAKC does not
+cache or count these calls. Details in [docs/python-api.md](docs/python-api.md#using-dakcs-clients-from-your-own-code).
 
 ## Benchmark
 

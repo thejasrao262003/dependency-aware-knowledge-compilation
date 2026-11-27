@@ -86,6 +86,56 @@ Read methods never take the lock. SQLite's WAL mode gives them a consistent
 snapshot while a build runs. This is what lets an agent or the REST API keep
 answering during a compile.
 
+## Using DAKC's clients from your own code
+
+`dakc.providers.make_client(name, options=None)` builds the model client of a
+provider, and nothing else: no workspace, no cache. Use it when your application
+calls the same model as its knowledge base, configured the same way.
+
+```python
+from dakc.providers import ProviderError, make_client
+
+client = make_client("anthropic", {"model": "claude-haiku-5-5", "api_key_env": "MYAPP_ANTHROPIC_KEY"})
+try:
+    reply = client.complete("Answer in one sentence.", "What does a write-ahead log protect against?")
+except ProviderError as exc:
+    if not exc.transient:   # a rejected request, a missing key, a refusal: asking again will not help
+        raise
+    ...                     # a rate limit, server error, timeout or lost connection: try again later
+else:
+    print(reply.text, reply.input_tokens, reply.output_tokens)
+```
+
+- **`name`**: `claude-code`, `anthropic` (or `claude`), an OpenAI-compatible
+  preset (`openai`, `gemini`, `grok`, `deepseek`, `mistral`, `groq`,
+  `openrouter`, `together`, `ollama`, `lmstudio`, or an alias such as `xai`),
+  or `custom`. `heuristic` and `mock` have no model client. Any other name raises
+  `ProviderError` listing the valid ones.
+- **`options`**: the keys of the `[provider.<name>]` table in `dakc.toml`, with the
+  same names and defaults (`model`, `api_key_env`, `base_url`, `max_tokens`,
+  `binary`, `timeout`, `factory`, ...). For `custom`, `path` is used as given; a
+  workspace resolves it relative to itself.
+- **`client.complete(system, user, json_schema=None)`** returns a `Completion`
+  (`text`, `input_tokens`, `output_tokens`). With `json_schema`, providers that
+  support structured output are asked for JSON matching it.
+- **`client.fingerprint`** is the one a compile with the same configuration
+  records, for example `anthropic:claude-haiku-5-5:default`. `make_provider`
+  builds its extractor, page writer, summarizer and conflict verifier on this same
+  client.
+- **Calls are yours.** DAKC does not cache, count or log what you send through
+  the client.
+- **Keys.** Hosted providers read their key from the variable `api_key_env`
+  names. For `anthropic`, when `api_key_env` is not given or the variable is
+  unset, the SDK finds the key as usual (`ANTHROPIC_API_KEY`,
+  `ANTHROPIC_AUTH_TOKEN` or a login profile). DAKC never logs a key or puts it in
+  an error message.
+- **Errors.** A failed call raises `ProviderError` (a `custom` client raises
+  whatever it raises). Its `transient` is True for a rate limit (429), request
+  timeout (408) or server error (5xx) that outlasted the client's own retries, a
+  timeout, a failed connection, and a `claude -p` that did not answer within
+  `timeout`. It is False otherwise (a rejected request, a missing key, a refusal,
+  a truncated answer), where asking again gets the same result.
+
 ## Extending: connectors and publishers
 
 The contracts are in

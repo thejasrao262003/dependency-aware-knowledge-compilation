@@ -3,8 +3,8 @@
 Install with ``pip install 'dakc[anthropic]'``. Credentials are resolved by the
 SDK (``ANTHROPIC_API_KEY``, ``ANTHROPIC_AUTH_TOKEN`` or an ``ant auth login``
 profile), unless ``api_key_env`` names another environment variable that is set:
-then its value is the API key. The key is passed to the SDK and never stored,
-logged or put in an error message.
+then its value is the API key. The key is passed to the SDK and is not kept on
+the client, logged or put in an error message.
 
 Notes for current models:
 * ``temperature`` is not sent: it is rejected on current models and API

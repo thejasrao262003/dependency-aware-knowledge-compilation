@@ -1,5 +1,68 @@
 # Changelog
 
+## v0.8.0 (unreleased): receipts, history, a self-repairing wiki and a public client factory
+
+### Added
+
+- **Comments after a sentence are kept as metadata.**
+  - In Markdown, an HTML comment written after a sentence
+    (`... TTL. <!-- t:3f9a12c4 -->`) is now kept as that sentence's `refs`.
+  - `trace` shows them with each evidence sentence, and `read` of a claim shows them with
+    each support. The CLI, REST, MCP, the web UI and publisher records do too.
+  - Comments are outside every hash: adding, editing or removing one makes no provider
+    call and rewrites no page.
+  - Write a comment after its sentence, on the same line. A line that *starts* with `<!--`
+    is an HTML block and is never read.
+- **`dakc.split_sentences`** is now public. It is the splitter that `evidence_sentences`
+  and `refs` index into.
+- **History on pages.** A claim stated only in documents that a `[[conflicts.scope]]` rule
+  declares `status = "past"` is listed in a deterministic `## History` section, with its
+  citation, instead of among current facts. No LLM call is made for it.
+  - Any current support makes a claim current.
+  - Only a status that a rule declares counts. The scope guessed from tense and headings
+    does not.
+- **One scope per document.** A `[[conflicts.scope]]` label may hold `{path}` or `{dir}`.
+  Notes recording a decision and its later reversal are then *scoped*, not a conflict. Two
+  statements in one note are still compared.
+- **Hand-edited or deleted wiki files are restored on every compile**, including a
+  no-change or a failed one.
+  - A failed build keeps HEAD and repairs the wiki to it; rollback repairs too.
+  - Reported as `projection.repaired` and `repaired_paths` (in the compile report, `--json`,
+    MCP and `CompileFailed.projection`).
+  - A file is read only when its size or mtime changed: on 2,501 pages a no-change compile
+    costs about 14 ms more.
+  - Only files DAKC wrote are repaired or deleted.
+  - `dakc verify` lists drifted files without repairing them.
+- **`dakc.providers.make_client(name, options)`** builds the model client of any provider
+  from the options of its `[provider.<name>]` table. It is for applications that call the
+  same model their knowledge base uses.
+  - Its fingerprint is the one a compile records, and `make_provider` is built on it.
+  - Fingerprints are unchanged, so nothing rebuilds.
+- **`api_key_env` for `anthropic`** names the environment variable holding the key. When it
+  is unset, the SDK finds the key as before.
+- **`ProviderError.transient`** is True for a rate limit, server error, timeout or lost
+  connection that outlasted the retries, including a `claude -p` that times out.
+
+### Changed
+
+- **Provider errors are always `ProviderError`.** HTTP errors such as 401 or 404 from
+  OpenAI-compatible servers, errors from the anthropic SDK, a malformed 200 response, or an
+  invalid `base_url` used to escape as library exceptions; they are now raised as
+  `ProviderError`, with `transient=False`. HTTP 408 is retried like 429 and 5xx.
+
+### Upgrading from 0.7.0
+
+- **Layer versions:** the parser is now `parse/4`, rendering `render/2` and conflict
+  detection `conflicts/8`. The first compile re-parses every source, re-renders every page
+  and re-judges conflicts, all with no provider calls. Pages without history claims render
+  the same text.
+- **Status rules:** workspaces with `[[conflicts.scope]]` rules that set a `status` see
+  "configuration changed" once, because those rules now also decide History.
+- **Projection manifest:** `.dakc/projection.json` gains a `stat` map. The first compile
+  hashes every wiki file once and rewrites none that match. Older versions ignore the map.
+- **Hand edits:** a hand edit to a wiki file is now overwritten by the next compile.
+  Change the sources instead.
+
 ## v0.7.0: Claude without an API key, named providers, and broken-link checking
 
 ### Added

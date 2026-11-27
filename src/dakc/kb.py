@@ -313,7 +313,7 @@ class SourceInfo:
 class RollbackResult:
     restored_build: int
     new_build: int
-    projection: dict[str, int]
+    projection: dict[str, Any]  # wiki file operations, as in BuildReport.projection
     publications: list[dict[str, Any]] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:
@@ -990,9 +990,10 @@ class KnowledgeBase:
                 report, _ = comp.run()
             except Exception as exc:  # provider, network, parse, injected faults
                 head = self.store.head
-                raise CompileFailed(f"{type(exc).__name__}: {exc}", head=head, preserved=head == head_before) from exc
-            if report.status in ("committed", "noop") or not self.output_root.exists():
-                report.projection = sync_projection(self.store, self.output_root, self.workspace.state_dir)
+                raise CompileFailed(f"{type(exc).__name__}: {exc}", head=head, preserved=head == head_before,
+                                    projection=self._repair_projection()) from exc
+            # Every compile, a no-change one included, also restores wiki files edited or deleted by hand.
+            report.projection = sync_projection(self.store, self.output_root, self.workspace.state_dir, verify_files=True)
             if report.status in ("committed", "noop"):
                 report.publications = [publish_to(self.store, n, pub).to_dict() for n, pub in publishers]
         return report
@@ -1043,9 +1044,19 @@ class KnowledgeBase:
                     raise RollbackError("no earlier committed build to roll back to")
                 to = earlier[0]
             new_id = rollback(store, to)
-            proj = sync_projection(store, self.output_root, self.workspace.state_dir)
+            proj = sync_projection(store, self.output_root, self.workspace.state_dir, verify_files=True)
             pubs = [publish_to(store, n, pub).to_dict() for n, pub in self.workspace.publishers()]
         return RollbackResult(to, new_id, proj, pubs)
+
+    def _repair_projection(self) -> dict[str, Any] | None:
+        """After a failed build (the caller holds the build lock): bring the wiki back to
+        HEAD, restoring hand-edited or deleted files. A failure here must not hide the
+        build's own error, and the next compile repairs the wiki anyway, so it is
+        reported as None."""
+        try:
+            return sync_projection(self.store, self.output_root, self.workspace.state_dir, verify_files=True)
+        except Exception:
+            return None
 
 
 def _line_at_flat_offset(text: str, offset: int) -> int:

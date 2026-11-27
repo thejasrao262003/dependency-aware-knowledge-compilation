@@ -9,9 +9,8 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from dakc.artifacts import from_payload
-from dakc.compiler.projection import MANIFEST, rel_path
+from dakc.compiler.projection import MANIFEST, drifted_files
 from dakc.graph import build_graph, find_cycle, layering_violations
-from dakc.hashing import h
 from dakc.provenance.compare import canonical_state, diff_states
 from dakc.storage import Store
 
@@ -110,18 +109,12 @@ def verify_store(store: Store, output_root: Path | None = None, state_dir: Path 
                  for i in sorted(set(want) | set(have)) if want.get(i) != have.get(i)])
 
     if output_root is not None and state_dir is not None:
-        problems = []
-        manifest_path = state_dir / MANIFEST
-        if manifest_path.exists():
-            for aid, kind, payload in store.conn.execute(
-                "SELECT id, kind, payload FROM artifacts WHERE to_build IS NULL AND kind IN ('page','summary','index')"
-            ):
-                p = output_root / rel_path(aid, kind)
-                if not p.exists():
-                    problems.append(f"missing {p}")
-                elif h(p.read_text(encoding="utf-8")) != h(json.loads(payload)["rendered"]):
-                    problems.append(f"differs {p}")
-        res.add("wiki files match the store", problems)
+        # Reports drift (a wiki file edited or deleted by hand) without repairing it; the next
+        # compile restores those files. Every file is read: verify does not trust recorded stats.
+        drifted = drifted_files(store, output_root) if (state_dir / MANIFEST).exists() else []
+        res.add("wiki files match the store", [f"{how} {output_root / rel}" for rel, how in drifted])
+        if drifted:
+            res.metrics["wiki_files_drifted"] = [rel for rel, _ in drifted]
     return res
 
 

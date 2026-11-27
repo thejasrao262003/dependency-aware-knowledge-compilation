@@ -168,7 +168,7 @@ class BuildReport:
     revisions: list[tuple[str, str, float]] = field(default_factory=list)
     notes: list[str] = field(default_factory=list)
     duration_s: float = 0.0
-    projection: dict[str, int] = field(default_factory=dict)
+    projection: dict[str, Any] = field(default_factory=dict)  # wiki file operations (compiler.projection.sync_projection)
     publications: list[dict[str, Any]] = field(default_factory=list)  # one PublishResult.to_dict() per publisher
 
     def op(self, category: str, ident: str) -> None:
@@ -203,7 +203,7 @@ class BuildReport:
             "claim_revisions": [{"old": o, "new": n, "score": round(s, 1)} for o, n, s in self.revisions],
             "notes": self.notes,
             "duration_s": round(self.duration_s, 4),
-            "projection": self.projection,
+            "projection": {k: (v[:limit] if limit and isinstance(v, list) else v) for k, v in self.projection.items()},
             "publications": self.publications,
         }
 

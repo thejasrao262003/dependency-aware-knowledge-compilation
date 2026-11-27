@@ -8,6 +8,8 @@ callers can catch one type. Most also derive from the matching built-in
 
 from __future__ import annotations
 
+from typing import Any
+
 
 class DakcError(Exception):
     """Base class for errors raised by DAKC."""
@@ -55,10 +57,15 @@ class CompileFailed(DakcError, RuntimeError):
     """Compilation failed and nothing was committed.
 
     ``preserved`` is True when HEAD still points at the previous committed
-    build; the knowledge base and the wiki are then exactly as before.
+    build; the knowledge base is then exactly as before. The wiki files are
+    brought back to HEAD (hand-edited or deleted ones are restored), and
+    ``projection`` holds those file operations, as in
+    ``BuildReport.projection``. It is None when the wiki could not be
+    repaired; the next compile repairs it.
     """
 
-    def __init__(self, message: str, *, head: int, preserved: bool):
+    def __init__(self, message: str, *, head: int, preserved: bool, projection: dict[str, Any] | None = None):
         super().__init__(message)
         self.head = head
         self.preserved = preserved
+        self.projection = projection

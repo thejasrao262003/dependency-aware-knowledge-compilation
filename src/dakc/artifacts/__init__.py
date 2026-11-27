@@ -172,6 +172,9 @@ class PageArt(Artifact):
     # Hub pages only: (signature, label, text with section-local citations, claim ids) of
     # every section, in order. Kept so unchanged sections are reused instead of rewritten.
     sections: tuple[tuple[str, str, str, tuple[str, ...]], ...] = ()
+    # The claims listed under History, the tail of claim_ids: every document supporting them
+    # is declared past by a [[conflicts.scope]] rule. Absent from the payload when empty.
+    history: tuple[str, ...] = ()
     kind: ClassVar[str] = "page"
 
     def content(self):
@@ -192,6 +195,7 @@ class PageArt(Artifact):
             "generator": self.generator,
             "dropped": list(self.dropped),
             **({"sections": [[s[0], s[1], s[2], list(s[3])] for s in self.sections]} if self.sections else {}),
+            **({"history": list(self.history)} if self.history else {}),
         }
 
     def deps(self):
@@ -277,7 +281,7 @@ def from_payload(kind: str, id_: str, p: dict[str, Any]) -> Artifact:
         return PageArt(
             id_, p["entity_id"], p["title"], p["body"], p["lead"], p["rendered"], tuple(p["claim_ids"]),
             tuple(p["rel_ids"]), p["topic"], p["gen_sig"], p["render_sig"], p.get("generator", ""), tuple(p.get("dropped", ())),
-            tuple((s[0], s[1], s[2], tuple(s[3])) for s in p.get("sections", ())),
+            tuple((s[0], s[1], s[2], tuple(s[3])) for s in p.get("sections", ())), tuple(p.get("history", ())),
         )
     if kind == "summary":
         return SummaryArt(id_, p["topic"], p["title"], p["rendered"], tuple(p["page_ids"]), p["sig"], p.get("generator", ""),

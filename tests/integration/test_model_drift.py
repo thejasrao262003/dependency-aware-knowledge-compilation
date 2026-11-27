@@ -120,9 +120,9 @@ def test_store_without_recorded_versions_is_treated_as_outdated(built, tmp_path)
 
 def test_rollback_restores_recorded_versions(built, monkeypatch):
     src, store = built
-    head = store.head
+    head, recorded = store.head, versions.RENDER
     monkeypatch.setattr(versions, "RENDER", "render/99")
     run(store, src)
     assert store.load_state().compiler_versions["render"] == "render/99"
     rollback(store, head)
-    assert store.load_state().compiler_versions["render"] == "render/1"
+    assert store.load_state().compiler_versions["render"] == recorded

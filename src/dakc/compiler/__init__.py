@@ -21,7 +21,7 @@ import json
 import re
 import time
 from collections import Counter, defaultdict
-from collections.abc import Callable, Iterable, Iterator
+from collections.abc import Callable, Iterable, Iterator, Sequence
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field, replace
 from pathlib import Path
@@ -41,7 +41,7 @@ from dakc.artifacts import (
 from dakc.errors import SourceError
 from dakc.conflicts import Occurrence, ScopeRule
 from dakc.conflicts import fingerprint as conflicts_fingerprint
-from dakc.conflicts import index_rows, judge
+from dakc.conflicts import index_rows, judge, rule_status, status_rules
 from dakc.conflicts import verifier as cverify
 from dakc.conflicts.verifier import Settings as VerifierSettings
 from dakc import links as dlinks
@@ -126,6 +126,28 @@ def _hub_lead(name: str, mentions: list[tuple[str, ...]]) -> str:
     about = f", most often alongside {sorted(co.items(), key=lambda kv: (-kv[1], kv[0]))[0][0]}" if co else ""
     n = len(mentions)
     return f"{name} has {n} documented fact{'s' if n != 1 else ''}{about}. They are listed below in sections."
+
+
+def _history_only_body(name: str) -> str:
+    """The body of a page whose every claim is history: deterministic, no writer call."""
+    return f"No current source describes {name}. What earlier sources recorded is listed under History."
+
+
+def config_fingerprint(aliases: dict[str, str], provenance: str, conflict_rules: list[ScopeRule] | None = None) -> str:
+    """Hash of the configuration that changes derived content. A change re-resolves entities
+    and re-checks every page; only pages whose signatures changed are rebuilt.
+
+    The status ``[[conflicts.scope]]`` rules declare is part of it, because it decides which
+    claims a page shows under History. It is added only when some rule has a status, so a
+    workspace without such rules keeps the fingerprint it had before History existed."""
+    cfg: dict[str, Any] = {"aliases": aliases, "entity_resolution": versions.ENTITY_RESOLUTION, "provenance": provenance}
+    declared = status_rules(conflict_rules)
+    if declared:
+        cfg["scope_status"] = declared
+    return h_obj(cfg)
+
+
+_config_fingerprint = config_fingerprint  # Compiler's keyword argument of the same name shadows it
 
 
 def topic_of(path: str) -> str:
@@ -240,9 +262,9 @@ class Compiler:
         if provenance not in ("report", "strict"):
             raise ValueError("provenance must be 'report' or 'strict'")
         self.provenance = provenance
-        self.config_fingerprint = config_fingerprint or h_obj(
-            {"aliases": self.alias_map, "entity_resolution": versions.ENTITY_RESOLUTION, "provenance": provenance}
-        )
+        self.conflict_rules = list(conflict_rules or [])
+        self.config_fingerprint = config_fingerprint or _config_fingerprint(self.alias_map, provenance, self.conflict_rules)
+        self._past: dict[str, bool] = {}  # source path -> declared past by a [[conflicts.scope]] rule
         self.strategy = strategy
         self.jobs = max(1, jobs)
         self.dry_run = dry_run
@@ -252,7 +274,6 @@ class Compiler:
         self.sentence_reuse = sentence_reuse
         self.acquire_lock = acquire_lock
         self.lock_timeout = lock_timeout
-        self.conflict_rules = list(conflict_rules or [])
         self.conflicts_fp = conflicts_fingerprint(self.conflict_rules, self.alias_map)
         self.conflicts_accepted = set(conflicts_accepted or ())  # reporting only: findings are stored either way
         self.verifier_settings = conflict_verifier  # None: the verifier is off (RFC 0002, phase 2)
@@ -592,7 +613,8 @@ class Compiler:
         # -------------------------------------------- entities & relationships
         config_changed = bool(old.config_fingerprint) and old.config_fingerprint != self.config_fingerprint and not full
         if config_changed:
-            report.notes.append("configuration changed (aliases, entity resolution or provenance mode): entities re-resolved and pages re-checked")
+            report.notes.append("configuration changed (aliases, entity resolution, provenance mode or the status of "
+                                "[[conflicts.scope]] rules): entities re-resolved and pages re-checked")
         members: dict[str, set[str]] = {}
         rel_members: dict[str, set[str]] = {}
         touched_entities: set[str] = set()
@@ -693,7 +715,14 @@ class Compiler:
         # depends on the claims alone, so moved citations or headings never rewrite a section.
         # Page-wide numbers and section labels are assigned when the page is assembled, so an
         # insertion renumbers citations without rewriting any text.
-        page_plans: list[tuple[str, EntityArt, list[str], str, list[tuple[str, list[str]]] | None]] = []
+        #
+        # History (versions.RENDER = render/2): a claim whose every support lies in a document
+        # a [[conflicts.scope]] rule declares past is not given to the writer. It is listed,
+        # deterministically, in the page's History section. The split is part of both
+        # signatures: the generation signature covers the current claims only, and the render
+        # signature the history list, so a claim that moves between the two rebuilds exactly
+        # the pages that show it. A page with no history claims is built exactly as before.
+        page_plans: list[tuple[str, EntityArt, list[str], list[str], str, list[tuple[str, list[str]]] | None]] = []
         regen: list[tuple[Any, str, tuple[ClaimView, ...]]] = []
         for eid in sorted(candidates):
             pid = page_id_for(eid)
@@ -705,18 +734,24 @@ class Compiler:
                 continue
             prev = pages.get(pid)
             order = sorted(ent.claim_ids, key=lambda c: (normalize_claim(claims[c].text), c))
-            if len(ent.claim_ids) <= PAGE_FLAT:
-                gen_sig = h_obj([W.fingerprint, ent.name, [(c, claims[c].content_hash) for c in order]])
-                page_plans.append((pid, ent, order, gen_sig, None))
-                if self.forced or prev is None or prev.gen_sig != gen_sig:
-                    views = tuple(ClaimView(f"C{i + 1}", claims[c].text, claims[c].mentions) for i, c in enumerate(order))
+            history = self._history(order, claims, passages, sources)
+            if history:
+                in_history = set(history)
+                current = [c for c in order if c not in in_history]
+            else:
+                current = order
+            if len(current) <= PAGE_FLAT:
+                gen_sig = h_obj([W.fingerprint, ent.name, [(c, claims[c].content_hash) for c in current]])
+                page_plans.append((pid, ent, current, history, gen_sig, None))
+                if current and (self.forced or prev is None or prev.gen_sig != gen_sig):
+                    views = tuple(ClaimView(f"C{i + 1}", claims[c].text, claims[c].mentions) for i, c in enumerate(current))
                     regen.append((pid, ent.name, views))
                     report.op("regenerate_page", pid)
                 continue
             cached = {sec[0] for sec in prev.sections} if prev is not None else set()
             secs: list[tuple[str, list[str]]] = []
             rewritten = False
-            for chunk in content_sections(order, key=lambda c: c):
+            for chunk in content_sections(current, key=lambda c: c):
                 sig_s = h_obj([W.fingerprint, versions.PAGE, ent.name, [(c, claims[c].content_hash) for c in chunk]])
                 secs.append((sig_s, chunk))
                 if self.forced or sig_s not in cached:
@@ -727,7 +762,7 @@ class Compiler:
                 else:
                     report.op("cutoff_section", f"{pid}#{len(secs)}")
             gen_sig = h_obj([W.fingerprint, versions.PAGE, ent.name, [sec[0] for sec in secs]])
-            page_plans.append((pid, ent, order, gen_sig, secs))
+            page_plans.append((pid, ent, current, history, gen_sig, secs))
             if rewritten:
                 report.op("regenerate_page", pid)
 
@@ -743,12 +778,16 @@ class Compiler:
                 bodies[item[0]] = (res.text, first_paragraph(res.text))
 
         changed_pages: set[str] = set(report.ops.get("delete_page", []))
-        for pid, ent, order, gen_sig, secs in page_plans:
+        for pid, ent, current, history, gen_sig, secs in page_plans:
             prev = pages.get(pid)
-            citations = [sorted({sources[passages[p].source_id].path for p in claims[c].passage_ids}) for c in order]
+            shown = current + history  # citation order: [^C1..Cn] the current claims, then History
+            citations = [sorted({sources[passages[p].source_id].path for p in claims[c].passage_ids}) for c in shown]
             stored: tuple[tuple[str, str, str, tuple[str, ...]], ...] = ()
             if secs is None:
-                body = bodies[pid][0] if pid in bodies else prev.body  # type: ignore[union-attr]
+                if current:
+                    body = bodies[pid][0] if pid in bodies else prev.body  # type: ignore[union-attr]
+                else:
+                    body = _history_only_body(ent.name)
                 written = pid in bodies
             else:
                 old_text = {sec[0]: sec[2] for sec in prev.sections} if prev is not None else {}
@@ -760,22 +799,24 @@ class Compiler:
                     parts.append(f"## {label}\n\n" + _renumber(local, offset, len(chunk)))
                     offset += len(chunk)
                 stored = tuple(kept)
-                body = _hub_lead(ent.name, [claims[c].mentions for c in order]) + "\n\n" + "\n\n".join(parts)
+                body = _hub_lead(ent.name, [claims[c].mentions for c in current]) + "\n\n" + "\n\n".join(parts)
                 written = any((pid, i) in bodies for i in range(len(secs)))
             dropped: list[str] = []
             display = body
             if self.provenance == "strict":
-                display, dropped = ground_body(body, len(order))
+                display, dropped = ground_body(body, len(current))
             lead = first_paragraph(display)
             related = self._related(ent.id, rels_by_entity, rels, entities)
             topic_votes: Counter[str] = Counter(topic_of(p) for paths in citations for p in paths)
             topic = sorted(topic_votes.items(), key=lambda kv: (-kv[1], kv[0]))[0][0]
-            render_sig = h_obj([gen_sig, versions.RENDER, self.provenance, related, citations])
-            rendered = self._render_page(ent.name, display, related, citations)
+            history_texts = [claims[c].text for c in history]
+            render_sig = h_obj([gen_sig, versions.RENDER, self.provenance, related, citations,
+                                list(zip(history, history_texts))])
+            rendered = self._render_page(ent.name, display, related, citations, history_texts)
             page = PageArt(
-                pid, ent.id, ent.name, body, lead, rendered, tuple(order),
+                pid, ent.id, ent.name, body, lead, rendered, tuple(shown),
                 tuple(sorted(set(rels_by_entity.get(ent.id, ())) & rels.keys())), topic, gen_sig, render_sig, W.fingerprint,
-                tuple(dropped), stored,
+                tuple(dropped), stored, tuple(history),
             )
             if prev is None or prev.state_hash != page.state_hash:
                 changed_pages.add(pid)
@@ -1341,9 +1382,34 @@ class Compiler:
         scored.sort()
         return [[o, name] for _, _, o, name in scored[:RELATED_LIMIT]]
 
+    def _history(self, order: list[str], claims: dict[str, ClaimArt], passages: dict[str, PassageArt],
+                 sources: dict[str, SourceRecord]) -> list[str]:
+        """The claims of a page that are history: every document that supports them is declared
+        past by a ``[[conflicts.scope]]`` rule. A claim with any other support is current.
+        Ordered by the earliest supporting path, so notes named by date read in order."""
+        if not any(r.status == "past" for r in self.conflict_rules):
+            return []
+        out = []
+        for i, c in enumerate(order):
+            paths = {sources[passages[p].source_id].path for p in claims[c].passage_ids}
+            for path in paths:
+                if path not in self._past:
+                    self._past[path] = rule_status(path, self.conflict_rules) == "past"
+            if paths and all(self._past[path] for path in paths):
+                out.append((min(paths), i, c))
+        return [c for _, _, c in sorted(out)]
+
     @staticmethod
-    def _render_page(name: str, body: str, related: list[list[str]], citations: list[list[str]]) -> str:
+    def _render_page(name: str, body: str, related: list[list[str]], citations: list[list[str]],
+                     history: Sequence[str] = ()) -> str:
+        """``citations`` covers the current claims, then the ``history`` ones, whose texts are
+        listed under History with the numbers that follow the current claims'."""
         parts = [f"# {name}", "", body.strip(), ""]
+        if history:
+            first = len(citations) - len(history) + 1
+            parts += ["## History", ""]
+            parts += [f"- {text} [^C{first + i}]" for i, text in enumerate(history)]
+            parts.append("")
         if related:
             parts += ["## Related", ""]
             parts += [f"- [{n}]({o.split(':', 1)[1]}.md)" for o, n in related]

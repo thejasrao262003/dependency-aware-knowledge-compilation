@@ -219,3 +219,79 @@ def test_the_web_ui_conflicts_view(tmp_path):
     traced = {c["claim_id"] for c in client.get("/artifacts/page:postgresql/trace").json()["claims"]}
     assert traced >= {loc["claim_id"] for v in full["values"] for loc in v["locations"]}
     assert client.get("/conflicts/cfl:nope").status_code == 404
+
+
+# --- per-document scope labels (RFC 0002, "Per-document scope")
+SESSION_RULE = '[[conflicts.scope]]\npath = "sessions/**"\nstatus = "past"\nlabel = "{path}"\n'
+BCRYPT = "# Auth\n\nThe password hashing algorithm of Auth is Bcrypt.\n"
+ARGON2 = "# Auth\n\nThe password hashing algorithm of Auth is Argon2.\n"
+
+
+def test_session_notes_are_each_their_own_scope(tmp_path, monkeypatch):
+    """A decision and its later reversal, in two session notes, are history, not a conflict;
+    the per-document expansion never changes the fingerprint, so a new note re-parses only
+    its own claims; and the findings always equal a detection from scratch."""
+    import dakc.compiler as compiler
+
+    ws = workspace(tmp_path, {"sessions/2026-03-02.md": BCRYPT, "sessions/2026-05-14.md": ARGON2}, SESSION_RULE)
+    with dakc.open(ws) as kb:
+        rules = kb.workspace.config.conflict_rules
+        rep = kb.compile()
+        assert rep.counts["conflicts_open"] == 0
+        (scoped,) = kb.conflicts(scoped=True)
+        assert scoped.kind == "scoped"
+        assert {loc.scope for v in scoped.values for loc in v.locations} == {
+            "past, 2026, sessions/2026-03-02.md", "past, 2026, sessions/2026-05-14.md"}
+        fp = kb.store.get_meta("conflicts_fp")
+
+        parsed: list[str] = []
+        real = compiler.index_rows
+
+        def counting(occurrences, *a, **kw):
+            parsed.extend(o.path for o, _m, _t in occurrences)
+            return real(occurrences, *a, **kw)
+
+        monkeypatch.setattr(compiler, "index_rows", counting)
+        write_files(ws / "knowledge", {"sessions/2026-06-01.md": "# Auth\n\nThe password hashing algorithm of Auth is Scrypt.\n"})
+        rep = kb.compile()
+        assert parsed == ["sessions/2026-06-01.md"]  # only the new note's claims were parsed
+        assert kb.store.get_meta("conflicts_fp") == fp and rep.counts["conflicts_open"] == 0
+        assert from_scratch(kb.store, rules) == stored(kb.store)
+
+        # two statements in one note are still compared
+        write_files(ws / "knowledge", {"sessions/2026-06-01.md": BCRYPT + "\nThe password hashing algorithm of Auth is Scrypt.\n"})
+        rep = kb.compile()
+        assert rep.counts["conflicts_open"] == 1
+        (c,) = kb.conflicts()
+        assert {loc.path for v in c.values for loc in v.locations} == {"sessions/2026-06-01.md"}
+
+        # a note moved out of sessions/ is current: against the other notes it is scoped, as before
+        (ws / "knowledge" / "current").mkdir()
+        (ws / "knowledge" / "sessions" / "2026-06-01.md").rename(ws / "knowledge" / "current" / "auth.md")
+        rep = kb.compile()
+        assert from_scratch(kb.store, rules) == stored(kb.store)
+        assert [c.kind for c in kb.conflicts()] == ["conflict"]  # the two current statements in current/auth.md
+        assert kb.verify().checks["conflict findings equal a detection from scratch"]
+
+
+def test_a_new_detector_version_rejudges_everything_and_touches_nothing_else(tmp_path, monkeypatch):
+    """DETECTOR_VERSION is the conflict layer's version: a store judged by an older detector is
+    re-indexed in full on the next compile, with no provider call and no artifact rebuilt."""
+    import dakc.conflicts as conflicts
+
+    ws = workspace(tmp_path, {"sessions/2026-03-02.md": BCRYPT, "sessions/2026-05-14.md": ARGON2}, SESSION_RULE)
+    # conflicts/7 read "{path}" as a literal label shared by both notes, so they conflicted
+    monkeypatch.setattr(conflicts, "DETECTOR_VERSION", "conflicts/7")
+    monkeypatch.setattr(conflicts.ScopeRule, "label_for", lambda self, path: self.label)
+    with dakc.open(ws) as kb:
+        assert kb.compile().counts["conflicts_open"] == 1
+        pages = {p.id: p.state_hash for p in kb.store.load_state().of("page").values()}
+    monkeypatch.undo()
+    with dakc.open(ws) as kb:
+        assert any("conflict detection" in r for r in kb.status().outdated)
+        rep = kb.compile()
+        assert rep.status == "committed" and rep.usage.calls == 0 and rep.changes["artifact_versions_written"] == 0
+        assert rep.ops["conflict_resolved"] and rep.counts["conflicts_open"] == 0
+        assert {p.id: p.state_hash for p in kb.store.load_state().of("page").values()} == pages
+        assert from_scratch(kb.store, kb.workspace.config.conflict_rules) == stored(kb.store)
+        assert kb.compile().status == "noop"

@@ -12,6 +12,11 @@ from dakc.providers.deterministic import HeuristicExtractor
 
 EX = HeuristicExtractor()
 
+# Session notes, one per session (Reckon's layout): every note is past, and its own scope.
+SESSIONS = [ScopeRule("sessions/**", status="past", label="{path}")]
+BCRYPT = "The password hashing algorithm of Auth is Bcrypt."
+ARGON2 = "The password hashing algorithm of Auth is Argon2."
+
 # (case, (path, heading, sentence), (path, heading, sentence) or None, expected, rules)
 CASES = [
     # --- conflicts: the same property, the same scope, incompatible
@@ -38,6 +43,12 @@ CASES = [
      ("b.md", "B", "In production, Kafka runs on three nodes."), "conflict", None),
     ("oauth2.md is not a revision", ("oauth2.md", "OAuth", "Keycloak is the identity provider."),
      ("oauth.md", "OAuth", "Auth0 is the identity provider."), "conflict", None),
+    ("two past notes, one shared label", ("sessions/2026-03-02.md", "Auth", BCRYPT),
+     ("sessions/2026-05-14.md", "Auth", ARGON2), "conflict", [ScopeRule("sessions/**", status="past")]),
+    ("two statements in one note, a label per document", ("sessions/2026-03-02.md", "Auth", f"{BCRYPT} {ARGON2}"), None,
+     "conflict", SESSIONS),
+    ("label per folder, one folder", ("teams/payments/db.md", "DB", "MongoDB is the database."),
+     ("teams/payments/stack.md", "Stack", "PostgreSQL is the database."), "conflict", [ScopeRule("teams/**", label="{dir}")]),
 
     # --- scoped: incompatible values, explained by time, release, environment or status
     ("revision file beside the current one", ("techstack001.md", "Tech stack", "MongoDB is the DB."),
@@ -52,6 +63,12 @@ CASES = [
      ("b.md", "B", "In development, SQLite is the database."), "scoped", None),
     ("scope rule in dakc.toml", ("docs/mvp/stack.md", "Stack", "MongoDB is the database."),
      ("docs/stack.md", "Stack", "PostgreSQL is the database."), "scoped", [ScopeRule("docs/mvp/**", status=None, label="release 1")]),
+    ("a decision and its reversal, in two notes with a label per document", ("sessions/2026-03-02.md", "Auth", BCRYPT),
+     ("sessions/2026-05-14.md", "Auth", ARGON2), "scoped", SESSIONS),
+    ("a past note against a current document", ("sessions/2026-03-02.md", "Auth", BCRYPT),
+     ("current/auth.md", "Auth", ARGON2), "scoped", SESSIONS),
+    ("label per folder, two folders", ("teams/payments/db.md", "DB", "MongoDB is the database."),
+     ("teams/search/db.md", "DB", "PostgreSQL is the database."), "scoped", [ScopeRule("teams/**", label="{dir}")]),
     ("archive path", ("archive/techstack.md", "Tech stack", "MongoDB is the database."),
      ("techstack.md", "Tech stack", "PostgreSQL is the database."), "scoped", None),
     ("decision records", ("docs/adr/0001-database.md", "Decision", "MongoDB is the database."),
@@ -129,6 +146,58 @@ def test_revision_numbers_in_file_names(path, token):
     sc = scope_of("MongoDB is the database.", "Stack", path)
     revs = {t for t in sc.time if t.startswith(("revision", "record"))}
     assert revs == ({token} if token else set())
+
+
+# --- per-document scope labels: [[conflicts.scope]] label = "{path}" or "{dir}"
+def test_a_label_with_a_placeholder_is_expanded_per_document():
+    assert SESSIONS[0].label_for("sessions/2026-03-02.md") == "sessions/2026-03-02.md"
+    assert ScopeRule("teams/**", label="team {dir}").label_for("teams/payments/db.md") == "team teams/payments"
+    assert ScopeRule("docs/mvp/**", label="release 1").label_for("docs/mvp/a.md") == "release 1"  # as before
+    sc = scope_of(BCRYPT, "Auth", "sessions/2026-03-02.md", SESSIONS)
+    assert sc.status == "past" and sc.label() == "past, 2026, sessions/2026-03-02.md"
+
+
+def _finding(occ, rules):
+    (f,) = detect(occ, rules).values()
+    return f.kind, {v["value"]: sorted(o["path"] for o in v["occurrences"]) for v in f.values}
+
+
+def test_a_note_against_a_current_document_is_reported_as_before():
+    """The labels separate the notes from one another and from nothing else. A past note
+    against a current document is scoped, as without the label, and every value is listed."""
+    occ = occurrences(("sessions/2026-03-02.md", "Auth", BCRYPT), "a") + occurrences(("current/auth.md", "Auth", ARGON2), "c")
+    expected = ("scoped", {"Argon2": ["current/auth.md"], "Bcrypt": ["sessions/2026-03-02.md"]})
+    assert _finding(occ, [ScopeRule("sessions/**", status="past")]) == expected
+    assert _finding(occ, SESSIONS) == expected
+    # a decision, its reversal in a later note, and the current document: one scoped finding with all three
+    occ += occurrences(("sessions/2026-05-14.md", "Auth", ARGON2), "b")
+    assert _finding(occ, SESSIONS) == ("scoped", {"Argon2": ["current/auth.md", "sessions/2026-05-14.md"],
+                                                  "Bcrypt": ["sessions/2026-03-02.md"]})
+
+
+def test_current_documents_still_conflict_when_notes_state_the_property_too():
+    occ = (occurrences(("current/auth.md", "Auth", ARGON2), "a") + occurrences(("current/security.md", "Sec", BCRYPT), "b")
+           + occurrences(("sessions/2026-03-02.md", "Auth", BCRYPT), "c"))
+    assert _finding(occ, SESSIONS) == ("conflict", {"Argon2": ["current/auth.md"], "Bcrypt": ["current/security.md"]})
+
+
+def test_labels_are_checked_when_the_rules_are_read():
+    from dakc.conflicts import rules_from_config
+
+    rules, _ = rules_from_config({"scope": [{"path": "sessions/**", "status": "past", "label": "{path}"}]})
+    assert rules == SESSIONS
+    with pytest.raises(ValueError, match=r"unknown placeholder \{paht\}"):
+        rules_from_config({"scope": [{"path": "sessions/**", "label": "{paht}"}]})
+    (rule,), _ = rules_from_config({"scope": [{"path": "v/**", "label": "release {1}"}]})  # not a placeholder
+    assert rule.label_for("v/a.md") == "release {1}"
+
+
+def test_the_fingerprint_holds_the_label_as_written():
+    """Not its expansions: adding a document under the rule must not re-judge everything."""
+    from dakc.conflicts import fingerprint
+
+    assert fingerprint(SESSIONS) == fingerprint([ScopeRule("sessions/**", status="past", label="{path}")])
+    assert fingerprint(SESSIONS) != fingerprint([ScopeRule("sessions/**", status="past")])
 
 
 # --- phase 2 rules: the same statement worded differently (RFC 0002, "Rules: wording")

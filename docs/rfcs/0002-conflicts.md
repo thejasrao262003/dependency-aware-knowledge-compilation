@@ -57,6 +57,8 @@ Each row is a test case in `tests/unit/test_conflicts.py`.
 | "The recommended algorithm is Argon2" / "… is Bcrypt" | conflict | current guidance, not a proposal |
 | both "in release 1", or both "in production", with different values | conflict | same scope, so the scope does not explain it |
 | two contradicting sentences in one document | conflict | |
+| two contradicting sentences in one note under a `label = "{path}"` rule | conflict | one document, one scope |
+| two notes under a rule with `status = "past"` and no label | conflict | both are past, and nothing else tells them apart |
 | `techstack001.md` MongoDB / `techstack.md` PostgreSQL | scoped | a zero-padded number in a file name marks a revision snapshot |
 | heading "Release 1 (MVP)" / heading "Production" | scoped | scope is read from the heading path |
 | "In release 1 (MVP), MongoDB is the database" / "PostgreSQL is the database" | scoped | scope is read from the sentence |
@@ -65,6 +67,8 @@ Each row is a test case in `tests/unit/test_conflicts.py`.
 | `archive/techstack.md`, `docs/adr/0001-*.md` vs `0004-*.md`, release notes under version headings | scoped | the path or heading marks history or a decision record |
 | "Rejected alternatives", "FAQ > Myths", "If caching is enabled, …" | scoped | proposed, quoted and conditional statements are not statements of fact |
 | a path matched by a `[[conflicts.scope]]` rule | scoped | the team said what the document describes |
+| two session notes under a rule with `label = "{path}"`: "… is Bcrypt" in March, "… is Argon2" in May | scoped | each document under the rule is its own scope |
+| a note under that rule (`status = "past"`) / a current document | scoped | past against current, as without the label |
 | "PostgreSQL supports JSONB" / "PostgreSQL supports Indexing" | nothing | "supports" is multi-valued |
 | "Ledger uses PostgreSQL" / "Ledger uses Redis"; "stores data in" | nothing | multi-valued |
 | "Redis is a cache" / "Memcached is a cache" | nothing | indefinite: different subjects can share a description |
@@ -152,6 +156,35 @@ time markers and environment markers. It is read from four places:
    `http2.md` are not.
 4. **`[[conflicts.scope]]` rules** in `dakc.toml`.
 
+### Per-document scope
+
+A rule's `status` and `label` are shared by every document it matches. That
+suits an `archive/` folder, but not a folder of notes written one per session
+or per meeting: two notes that record a decision and, later, its reversal
+("the password hashing algorithm is Bcrypt" in March, "… is Argon2" in May)
+are both past, share one scope, and would be reported as a conflict.
+
+A label can hold a placeholder, expanded for each document:
+
+```toml
+[[conflicts.scope]]
+path = "sessions/**"
+status = "past"
+label = "{path}"      # every note its own scope; "{dir}": every folder
+```
+
+- **Between documents under the rule**, a difference is explained by scope:
+  *scoped*, listed with `--all`.
+- **Within one document** the scope is shared, so two statements that
+  disagree are still a conflict.
+- **Against a document outside the rule** nothing changes. A past note
+  against a current document was already scoped (two statuses), and stays
+  scoped, with every value listed. Two current documents that disagree are
+  a conflict whatever the notes say.
+- Only `{path}` and `{dir}` are placeholders. Another `{name}` in a label is
+  an error when the configuration is read, so a typo cannot silently put
+  every document in one scope.
+
 ### Judging
 
 All occurrences that share a key are grouped by scope.
@@ -184,7 +217,11 @@ that is fixed and later reintroduced comes back with the same id.
   build it returns to.
 - **When everything is rebuilt.**
   - Everything is re-judged when the detector version or the scope rules
-    change: their fingerprint is stored with the index.
+    change: their fingerprint is stored with the index. A rule enters the
+    fingerprint as written: a `{path}` label is hashed as the template, not
+    its expansions, so adding a document under the rule re-judges only that
+    document's keys. A renamed document's claims are re-parsed (above), which
+    picks up its new label.
   - The index is rebuilt after a rollback.
   - The first build after an upgrade builds it from scratch.
 - **Checking it.** `dakc verify` recomputes every finding from scratch and
@@ -199,6 +236,21 @@ that is fixed and later reintroduced comes back with the same id.
 Detection never changes a claim, a page or a signature. It is not part of
 the canonical state, so it cannot affect `verify --against-full` or the
 benchmark.
+
+### Past-scoped claims on pages
+
+The status a `[[conflicts.scope]]` rule declares is also read by page
+rendering, which is separate from detection. A claim whose every supporting
+document a rule declares past is listed under a deterministic `## History`
+section of its page, not among its current facts. With the session-notes rule
+above, Bcrypt (stated only in a March note) is History on the Auth page and
+Argon2 (stated in `current/auth.md`) is current. The finding between them
+stays *scoped*.
+
+Only declared status moves a claim. Scope inferred from a sentence, heading or
+path stays a conflict-detection matter: it is tuned so that a wrong "past"
+costs a finding, not a fact on a page. Design, invalidation and measurements:
+"History" in [docs/dependency-model.md](../dependency-model.md) and ADR-30.
 
 ### The verifier (optional)
 

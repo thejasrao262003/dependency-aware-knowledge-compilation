@@ -293,7 +293,8 @@ def test_status_reports_work_that_is_not_a_source_change(kb, monkeypatch):
     cfg = kb.root / "dakc.toml"
     cfg.write_text(cfg.read_text() + '"Postgres" = "PostgreSQL"\n')
     with dakc.open(kb.root) as kb2:
-        assert kb2.status().outdated == ["configuration changed (entity aliases, entity resolution or provenance mode)",
+        assert kb2.status().outdated == ["configuration changed (entity aliases, entity resolution, provenance mode or "
+                                         "the status of [[conflicts.scope]] rules)",
                                          "conflict detection, its [conflicts] scope rules or the aliases changed"]
         kb2.compile()
         assert kb2.status().up_to_date

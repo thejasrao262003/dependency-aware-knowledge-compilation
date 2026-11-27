@@ -98,7 +98,7 @@ def _print_report(report, as_json: bool) -> None:
     if as_json:
         _emit_json(report.to_dict())
         return
-    console.print(render(report))
+    console.print(render(report), markup=False)  # plain text: notes quote "[[conflicts.scope]]", "[conflicts]"
     _print_publications(report.publications)
     if report.status == "noop":
         console.print("\nNothing changed. Knowledge base is up to date.")
@@ -499,7 +499,7 @@ def status(workspace: WS = Path("."), as_json: JSON = False) -> None:
         if st.new_sources:
             console.print(f"  plus {st.new_sources} new source(s) not yet compiled")
     for reason in st.outdated:
-        console.print(f"[yellow]Outdated[/yellow]: {reason}")
+        console.print(f"[yellow]Outdated[/yellow]: {escape(reason)}")
     console.print("  `dakc compile --dry-run` shows exactly what a compile would redo.")
 
 

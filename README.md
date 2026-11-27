@@ -450,6 +450,27 @@ id = "cfl:0123456789"
 reason = "two clusters, two ports"
 ```
 
+Notes written one per session or meeting are each their own scope with a
+per-document label. A note that records a decision and a later note that
+reverses it are then *scoped*, not a conflict. Two statements in one note are
+still compared, and a note against a current document is judged as before:
+
+```toml
+[[conflicts.scope]]
+path = "sessions/**"
+status = "past"
+label = "{path}"           # "{dir}": one scope per folder
+```
+
+Pages follow a declared `status = "past"`. A claim stated only in documents a
+rule declares past is listed under a `## History` section of its page,
+deterministically and with its citation, instead of among the current facts.
+The page writer never sees it. If a March note says Bcrypt and `current/auth.md`
+says Argon2, the Auth page shows Argon2 as a fact and Bcrypt under History. A
+claim with any current source stays current. Scope that DAKC only infers from
+tense or headings never moves a fact (see "History" in
+[docs/dependency-model.md](docs/dependency-model.md)).
+
 **The rules are precise but narrow.** They raised no false alarm on
 FastAPI's documentation (0 findings over 11,067 claims) or on 55 labelled
 pairs that are scoped or compatible. But they compare only statements of the
@@ -556,6 +577,7 @@ including deletion semantics and dry-run precision, is in
 | Source renamed | Same source id, **zero** LLM calls; citations re-rendered. |
 | Duplicate document added | Extraction-cache hit, **zero** extraction calls. |
 | Entity aliases changed (`[aliases]` in `dakc.toml`) | Entity resolution re-runs deterministically; only pages whose membership changed are rebuilt. |
+| A document moves into or out of a folder declared past, or a `[[conflicts.scope]]` status changes | Claims move between a page's facts and its History section. Only the pages that show them are rebuilt: the writer rewrites the body from the current claims (no call if none is left), and History is rendered by code. |
 | A fact about a hub entity, or a page in a large topic, changes | The hub page (more than 64 claims) and large topic summaries (more than 64 pages) are built in content-defined sections. Only the sections whose inputs changed are rewritten, then their parent. No prompt reads a whole hub or a whole large topic. |
 | Prompt or model changed | The provider fingerprint changes. Writer and summarizer changes invalidate exactly the pages and summaries they built. An extractor change re-extracts every passage, because each passage records which extractor produced its claims. Pages are regenerated only where the re-extracted claims differ. |
 | Build fails (provider error, crash, injected fault) | Nothing is committed. HEAD is unchanged, and the wiki is repaired to HEAD (hand-edited or deleted files are restored) by the failed compile, or by the next one after a crash; paid extraction results are cached for the retry. |

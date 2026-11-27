@@ -204,14 +204,34 @@ class Parsed:
         return " ".join(self.tokens)
 
 
+# Placeholders a ``[[conflicts.scope]]`` label may hold, expanded for each document the rule
+# matches: ``{path}`` gives every document its own scope, ``{dir}`` every folder.
+LABEL_PLACEHOLDERS = ("path", "dir")
+_PLACEHOLDER = re.compile(r"\{(" + "|".join(LABEL_PLACEHOLDERS) + r")\}")
+_ANY_PLACEHOLDER = re.compile(r"\{([A-Za-z_]\w*)\}")
+
+
 @dataclass
 class ScopeRule:
     pattern: str
     status: str | None = None
-    label: str | None = None
+    label: str | None = None  # may hold {path} or {dir}: see label_for
 
     def applies(self, path: str) -> bool:
         return fnmatch.fnmatch(path, self.pattern) or fnmatch.fnmatch(path, self.pattern.rstrip("/") + "/*")
+
+    def label_for(self, path: str) -> str | None:
+        """The label this rule gives the document at ``path``.
+
+        A label with a placeholder is expanded per document: ``label = "{path}"`` puts every
+        matching document in a scope of its own. Two session notes, one recording a decision
+        and a later one its reversal, then differ by scope (*scoped*), while two statements in
+        one note still share a scope and are compared. Only the template is part of the
+        detector's fingerprint, so adding a document under the rule re-judges its claims alone."""
+        if not self.label:
+            return None
+        values = {"path": path, "dir": str(PurePosixPath(path).parent)}
+        return _PLACEHOLDER.sub(lambda m: values[m.group(1)], self.label)
 
 
 def _stem(tok: str) -> str:
@@ -263,8 +283,9 @@ def scope_of(sentence: str, heading: str, path: str, rules: list[ScopeRule] | No
         if r.applies(path):
             if r.status:
                 status = r.status
-            if r.label:
-                time.add(r.label.lower())
+            label = r.label_for(path)
+            if label:
+                time.add(label.lower())
     time -= {"legacy", "deprecated", "archived", "archive", "history", "historical", "changelog", "release notes"}
     return Scope(status, frozenset(time), frozenset(env))
 
@@ -477,7 +498,8 @@ def _judge(key: str, members: list[tuple[Parsed, str]], readable: str, why: str)
     return Finding(fid, "scoped", readable, f"{why} ({'; '.join(labels)})", _values(members))
 
 
-DETECTOR_VERSION = "conflicts/7"  # bump on any change to parsing, scope or judging: stores re-judge everything
+DETECTOR_VERSION = "conflicts/8"  # bump on any change to parsing, scope or judging: stores re-judge everything
+# 8: {path} and {dir} in a [[conflicts.scope]] label are expanded per document
 
 # One index row per comparable key of a claim occurrence:
 # (key, claim_id, passage_id, value, polarity, scope_json, path, heading, sentence)
@@ -574,12 +596,21 @@ def rules_from_config(table: dict[str, Any] | None) -> tuple[list[ScopeRule], di
     """``[conflicts]`` in dakc.toml -> (scope rules, accepted conflict id -> reason)."""
     table = table or {}
     rules = [ScopeRule(r["path"], r.get("status"), r.get("label")) for r in table.get("scope", []) if r.get("path")]
+    for r in rules:
+        unknown = sorted({m for m in _ANY_PLACEHOLDER.findall(r.label or "") if m not in LABEL_PLACEHOLDERS})
+        if unknown:
+            raise ValueError(f"[[conflicts.scope]] path = {r.pattern!r}: unknown placeholder "
+                             f"{', '.join('{' + u + '}' for u in unknown)} in label {r.label!r}; "
+                             f"use {' or '.join('{' + p + '}' for p in LABEL_PLACEHOLDERS)}")
     accepted = {a["id"]: a.get("reason", "") for a in table.get("accept", []) if a.get("id")}
     return rules, accepted
 
 
 def fingerprint(rules: list[ScopeRule], aliases: dict[str, str] | None = None) -> str:
-    """Changes whenever the detector, the scope rules or the aliases change: the index is then rebuilt."""
+    """Changes whenever the detector, the scope rules or the aliases change: the index is then rebuilt.
+
+    A rule enters as written: a per-document label (``{path}``) is hashed as the template, not
+    as its expansions, so adding or removing a document never re-judges everything."""
     from dakc.hashing import h_obj
 
     return h_obj([DETECTOR_VERSION, [(r.pattern, r.status, r.label) for r in rules], sorted((aliases or {}).items())])

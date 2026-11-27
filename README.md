@@ -442,6 +442,18 @@ id = "cfl:0123456789"
 reason = "two clusters, two ports"
 ```
 
+Notes written one per session or meeting are each their own scope with a
+per-document label. A note that records a decision and a later note that
+reverses it are then *scoped*, not a conflict. Two statements in one note are
+still compared, and a note against a current document is judged as before:
+
+```toml
+[[conflicts.scope]]
+path = "sessions/**"
+status = "past"
+label = "{path}"           # "{dir}": one scope per folder
+```
+
 **The rules are precise but narrow.** They raised no false alarm on
 FastAPI's documentation (0 findings over 11,067 claims) or on 55 labelled
 pairs that are scoped or compatible. But they compare only statements of the

@@ -52,6 +52,16 @@ def test_public_surface():
         assert issubclass(err, dakc.DakcError)
 
 
+def test_split_sentences_is_public_and_is_the_splitter_dakc_uses():
+    from dakc.claims import split_sentences as from_claims
+
+    assert "split_sentences" in dakc.__all__
+    assert dakc.split_sentences is from_claims  # one splitter: evidence indices and refs agree with it
+    assert dakc.split_sentences("Redis is fast. It holds sessions! Is it safe? yes, mostly.") == [
+        "Redis is fast.", "It holds sessions!", "Is it safe? yes, mostly."]
+    assert "since 0.8" in dakc.split_sentences.__doc__ and "PARSER" in dakc.split_sentences.__doc__
+
+
 def test_open_requires_a_workspace(tmp_path):
     with pytest.raises(dakc.WorkspaceNotFound, match="dakc.toml"):
         dakc.open(tmp_path)

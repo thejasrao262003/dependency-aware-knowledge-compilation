@@ -14,13 +14,17 @@ Notes for current models:
   response is valid JSON.
 * Server-side refusal fallbacks are enabled by default (``fallbacks="default"``);
   a request the whole chain refuses raises :class:`ProviderError`.
+* The SDK retries rate limits, server errors and dropped connections itself. What
+  still fails is raised as :class:`ProviderError`, with ``transient`` set for a rate
+  limit, a server error, a timeout or a connection failure.
 """
 
 from __future__ import annotations
 
 import os
+import sys
 
-from dakc.providers.llm import Completion, ProviderError
+from dakc.providers.llm import Completion, ProviderError, is_transient_status
 
 DEFAULT_MODEL = "claude-opus-5-5"
 FALLBACK_BETA = "server-side-fallback-2026-07-01"
@@ -68,10 +72,16 @@ class AnthropicClient:
         if output_config:
             kwargs["output_config"] = output_config
 
-        if self.fallbacks and self.model.startswith(FALLBACK_MODELS):
-            response = self.client.beta.messages.create(betas=[FALLBACK_BETA], fallbacks="default", **kwargs)
-        else:
-            response = self.client.messages.create(**kwargs)
+        try:
+            if self.fallbacks and self.model.startswith(FALLBACK_MODELS):
+                response = self.client.beta.messages.create(betas=[FALLBACK_BETA], fallbacks="default", **kwargs)
+            else:
+                response = self.client.messages.create(**kwargs)
+        except Exception as exc:
+            transient = _transient(exc)
+            if transient is None:
+                raise  # not an API error (a bug, an interrupted process): let it show as it is
+            raise ProviderError(f"Claude API call failed: {str(exc)[:300]}", transient=transient) from exc
 
         if response.stop_reason == "refusal":
             category = getattr(getattr(response, "stop_details", None), "category", None)
@@ -80,3 +90,17 @@ class AnthropicClient:
             raise ProviderError("response truncated at max_tokens; raise max_tokens in dakc.toml")
         text = "".join(block.text for block in response.content if block.type == "text")
         return Completion(text, response.usage.input_tokens, response.usage.output_tokens)
+
+
+def _transient(exc: BaseException) -> bool | None:
+    """Whether an exception of the ``anthropic`` SDK is worth retrying later, or None
+    when it is not an SDK API error. The SDK has already retried what it could."""
+    sdk = sys.modules.get("anthropic")  # imported by whoever built the SDK client
+    connection, status, api = (getattr(sdk, n, ()) for n in ("APIConnectionError", "APIStatusError", "APIError"))
+    if isinstance(exc, connection):  # includes APITimeoutError
+        return True
+    if isinstance(exc, status):
+        return is_transient_status(int(exc.status_code))
+    if isinstance(exc, api):  # e.g. a response that does not match the SDK's types
+        return False
+    return None

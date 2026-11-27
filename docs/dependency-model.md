@@ -15,7 +15,7 @@ detection, as a check on that invariant.
 | Layer | Kind | Identity | Content | Depends on |
 |---|---|---|---|---|
 | 0 | `source` | `src:<slug of first-seen path>`, kept across renames | path, raw-bytes hash, extracted-text hash, type | (input) |
-| 1 | `passage` | `psg:` + H(source id, normalized text hash, occurrence #) | normalized text of one block (paragraph, list item, PDF block…) | its source |
+| 1 | `passage` | `psg:` + H(source id, normalized text hash, occurrence #) | normalized text of one block (paragraph, list item, PDF block…); as metadata, the comments written after each sentence (`refs`) | its source |
 | 2 | `claim` | `clm:` + H(normalized claim text) | canonical text + sorted entity mentions | every passage that yields it (its **support set**) |
 | 3 | `entity` | `ent:` + normalized key (after alias map) | display name + sorted claim ids | claims that mention it |
 | 3 | `relationship` | `rel:<a>--<b>` (a < b) | sorted ids of claims in which a and b co-occur | those claims |
@@ -256,9 +256,37 @@ Each claim support records `(passage, surface text, mentions, evidence
 sentence indices)`. `dakc trace PAGE` maps every displayed sentence to the
 claims it cites (`[^Cn]`), and every claim to the exact evidence sentences, the
 passage, the source path, and the source version (content hash and the
-build that registered it). Under `provenance = "strict"`, rendering keeps only
+build that registered it). Each evidence sentence also carries the HTML
+comments written after it in the source (`refs`, see below). Under `provenance = "strict"`, rendering keeps only
 sentences that cite one of the page's own claims. Removed sentences stay in
 the page record as an audit list, and switching modes needs no LLM calls.
+
+## Comments after a sentence: metadata outside every hash
+
+In Markdown paragraphs and list items, an HTML comment written after a
+sentence is kept on the passage as that sentence's `refs`:
+
+```markdown
+- The refresh endpoint takes a per-user Redis lock with a 5-second TTL. <!-- t:3f9a12c4 -->
+```
+
+gives the passage text `The refresh endpoint ... 5-second TTL.` and the refs
+`[["t:3f9a12c4"]]`, one list per sentence of `split_sentences(text)`. A
+comment belongs to the sentence its preceding text ends in. Comments in
+headings and table cells are dropped, and a line that starts with `<!--` is an
+HTML block in CommonMark, whose text DAKC does not read.
+
+Refs are not text. They are outside the passage id, the text hash, the
+extraction cache key and the sentence keys, and no claim, page or summary is
+built from them; `trace` and `read` load them from the passage. So:
+
+| Change | Work |
+|---|---|
+| A comment added, rewritten, moved or removed | the passage's new version (`passage_refs_changed`); zero provider calls, no page re-rendered |
+| A sentence edited next to its comment | as any sentence edit: only that sentence is re-extracted (sentence reuse) |
+
+The source itself still counts as modified (its bytes changed), so it is
+re-parsed. That is the only cost. See ADR-29.
 
 ## Dry-run precision
 

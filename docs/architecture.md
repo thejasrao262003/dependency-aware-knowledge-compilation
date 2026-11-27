@@ -47,7 +47,7 @@ inputs. A Markdown "wiki" directory is a projection of that store.
 | Module | Responsibility |
 |---|---|
 | `hashing` | BLAKE3 helpers, canonical JSON, text normalization, id derivation. |
-| `parsing` | Format detection and text-block extraction (Markdown via markdown-it-py, HTML via BeautifulSoup, PDF via PyMuPDF, JSON, TXT). |
+| `parsing` | Format detection and text-block extraction (Markdown via markdown-it-py, HTML via BeautifulSoup, PDF via PyMuPDF, JSON, TXT); sentence splitting (`split_sentences`); the comments after each Markdown sentence, kept as passage metadata. |
 | `sources` | Source connectors (RFC 0001): the connector protocol, the filesystem connector, and `SourceSet`, which lists every configured source into one prefixed namespace and classifies changes (native-key matching, rename pairing within a source). Plugin loading. |
 | `ingestion` | Source records, file discovery, and the scan result the compiler consumes. |
 | `publishers` | Publishers (RFC 0001): the publication ledger, resumable batches, records, and the built-in `jsonl` change feed. |

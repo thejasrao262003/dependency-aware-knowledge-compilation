@@ -508,6 +508,49 @@ details, so they should not be inside it.
   claims, pages and summaries, which is a compiler concern (RFC 0001,
   phase 3).
 
+## ADR-29: Comments after a sentence are passage metadata, outside every hash
+
+**Decision.** In Markdown paragraphs and list items, the HTML comments written
+after a sentence (`... TTL. <!-- t:3f9a12c4 -->`) are kept as that sentence's
+`refs` on the passage (one list per sentence of `split_sentences`). They are
+not part of the passage text, so they are outside the passage id, the text
+hash, the extraction cache key and the sentence keys of ADR-17. `trace`
+returns them with each evidence sentence, and `read` with each claim support.
+A comment-only edit keeps every passage id; the compiler writes the passages
+whose refs changed (`passage_refs_changed`), the same in-place path a heading
+change takes, and nothing else.
+
+**Why.** Reckon writes session notes whose sentences end with receipts: the
+conversation turn, or the source and turn, that a sentence came from. They
+must reach whoever traces a fact back to its source, but they are not
+knowledge. If they were text, rewriting a receipt would re-extract its
+passage and, with an LLM, reword its claims and regenerate their pages.
+
+- **On the passage, not the claim.** A claim is shared by every passage that
+  states it, and its id is its text. A sentence's comments belong to that
+  sentence in that document, which is exactly what a passage holds. Putting
+  them on claim supports would make a comment edit touch claims, and then
+  every page signature built from them.
+- **Read at query time.** No signature includes refs, because no artifact
+  above the passage is built from them. `trace` and `read` load them from the
+  current passage, so they are always current without re-rendering anything:
+  cheaper than the "re-render citations only" path, which still rewrites
+  pages.
+- **Versioned.** Filling refs changes the parser's output, so `PARSER` is
+  `parse/4`. Upgrading re-parses every source once; passages with comments
+  get a new version, and nothing is extracted or rendered.
+  `canonical_state` compares refs, so `verify --against-full` and the
+  regression suite check them like any other content.
+
+**Rejected.**
+- *Keeping comments in the text.* Free to implement, but every receipt edit
+  would cost an extraction call and could change claims and pages.
+- *A separate refs artifact or table.* One more kind to version, diff, roll
+  back and publish, for data that is one-to-one with a passage.
+- *Inline HTML other than comments, and comments in headings and table
+  cells.* Not kept: no producer needs them, and a table row's text is built
+  from several cells, so the sentence a comment ends is not well defined.
+
 ## Libraries reused rather than reimplemented
 
 | Need | Library |

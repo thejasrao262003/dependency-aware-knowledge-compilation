@@ -44,9 +44,9 @@ dakc mcp --workspace ... --transport streamable-http        # HTTP on 127.0.0.1:
 | `status` | read-only | HEAD, counts, whether sources changed, stale artifacts per kind |
 | `check_sources` | read-only | new / modified / deleted / renamed documents |
 | `list_artifacts` | read-only | artifacts by kind (default `page`) and title substring |
-| `read_artifact` | read-only | rendered Markdown of a page, summary or the index, with `[^Cn]` citation markers, or the text of a claim or passage; `max_chars` truncates |
+| `read_artifact` | read-only | rendered Markdown of a page, summary or the index, with `[^Cn]` citation markers, or the text of a claim or passage; a claim's `metadata.supports` carry the `refs` of their evidence sentences; `max_chars` truncates |
 | `explain` | read-only | dependencies, dependents, upstream sources, VALID / STALE with reasons |
-| `trace` | read-only | each page sentence, the claims it cites, and each claim's source document, version and evidence sentences |
+| `trace` | read-only | each page sentence, the claims it cites, and each claim's source document, version and evidence sentences, each with the HTML comments written after it in the source (`refs`) |
 | `downstream` | read-only | everything an edit to a document would invalidate |
 | `graph_stats` | read-only | artifact and edge counts |
 | `builds` | read-only | build history with LLM calls and operation counts |

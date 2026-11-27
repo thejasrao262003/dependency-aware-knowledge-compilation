@@ -211,10 +211,14 @@ with dakc.open("demo") as kb:                 # a directory holding dakc.toml
 ```
 
 Module functions: `dakc.open(path)`, `dakc.init(path, source_dir=...)`,
-`dakc.ingest(directory, workspace)`. `KnowledgeBase` methods: `status`,
+`dakc.ingest(directory, workspace)`, and `dakc.split_sentences(text)`, the
+splitter whose indices claim evidence uses. `KnowledgeBase` methods: `status`,
 `check`, `plan`, `compile`, `artifacts`, `read`, `explain`, `trace`,
 `downstream`, `graph_stats`, `export_graph`, `builds`, `diff`, `duplicates`,
 `verify`, `rollback`, `sources`, `publish`. Every result is a dataclass with `to_dict()`.
+In Markdown, an HTML comment written after a sentence (`... TTL. <!-- t:3f9a12c4 -->`)
+is kept as that sentence's metadata: `trace` and `read` return it as `refs` with
+each evidence sentence, and editing it costs nothing to compile.
 
 Errors derive from `dakc.DakcError`: `WorkspaceNotFound`, `ArtifactNotFound`,
 `InvalidArgument`, `BuildLocked`, `CompileFailed` (with `.preserved`: HEAD
@@ -542,6 +546,7 @@ including deletion semantics and dry-run precision, is in
 |---|---|
 | One sentence edited | Only that sentence is sent to the extractor, with its paragraph as context. Claims of unchanged sentences are reused verbatim, so their pages are untouched even when an LLM would have reworded them. A sentence whose pronoun refers to the edited one is re-extracted too. |
 | Sentence deleted or paragraphs reordered | Zero extraction calls; claims of the deleted sentence are retracted. |
+| Only a comment after a sentence changed (`<!-- t:3f9a12c4 -->`) | Zero provider calls, no page touched. Comments are passage metadata outside every hash: only the passage gets a new version, and `trace` shows the new comment. |
 | Source deleted | Remove its passages from claims' support sets. Retract claims left unsupported. Pages whose claims survive elsewhere are only re-rendered (citations). |
 | Source renamed | Same source id, **zero** LLM calls; citations re-rendered. |
 | Duplicate document added | Extraction-cache hit, **zero** extraction calls. |

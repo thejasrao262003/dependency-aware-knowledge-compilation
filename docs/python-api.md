@@ -26,7 +26,7 @@ Instances are cheap to open.
 | `status()` | `Status` | `head`, `counts`, `up_to_date`, `source_changes`, `stale` (artifacts per kind downstream of changed sources), `conflicts_open`, and `outdated`: reasons a compile has work besides source changes (DAKC's logic, the configuration, the conflict scope rules or the provider changed since HEAD, or the conflict verifier has pairs left to judge). `up_to_date` is true only when there are neither. |
 | `check(root=None)` | `SourceChanges` | new / modified / deleted / renamed / unchanged, by content hash |
 | `plan(full=False)` | `BuildReport` | Dry run. Nothing is written or spent. `has_work()` and `llm_calls()` tell you whether a compile is needed and what it costs. Exact for free providers. For LLM providers, extraction calls are exact and page and summary counts are an estimate (`report.exact` is false). |
-| `compile(full=False, wait=0.0)` | `BuildReport` | Takes the build lock, commits atomically, updates the wiki files, then runs the configured publishers. `report.publications` has one result per publisher; a failing publisher does not fail the build. Raises `BuildLocked` or `CompileFailed`. |
+| `compile(full=False, wait=0.0)` | `BuildReport` | Takes the build lock, commits atomically, updates the wiki files, then runs the configured publishers. `report.publications` has one result per publisher; a failing publisher does not fail the build. `report.projection` counts the wiki file operations (see [Wiki files](#wiki-files)). Raises `BuildLocked` or `CompileFailed`. |
 | `artifacts(kind=None, query=None, limit=100)` | `list[ArtifactSummary]` | Ordered by layer, then id. `query` is a case-insensitive substring of the title, or of the full text for claims and passages |
 | `read(artifact)` | `ArtifactContent` | Rendered Markdown for pages, summaries and the index. Text for claims and passages. For a source document, its current text on disk, with `metadata['changed_since_build']`. |
 | `explain(artifact)` | `Explanation` | Dependencies, dependents, upstream sources, signatures, history, `VALID` / `STALE` / `DELETED` with reasons. `STALE` means a source upstream changed. That is an upper bound: `plan()` shows whether the artifact actually changes. |
@@ -41,8 +41,8 @@ Instances are cheap to open.
 | `linked_from(path)` | `list[dict]` | Every link in another document that points at `path`, working or not: who a rename of it, or of its headings, affects. |
 | `conflicts(scoped=False, accepted=False)` | `list[Conflict]` | Open conflicts between sources at HEAD (RFC 0002): `kind` is `conflict` (found by the rules) or `possible` (judged by the optional verifier). `scoped=True` adds differences explained by time, release, environment or status. `accepted=True` adds those accepted in `dakc.toml`. Advisory: nothing is changed. |
 | `conflict(id)` | `Conflict` | One finding: each value with its `locations` (path, `line` in the source on disk, heading, scope, claim and the source's own `evidence` sentence), and `affected` pages and summaries. `id` is `cfl:…`, a unique prefix, or `conflict:…`. |
-| `verify(against_full=False, allow_cost=False)` | `VerifyReport` | Invariants. `against_full` also compares with a full rebuild; with an LLM provider it needs `allow_cost=True` (`CostNotAllowed` otherwise). |
-| `rollback(to=None, wait=0.0)` | `RollbackResult` | Takes the build lock. Destructive: later artifact versions are discarded, though their build records remain. Publishers are brought back too (`.publications`). |
+| `verify(against_full=False, allow_cost=False)` | `VerifyReport` | Invariants. `against_full` also compares with a full rebuild; with an LLM provider it needs `allow_cost=True` (`CostNotAllowed` otherwise). The check `wiki files match the store` reads every wiki file and lists drifted ones (`metrics['wiki_files_drifted']`) without repairing them. |
+| `rollback(to=None, wait=0.0)` | `RollbackResult` | Takes the build lock. Destructive: later artifact versions are discarded, though their build records remain. Publishers are brought back too (`.publications`), and the wiki is repaired like a compile's (`.projection`). |
 | `sources()` | `list[SourceInfo]` | The configured sources: name, type, path prefix, location, capabilities, documents at HEAD |
 | `publish(name=None, dry_run=False, reset=False, wait=0.0)` | `list[PublishResult]` | Sends each publisher what its ledger has not acknowledged. `dry_run` only counts; `reset` sends everything again. A failure is returned (`.error`, `.pending`), not raised. |
 
@@ -59,6 +59,29 @@ Every result has `to_dict()`, which returns JSON-safe data. That is what
 `--json`, the REST API and the MCP tools emit. `Downstream.to_dict` and
 `BuildDiff.to_dict` take a `limit`.
 
+## Wiki files
+
+The wiki (`output_dir`, `wiki/` by default) is build output. Each compile
+brings it in line with HEAD, and so does a no-change compile, a failed
+compile and a rollback. `projection` (on `BuildReport`, `RollbackResult` and
+`CompileFailed`) has:
+
+| Key | Meaning |
+|---|---|
+| `written` | files written because their page, summary or index changed |
+| `repaired` | files restored because they were edited or deleted by hand although their artifact did not change |
+| `repaired_paths` | those files, sorted, relative to the wiki directory (`pages/jsonb.md`) |
+| `deleted` | files removed because their artifact no longer exists |
+| `unchanged` | files left as they were |
+
+`written + repaired + unchanged` is the number of wiki files. A file is read
+only when its size or mtime differs from what DAKC recorded when it last wrote
+or checked it, so a repair pass over an unchanged wiki costs one `stat` per
+file. Only files listed in `.dakc/projection.json` (the files DAKC wrote) are
+repaired or deleted; your own files in the wiki directory are left alone. To
+change a page, change its sources: a hand edit is overwritten by the next
+compile.
+
 ## Errors
 
 All errors derive from `dakc.DakcError`. Each one also derives from the
@@ -70,7 +93,7 @@ matching built-in, so existing `except` clauses keep working.
 | `ArtifactNotFound` | `LookupError` | no artifact or source matches |
 | `InvalidArgument` | `ValueError` | unknown strategy, kind or format; `trace` on something that is not a page or claim; a missing build |
 | `BuildLocked` | `RuntimeError` | another process is compiling or rolling back (pass `wait=` to queue) |
-| `CompileFailed` | `RuntimeError` | a build failed. Nothing was committed. `.preserved` is True when HEAD still points at the previous build, and `.head` is that build. |
+| `CompileFailed` | `RuntimeError` | a build failed. Nothing was committed. `.preserved` is True when HEAD still points at the previous build, and `.head` is that build. The wiki is repaired to HEAD; `.projection` has its file operations, or is None if the repair itself could not run (the next compile does it). |
 | `CostNotAllowed` | `PermissionError` | a full-rebuild comparison with a paid provider without `allow_cost=True` |
 | `RollbackError` | `ValueError` | the target is not a committed build, or is already HEAD |
 | `SourceError` | `RuntimeError` | a source is misconfigured, could not be listed or read, or its plugin could not be loaded. During a compile it surfaces as `CompileFailed` and nothing is committed. |

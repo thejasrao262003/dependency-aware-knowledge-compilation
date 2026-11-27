@@ -216,10 +216,14 @@ Module functions: `dakc.open(path)`, `dakc.init(path, source_dir=...)`,
 `downstream`, `graph_stats`, `export_graph`, `builds`, `diff`, `duplicates`,
 `verify`, `rollback`, `sources`, `publish`. Every result is a dataclass with `to_dict()`.
 
+`report.projection` counts the wiki files `written`, `deleted`, `unchanged`
+and `repaired` (edited or deleted by hand, and restored), with the
+`repaired_paths`.
+
 Errors derive from `dakc.DakcError`: `WorkspaceNotFound`, `ArtifactNotFound`,
 `InvalidArgument`, `BuildLocked`, `CompileFailed` (with `.preserved`: HEAD
-still points at the previous build), `CostNotAllowed`, `RollbackError`,
-`SourceError` and `PublishError`.
+still points at the previous build, and `.projection`: the wiki repaired to
+it), `CostNotAllowed`, `RollbackError`, `SourceError` and `PublishError`.
 `compile` and `rollback` hold the workspace build lock. Read methods never take
 it and see a consistent snapshot while a build runs. A `KnowledgeBase` holds
 one SQLite connection, so use one per thread. Details are in
@@ -529,6 +533,7 @@ broken  gateway.md:3  [Redis setup](caching.md#redis-setup)
 | Contradictions | Conflicting claims are both kept, each with its own sources; deleting a source retracts exactly the claims it alone supported. Conflicts are flagged, never resolved, and the incremental findings equal a detection from scratch | `tests/integration/test_contradictions.py`, `tests/integration/test_conflicts.py`; `dakc verify`; benchmark scenario S9 |
 | Claim identity | Exact after normalization (never merged by similarity); paraphrases are only *reported* | `benchmarks/equivalence.py` (precision/recall incl. hard negatives) |
 | Failures and crashes | All-or-nothing commit; the extraction cache survives for retries; rollback to any earlier committed build | failure-injection and process-kill tests |
+| Wiki files | The wiki is build output. Every compile, including a no-change or failed one, restores files edited or deleted by hand from the store (reported as `repaired`). A file is read only when its size or mtime changed, so this costs one `stat` per file. Files DAKC did not write are never repaired or deleted | `tests/integration/test_projection_repair.py`; `dakc verify` reports drifted files without repairing them |
 
 ## How it decides what to rebuild
 
@@ -548,7 +553,8 @@ including deletion semantics and dry-run precision, is in
 | Entity aliases changed (`[aliases]` in `dakc.toml`) | Entity resolution re-runs deterministically; only pages whose membership changed are rebuilt. |
 | A fact about a hub entity, or a page in a large topic, changes | The hub page (more than 64 claims) and large topic summaries (more than 64 pages) are built in content-defined sections. Only the sections whose inputs changed are rewritten, then their parent. No prompt reads a whole hub or a whole large topic. |
 | Prompt or model changed | The provider fingerprint changes. Writer and summarizer changes invalidate exactly the pages and summaries they built. An extractor change re-extracts every passage, because each passage records which extractor produced its claims. Pages are regenerated only where the re-extracted claims differ. |
-| Build fails (provider error, crash, injected fault) | Nothing is committed. HEAD and the wiki are unchanged; paid extraction results are cached for the retry. |
+| Build fails (provider error, crash, injected fault) | Nothing is committed. HEAD is unchanged, and the wiki is repaired to HEAD (hand-edited or deleted files are restored) by the failed compile, or by the next one after a crash; paid extraction results are cached for the retry. |
+| A wiki file is edited or deleted by hand | The next compile restores it from the store, even when nothing else changed. Zero provider calls. |
 
 ## Providers
 

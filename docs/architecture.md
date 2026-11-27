@@ -106,6 +106,21 @@ output directory.
    (temp file + `os.replace`), delete removed ones and record the projected
    build. A projection interrupted after commit is detected and repaired on
    the next run, because it is a pure function of the store.
+   - **Repair.** Every compile also restores wiki files that were edited or
+     deleted by hand although their artifact did not change. That includes a
+     no-change build and a failed one: a failed build keeps HEAD, and the wiki
+     is repaired to HEAD. Repaired paths are reported apart from written ones
+     (`projection.repaired`, `projection.repaired_paths`); `dakc verify`
+     reports such drift without repairing it.
+   - **Cost.** The manifest (`.dakc/projection.json`) records each file's text
+     hash, and its size and `mtime_ns` when DAKC last wrote or checked it. A
+     file is read and hashed only when its stat differs, so an unchanged
+     wiki costs one `stat` per file. As in git's racy-index rule, a recorded
+     stat is trusted only when it is older than the manifest, so an edit made
+     in the same timestamp tick as DAKC's write is still found.
+   - **Ownership.** Only files the manifest lists are ever repaired or
+     deleted. Other files in `wiki/` are left alone (a new page whose path is
+     already taken by such a file still overwrites it, as it always has).
 6. **Publish**: each configured publisher receives the difference between
    the current state and its ledger, in batches recorded after each
    succeeds. A failing target leaves the rest pending for the next run, and

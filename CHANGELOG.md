@@ -1,6 +1,6 @@
 # Changelog
 
-## v0.8.0 (unreleased): receipts, history, a self-repairing wiki and a public client factory
+## v0.8.0: receipts, history, a self-repairing wiki and a public client factory
 
 ### Added
 

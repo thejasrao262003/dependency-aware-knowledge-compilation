@@ -347,7 +347,7 @@ wheels = [
 
 [[package]]
 name = "dakc"
-version = "0.8.0.dev0"
+version = "0.8.0"
 source = { editable = "." }
 dependencies = [
     { name = "beautifulsoup4" },

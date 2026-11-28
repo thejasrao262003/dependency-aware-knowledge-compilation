@@ -328,7 +328,7 @@ the change does to the knowledge base: facts added and retracted, pages
 affected, and the LLM calls and cost of applying it. It never calls a model.
 
 ```yaml
-- uses: thejasrao262003/dependency-aware-knowledge-compilation@v0.7.0
+- uses: thejasrao262003/dependency-aware-knowledge-compilation@v0.8.0
   with:
     workspace: .
 ```

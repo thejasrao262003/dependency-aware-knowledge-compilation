@@ -56,7 +56,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0     # the base commit must be available
-      - uses: thejasrao262003/dependency-aware-knowledge-compilation@v0.7.0
+      - uses: thejasrao262003/dependency-aware-knowledge-compilation@v0.8.0
         with:
           workspace: .       # the directory holding dakc.toml
           price: |           # optional: adds a dollar estimate per model
